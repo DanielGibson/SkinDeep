@@ -1186,7 +1186,7 @@ void idAnim::CallFrameCommands( idEntity *ent, int from, int to, int animChannel
 							idleSmoke->SetAxis(axis);
 							idleSmoke->BindToJoint(ent, jointNum, true);
 							idleSmoke->PostEventMS(&EV_Remove, 8000); //Delete particle effect after XX seconds.
-							idleSmoke->PostEventMS(&EV_Activate, 0, NULL);
+							idleSmoke->PostEventMS(&EV_Activate, 0, (const idEntity*)NULL);
 
 							//gameRenderWorld->DebugArrowSimple(offset);
 						}

@@ -6377,7 +6377,7 @@ idEntity* idGameLocal::DoParticleAng(const char* particleName, idVec3 position, 
 			idleSmoke->PostEventMS(&EV_Remove, 5000);
 		}
 
-		idleSmoke->PostEventMS(&EV_Activate, 0, NULL);
+		idleSmoke->PostEventMS(&EV_Activate, 0, (const idEntity*)NULL);
 		return idleSmoke;
 	}
 
@@ -6412,7 +6412,7 @@ idEntity * idGameLocal::DoParticle(const char *particleName, idVec3 position, id
 			idleSmoke->PostEventMS(&EV_Remove, 5000);
 		}
 
-		idleSmoke->PostEventMS(&EV_Activate, 0, NULL);
+		idleSmoke->PostEventMS(&EV_Activate, 0, (const idEntity*)NULL);
 		return idleSmoke;
 	}
 
