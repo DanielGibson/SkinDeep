@@ -34,7 +34,7 @@ const float WORDBUBBLE_JIGGLEAMOUNT = .2f;
 const idEventDef EV_SetCallForHelp("setCallForHelp", "d");
 
 CLASS_DECLARATION(idEntity, idCatcage)
-	EVENT(EV_SetCallForHelp, Event_SetCallForHelp)
+	EVENT(EV_SetCallForHelp, idCatcage::Event_SetCallForHelp)
 END_CLASS
 
 
