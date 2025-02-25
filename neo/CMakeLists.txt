@@ -244,6 +244,8 @@ endif()
 		set(sys_libs ${sys_libs} dl)
 	endif()
 elseif(MSVC)
+	add_compile_options(/MP) # parallel build (use all cores, or as many as configured in VS)
+
 	add_compile_options(/W4)
 	add_compile_options(/wd4100) # unreferenced formal parameter
 	add_compile_options(/wd4127) # conditional expression is constant
@@ -277,6 +279,7 @@ if(WIN32)
 		iphlpapi
 		wsock32
 		ole32
+		dbghelp
 	)
 endif()
 
@@ -711,6 +714,8 @@ elseif(WIN32)
 		sys/win32/win_shared.cpp
 		sys/win32/win_syscon.cpp
 		sys/win32/SDL_win32_main.c
+		# used for zipping crashdumps on windows
+		framework/miniz/miniz.c
 	)
 
 	set(src_sys_core
