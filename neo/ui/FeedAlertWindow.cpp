@@ -719,7 +719,7 @@ void idFeedAlertWindow::Update()
 		float edgeFaded = (pushUpwards ? (curRect.y - fadeEdgeY) : ( rect.h() + fadeEdgeY - curRect.y) ) / curRect.h;
 		edgeFaded = idMath::ClampFloat(0.0f, 1.0f, edgeFaded );
 
-		float faded = idMath::ClampFloat(0.0f, 1.0f, min(fadeInInterp,fadeOutInterp) );
+		float faded = idMath::ClampFloat(0.0f, 1.0f, Min(fadeInInterp,fadeOutInterp) );
 		faded = Min(edgeFaded,faded);
 
 		// make sure fade is always moving in proper direction

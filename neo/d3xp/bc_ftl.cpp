@@ -757,7 +757,7 @@ void idFTL::DoCloseSequence()
 
 void idFTL::DoRepairTick(int amount)
 {
-	health = min(health + amount, maxHealth);
+	health = Min(health + amount, maxHealth);
 	UpdateHealthGUI();
 
 	if (health >= maxHealth)
@@ -846,10 +846,10 @@ void idFTL::UpdateHealthGUI()
 	else
 	{
 		//if health is not maxed, then clamp its value to 99 at most.
-		healthAdjusted = min(99, (int)(((float)health / maxHealth) * 100.0f));
+		healthAdjusted = Min(99, (int)(((float)health / maxHealth) * 100.0f));
 
 		if (health > 0)
-			healthAdjusted = max(1, health); //always show at LEAST 1% health if health is greater than zero.
+			healthAdjusted = Max(1, health); //always show at LEAST 1% health if health is greater than zero.
 		else
 			healthAdjusted = 0; //Clamp health to zero if health is less than or zero.
 	}

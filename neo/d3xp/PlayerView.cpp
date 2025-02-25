@@ -781,12 +781,12 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view ) 
 
 					if (player->viewAngles[0] > 0)
 					{
-						float lerp = min(player->viewAngles[0], 30) / 30.0f;
+						float lerp = Min(player->viewAngles[0], 30.0f) / 30.0f;
 						offsetY = idMath::Lerp(0, OVERLAY_OFFSET, lerp);
 					}
 					else
 					{
-						float lerp = max(player->viewAngles[0], -30) / 30.0f;
+						float lerp = Max(player->viewAngles[0], -30.0f) / 30.0f;
 						offsetY = idMath::Lerp(0, OVERLAY_OFFSET, lerp);
 					}
 

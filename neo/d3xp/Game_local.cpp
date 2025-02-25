@@ -7737,7 +7737,7 @@ void idGameLocal::AddSubtitle( idStr speakerName, idStr text, int durationMS)
 	if (subCount > 1)
 	{
 		idSubtitleItem& otherItem = GetSubtitleSlot(1);
-		newSub.expirationTime = max(newSub.expirationTime, otherItem.expirationTime + fadeTimeMS);
+		newSub.expirationTime = Max(newSub.expirationTime, otherItem.expirationTime + fadeTimeMS);
 	}
 
 	//gameLocal.GetLocalPlayer()->hud->SetStateString(va("subtitle%d_text", availableIdx), text);

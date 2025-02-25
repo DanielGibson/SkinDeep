@@ -468,14 +468,14 @@ void idHighlighter::InitializeArrows(highlightEntity_t hlEnt0, highlightEntity_t
 idVec2 idHighlighter::GetUpperBound(idBounds entBounds)
 {
 	idVec2 barPos = gameLocal.GetLocalPlayer()->GetWorldToScreen(entBounds[1]);
-	barPos.y = max(barPos.y, LETTERBOX_MINSIZE);
+	barPos.y = Max(barPos.y, (float)LETTERBOX_MINSIZE);
 	return barPos;
 }
 
 idVec2 idHighlighter::GetLowerBound(idBounds entBounds)
 {
 	idVec2 barPos = gameLocal.GetLocalPlayer()->GetWorldToScreen(entBounds[0]);
-	barPos.y = min(barPos.y, 480 - LETTERBOX_MINSIZE);
+	barPos.y = Min(barPos.y, float(480 - LETTERBOX_MINSIZE));
 	return barPos;
 }
 

@@ -725,7 +725,7 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity ) {
 
 		#define MAXSPEED_RICOCHET_CHANCE 2 //chooses number within this range (0 to RICOCHET_CHANCE - 1). 2 = 50% chance, 3 = 33% chance, 4 = 25% chance, etc.
 		if (gameLocal.random.RandomInt(MAXSPEED_RICOCHET_CHANCE))
-			physicsObj.SetLinearVelocity(reflectionAngle * max(RICOCHET_SPEED_THRESHOLD, (currentSpeed * .7f))); //Random chance that the bullet maintains minimum ricochet speed, so it continues bouncing...
+			physicsObj.SetLinearVelocity(reflectionAngle * Max(RICOCHET_SPEED_THRESHOLD, (currentSpeed * .7f))); //Random chance that the bullet maintains minimum ricochet speed, so it continues bouncing...
 		else
 			physicsObj.SetLinearVelocity(reflectionAngle * currentSpeed * .7f);
 
@@ -1399,7 +1399,7 @@ void idProjectile::Explode( const trace_t &collision, idEntity *ignore ) {
 
 
 		Show();
-		removeTime = min(removeTime, 3000); //BC max particle time
+		removeTime = Min(removeTime, 3000); //BC max particle time
 	}
 
 	// explosion light

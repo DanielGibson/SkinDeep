@@ -101,7 +101,7 @@ void idCat::Think(void)
 		idVec3 newcatPosition;
 		idVec3 adjustedTargetPosition = targetPosition + (targetMovedir * -CAT_RADIUS);
 
-		float lerp = min(1.0f, (gameLocal.time - stateTimer) / (float)CAT_MOVETIME);
+		float lerp = Min(1.0f, (gameLocal.time - stateTimer) / (float)CAT_MOVETIME);
 		lerp = idMath::CubicEaseOut(lerp);
 
 		if (lerp >= 1.0f)
@@ -132,7 +132,7 @@ void idCat::Think(void)
 	else if (catState == CAT_FAILSAFEJUMP)
 	{
 		idVec3 newcatPosition;
-		float lerp = min(1.0f, (gameLocal.time - stateTimer) / (float)CAT_MOVETIME);
+		float lerp = Min(1.0f, (gameLocal.time - stateTimer) / (float)CAT_MOVETIME);
 
 		if (lerp > 1)
 			lerp = 1;

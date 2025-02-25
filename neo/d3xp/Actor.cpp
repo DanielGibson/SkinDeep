@@ -3223,7 +3223,7 @@ void idActor::Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir,
 
 	int	damage = damageDef->GetInt("damage") * damageScale;
 	int originalDamageAmount = damage;
-	damage = max(damage, GetDamageForLocation(damage, location)); //BC this was meant to handle items that bop the head to not inflict damage; but this isn't working and needs to be fixed
+	damage = Max(damage, GetDamageForLocation(damage, location)); //BC this was meant to handle items that bop the head to not inflict damage; but this isn't working and needs to be fixed
 
 	// inform the attacker that they hit someone
 	attacker->DamageFeedback( this, inflictor, damage );

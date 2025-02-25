@@ -2133,7 +2133,7 @@ void idThread::Event_MakePropZoo()
 		if (idStr::Icmp(t1, t2))
 		{
 			xPosition = 0;
-			yPosition += max(ROW_GAPSIZE, longest_Y_length + 128);
+			yPosition += Max(ROW_GAPSIZE, longest_Y_length + 128);
 			longest_Y_length = 0;
 			lastPropName = t1;
 

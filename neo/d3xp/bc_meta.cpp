@@ -1576,7 +1576,7 @@ void idMeta::UpdateEscalationmeter()
 		if (amountWhoCanSeePlayer > 0 && (combatMetastate == COMBATSTATE_COMBAT || combatMetastate == COMBATSTATE_SEARCH))
 		{
 			//Increase the meter.
-			escalationmeterAmount = min(escalationmeterAmount + ESCALATIONMETER_INCREASEDELTA, ESCALATIONMETER_MAX);
+			escalationmeterAmount = Min(escalationmeterAmount + ESCALATIONMETER_INCREASEDELTA, ESCALATIONMETER_MAX);
 
 
 			//if (escalationmeterAmount >= ESCALATIONMETER_MAX)
@@ -1592,7 +1592,7 @@ void idMeta::UpdateEscalationmeter()
 		else if (combatMetastate == COMBATSTATE_IDLE && escalationmeterAmount > 0)
 		{
 			//De-escalate.
-			escalationmeterAmount = max(escalationmeterAmount - ESCALATIONMETER_DECREASEDELTA, 0);
+			escalationmeterAmount = Max(escalationmeterAmount - ESCALATIONMETER_DECREASEDELTA, 0);
 		}
 
 
@@ -2359,7 +2359,7 @@ void idMeta::Event_GetEscalationLevel()
 //This gets called AFTER each FTL jump.
 void idMeta::ResetEscalationLevel()
 {
-	escalationLevel = max(escalationLevel - ESCALATION_MAX, 0);
+	escalationLevel = Max(escalationLevel - ESCALATION_MAX, 0);
 	gameLocal.GetLocalPlayer()->hud->SetStateInt("escalationlevel", escalationLevel);
 
 	//Also, update the next hyperspace jump nav nodes.

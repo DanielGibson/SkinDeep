@@ -2198,7 +2198,7 @@ bool idInventory::CanGive( idPlayer *owner, const idDict &spawnArgs, const char 
 int idInventory::GetEmptyHotbarSlot()
 {
 	//iterate over all slots. Return the first free empty slot.
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, hotbarUnlockedSlots); i++)
 	{
 		if (hotbarSlots[i].weaponType <= 0)
 			return i;
@@ -2237,7 +2237,7 @@ bool idInventory::SetHotbarSlot(idPlayer *owner, int slotIndex, int weaponIndex,
 
 int idInventory::GetHotbarslotViaWeaponIndex(int weaponIndex)
 {
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, hotbarUnlockedSlots); i++)
 	{
 		if (hotbarSlots[i].weaponType == weaponIndex)
 			return i;
@@ -2248,7 +2248,7 @@ int idInventory::GetHotbarslotViaWeaponIndex(int weaponIndex)
 
 void idInventory::UpdateInventoryCollision(idEntity * changedEnt)
 {
-	for (int idx = 0; idx < min(MAX_HOTBARSLOTS, hotbarUnlockedSlots); idx++)
+	for (int idx = 0; idx < Min(MAX_HOTBARSLOTS, hotbarUnlockedSlots); idx++)
 	{
 		idEntity * curItem = hotbarSlots[idx].carryPtr.GetEntity();
 		if(curItem)
@@ -2279,7 +2279,7 @@ void idInventory::UpdateInventoryCollision(idEntity * changedEnt)
 
 void idInventory::SetHotbarSelection( int value )
 {
-	if(value >= 0 && value < min(MAX_HOTBARSLOTS, hotbarUnlockedSlots))
+	if(value >= 0 && value < Min(MAX_HOTBARSLOTS, hotbarUnlockedSlots))
 	{
 		hotbarCurrentlySelected = value;
 		UpdateInventoryCollision();
@@ -5524,7 +5524,7 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 
 	
 	float healthPercentage = float(health / float(maxHealth));
-	healthPercentage = min(healthPercentage, 1.0f);
+	healthPercentage = Min(healthPercentage, 1.0f);
 	_hud->SetStateFloat("player_healthpercent", healthPercentage);
 
 	_hud->SetStateInt( "player_health", health );
@@ -5537,7 +5537,7 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		_hud->SetStateInt("player_healthpips", 0);
 	else
 	{
-		int healthPips = max(1, (health / HEALTH_PER_HEALTHBARBLOCK));
+		int healthPips = Max(1, (health / HEALTH_PER_HEALTHBARBLOCK));
 		_hud->SetStateInt("player_healthpips", healthPips);
 	}
 
@@ -6474,7 +6474,7 @@ void idPlayer::DrawHUD( idUserInterface *_hud )
 
 				if (ammoPerMag > 0 && spawnArgs.GetBool(va("weapon%d_magdisplay", currentWeapon), "1"))
 				{
-					pipsToDraw = max(ceil((float)ammoInReserve / (float)ammoPerMag), 1); //Get the amount of mags to draw. At least one. Round up for any remaining ammo.
+					pipsToDraw = Max(ceil((float)ammoInReserve / (float)ammoPerMag), 1); //Get the amount of mags to draw. At least one. Round up for any remaining ammo.
 				}
 				else
 				{
@@ -6914,7 +6914,7 @@ void idPlayer::DrawZoomInspect()
 		//how large sprite is.
 		idVec3 viewRight, viewUp;
 		viewAngles.ToVectors(NULL, &viewRight, &viewUp);
-		zoominspect_size = max(zoominspect_size, ZOOMINSPECT_MINIMUMSIZE); //it looks weird if it gets too small. Enforce a minimum size.
+		zoominspect_size = Max(zoominspect_size, ZOOMINSPECT_MINIMUMSIZE); //it looks weird if it gets too small. Enforce a minimum size.
 		idVec2 sizePos = GetWorldToScreen(entityWorldPos + (viewRight * zoominspect_size) + (viewUp * zoominspect_size));
 		idVec2 spriteSize = idVec2(idMath::Fabs(sizePos.x - entScreenPos.x), idMath::Fabs(sizePos.y - entScreenPos.y));
 		
@@ -7683,12 +7683,12 @@ void idPlayer::DrawFrobHUD(int time)
 		if (screenCoords.x > rightmostPoint)
 			rightmostPoint = screenCoords.x;
 
-        promptPos.x = max(rightmostPoint, spriteScreenPos.x + 10);
+        promptPos.x = Max(rightmostPoint, spriteScreenPos.x + 10);
 
 		//If prompt gets pushed off screen right, then clamp its position.
 		if (promptPos.x > SCREEN_RIGHT_THRESHOLD)
 		{
-			promptPos.x = max(spriteScreenPos.x + 10, SCREEN_RIGHT_THRESHOLD);
+			promptPos.x = Max(spriteScreenPos.x + 10, (float)SCREEN_RIGHT_THRESHOLD);
 		}
 	}
 	else
@@ -8573,7 +8573,7 @@ void idPlayer::UpdateBeaconSignalLock()
 		{
 			//If we don't have LOS to the beacon, then just artifically "degrade" the signal strength, so the player can't input a code.
 			EnableBeaconUI();
-			signalStrength = min(signalStrength, BEACON_SIGNAL_STRENGTH_THRESHOLD - .022f);
+			signalStrength = Min(signalStrength, BEACON_SIGNAL_STRENGTH_THRESHOLD - .022f);
 		}
 
 		if (signalStrength < BEACON_SIGNAL_STRENGTH_THRESHOLD)
@@ -9047,7 +9047,7 @@ void idPlayer::DrawAutoAimUI(void)
 	if (autoaimDotState == AUTOAIMDOTSTATE_MOVING_TO_LOCK)
 	{
 		idVec2 dotScreenPos = GetWorldToScreen(autoaimPos);
-		float lerp = min(1.0f, (gameLocal.time - autoaimDotTimer) / (float)AUTOAIM_DOT_MOVETIME);
+		float lerp = Min(1.0f, (gameLocal.time - autoaimDotTimer) / (float)AUTOAIM_DOT_MOVETIME);
 		lerp = idMath::CubicEaseOut(lerp);
 
 		autoaimDotEndPos = dotScreenPos;
@@ -9064,7 +9064,7 @@ void idPlayer::DrawAutoAimUI(void)
 	}
 	else if (autoaimDotState == AUTOAIMDOTSTATE_LOCKED)
 	{
-		float lerp = min(1.0f, (gameLocal.time - autoaimDotTimer) / (float)AUTOAIM_DOT_FLASHTIME);
+		float lerp = Min(1.0f, (gameLocal.time - autoaimDotTimer) / (float)AUTOAIM_DOT_FLASHTIME);
 		idVec2 dotScreenPos = GetWorldToScreen(autoaimPos);
 		float dotDist;
 
@@ -9086,7 +9086,7 @@ void idPlayer::DrawAutoAimUI(void)
 	}
 	else if (autoaimDotState == AUTOAIMDOTSTATE_MOVING_TO_IDLE)
 	{
-		float lerp = min(1.0f, (gameLocal.time - autoaimDotTimer) / (float)AUTOAIM_DOT_MOVETIME_IDLE);
+		float lerp = Min(1.0f, (gameLocal.time - autoaimDotTimer) / (float)AUTOAIM_DOT_MOVETIME_IDLE);
 		lerp = idMath::CubicEaseOut(lerp);
 
 		autoaimDotPosition.Lerp(autoaimDotStartPos, autoaimDefaultPosition, lerp);
@@ -9645,7 +9645,7 @@ void idPlayer::GiveHealthGranular(int amount)
 	if (health >= adjustedMaxHealth)
 		return; //already maxed out.
 
-	health = min(health + amount, adjustedMaxHealth);
+	health = Min(health + amount, adjustedMaxHealth);
 	healthrechargeTimer = gameLocal.time + (cond_shrapnel > 0 ? HEALTH_RECHARGE_INITIALDELAY_SHRAPNELWOUND : HEALTH_RECHARGE_INITIALDELAY);
 	readyForHealthrechargeSound = true;
 }
@@ -9659,7 +9659,7 @@ void idPlayer::GiveBleedoutHealth(int amount)
 	if (health >= BLEEDOUT_HEALTHMAX)
 		return; //already maxed out.
 
-	health = min(health + amount, BLEEDOUT_HEALTHMAX);
+	health = Min(health + amount, BLEEDOUT_HEALTHMAX);
 	downedTickTimer = gameLocal.time + 300; //reset the bleedout tick timer so that the bleedout DOT doesn't interfere with this.
 
 	if (health >= BLEEDOUT_HEALTHMAX)
@@ -9939,7 +9939,7 @@ void idPlayer::Event_ClearInventory(void)
 	
 	ThrowCurrentWeapon();
 
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].carryPtr.IsValid())
 		{			
@@ -9980,7 +9980,7 @@ bool idPlayer::SelectHotbarslot(int slotIndex)
 
 	//Attempt to select the weapon in the hotbar slot.
 	int desiredWeapon = inventory.hotbarSlots[slotIndex].weaponType; //Get the weapon index that's in the slot.
-	desiredWeapon = max(desiredWeapon, 0);
+	desiredWeapon = Max(desiredWeapon, 0);
 	
 	if (desiredWeapon <= 0)
 	{
@@ -15796,7 +15796,7 @@ void idPlayer::SetCurrentHeartRate( void )
 
 			if (gameLocal.time > lastHeartAdjust)
 			{
-				targetHeartrate = min(lastTargetHeartRate + 100, targetHeartrate);
+				targetHeartrate = Min(lastTargetHeartRate + 100, targetHeartrate);
 				lastHeartAdjust = gameLocal.time + 2500;
 			}
 			else
@@ -21912,7 +21912,7 @@ void idPlayer::UpdateHealthbarAnimation(void)
 		//hud->SetStateInt("player_lasthealth", lastHealthValue);
 
 		float lastHealthPercent = float(lastHealthValue / float(maxHealth));
-		lastHealthPercent = min(lastHealthPercent, 1.0f);
+		lastHealthPercent = Min(lastHealthPercent, 1.0f);
 		hud->SetStateFloat("player_lasthealthpercent", lastHealthPercent);
 
 		lastHealthDisplayvalue = lastHealthValue;
@@ -21938,7 +21938,7 @@ void idPlayer::UpdateHealthbarAnimation(void)
 			//hud->SetStateInt("player_lasthealth", lastHealthDisplayvalue);
 
 			float lastHealthPercent = float(lastHealthDisplayvalue / float(maxHealth));
-			lastHealthPercent = min(lastHealthPercent, 1.0f);
+			lastHealthPercent = Min(lastHealthPercent, 1.0f);
 			hud->SetStateFloat("player_lasthealthpercent", lastHealthPercent);
 
 			lastHealthDisplayvalue -= .3f;
@@ -23241,7 +23241,7 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 		else
 		{
 			damage *= dmgScale;
-			damage = max(damage, 1);
+			damage = Max(damage, 1);
 		}
 
 
@@ -23619,7 +23619,7 @@ float idPlayer::CalcFov( bool honorZoom ) {
 	if (fovLerpState == FOVLERP_LERPING || fovLerpState == FOVLERP_LOCKED)
 	{
 		float newFov = DefaultFov() + fovLerpCurrent;
-		return max(newFov, 1);
+		return Max(newFov, 1.0f);
 	}
 
 	if ( influenceFov ) {
@@ -23847,7 +23847,7 @@ void idPlayer::CalculateViewWeaponPos( idVec3 &origin, idMat3 &axis ) {
 		idVec3 forward;
 		viewAngles.ToVectors(&forward, NULL, NULL);
 
-		float lerp = min(1.0f, 1.0f - ((carryableBashTimer - gameLocal.time) / (float)CARRYABLE_MELEE_ANIMATIONTIME));
+		float lerp = Min(1.0f, 1.0f - ((carryableBashTimer - gameLocal.time) / (float)CARRYABLE_MELEE_ANIMATIONTIME));
 		lerp = idMath::CubicEaseOut(lerp);
 
 		idVec3 bashTargetPosition = firstPersonViewOrigin + (forward * 8);
@@ -24610,7 +24610,7 @@ void idPlayer::CalculateRenderView( void ) {
 			float range;
 			float camHeight;
 
-			lerp = min(1, (gameLocal.time - deathTimer) / 3000.0f);
+			lerp = Min(1.0f, (gameLocal.time - deathTimer) / 3000.0f);
 			lerp = idMath::CubicEaseOut(lerp);
 		
 			range = idMath::Lerp(160, 70, lerp);
@@ -27215,7 +27215,7 @@ void idPlayer::StartHealState(int healstateIndex)
 			bloodbagMesh->SetShaderParm(5, -.05f); //fill bag full of blood.		
 			bloodbagHealthFXState = 0;
 
-			inventory.bloodbags = max(inventory.bloodbags - 1, 0);
+			inventory.bloodbags = Max(inventory.bloodbags - 1, 0);
 			
 
 			break;
@@ -29134,7 +29134,7 @@ void idPlayer::UpdateCarryableItem()
 	//Bash animation.
 	if (carryableBashActive)
 	{
-		float lerp = min(1.0f, 1.0f - ((carryableBashTimer - gameLocal.time) / (float)CARRYABLE_MELEE_ANIMATIONTIME));
+		float lerp = Min(1.0f, 1.0f - ((carryableBashTimer - gameLocal.time) / (float)CARRYABLE_MELEE_ANIMATIONTIME));
 		lerp = idMath::CubicEaseOut(lerp);
 		
 		idVec3 bashTargetPosition = firstPersonViewOrigin + (forward * 24);
@@ -29845,7 +29845,7 @@ void idPlayer::UpdateTrackedInteractions(renderEntity_s* renderEnt, idList<track
 			//player->SetLuminance(totalLuminance / 255.0f);
 
 			#define MAX_LUMINENCE 64.0f
-			player->SetLuminance(min(totalLuminance, MAX_LUMINENCE) / MAX_LUMINENCE); //BC Clamp luminance to the first half of values. Because at luminance MAX_LUMINENCE, the player is already very brightly-lit.
+			player->SetLuminance(Min(totalLuminance, MAX_LUMINENCE) / MAX_LUMINENCE); //BC Clamp luminance to the first half of values. Because at luminance MAX_LUMINENCE, the player is already very brightly-lit.
 																   //SW: Experimenting with clamping this further to the lower quarter of values -- I think it makes for a better range when designing for stealth
 		}
 	}
@@ -29919,12 +29919,12 @@ void idPlayer::SetLuminance(float lum)
 	//Crosshair gui for light value.
 	if (1)
 	{
-		//float crosshairLuminance = max(0, lum - LIGHTMETER_DARKTHRESHOLD);
+		//float crosshairLuminance = Max(0, lum - LIGHTMETER_DARKTHRESHOLD);
 		//crosshairLuminance = crosshairLuminance / (float)(1.0f - LIGHTMETER_DARKTHRESHOLD);
 		//crosshairLuminance = idMath::Lerp(.5f, 1, crosshairLuminance); //Clamp it because the UI looks weird when resized to really small values.
 		//cursor->SetStateFloat("lighthairvalue", crosshairLuminance);
 
-		float crosshairLuminance = max(0, lum - LIGHTMETER_DARKTHRESHOLD);
+		float crosshairLuminance = Max(0.0f, lum - LIGHTMETER_DARKTHRESHOLD);
 		crosshairLuminance = crosshairLuminance / (float)(1.0f - LIGHTMETER_DARKTHRESHOLD);
 		hud->SetStateFloat("lighthairvalue", crosshairLuminance);
 	}
@@ -29932,7 +29932,7 @@ void idPlayer::SetLuminance(float lum)
 	//Crosshair gui for darkness value.
 	if (1)
 	{
-		float crosshairLuminance = min(LIGHTMETER_DARKTHRESHOLD, lum);
+		float crosshairLuminance = Min(LIGHTMETER_DARKTHRESHOLD, lum);
 		crosshairLuminance = crosshairLuminance / (float)(LIGHTMETER_DARKTHRESHOLD);
 		crosshairLuminance = idMath::Lerp(0, 1, crosshairLuminance);
 		//cursor->SetStateFloat("darkhairvalue", crosshairLuminance);
@@ -30394,7 +30394,7 @@ bool idPlayer::HasItemViaClassname(const char *itemClassname)
 	idStr strClassname = itemClassname;
 	int subIndex = strClassname.Find("*", false, 0, -1);
 
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].carryPtr.IsValid())
 		{
@@ -30427,7 +30427,7 @@ void idPlayer::Event_HasItemViaClassname(const char *itemClassname)
 
 bool idPlayer::RemoveItemViaClassname(const char *itemClassname)
 {
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].carryPtr.IsValid())
 		{
@@ -30460,7 +30460,7 @@ void idPlayer::Event_RemoveItemViaClassname(const char *itemClassname)
 
 void idPlayer::Event_RemoveItemViaEntity(idEntity *ent)
 {
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].carryPtr.IsValid())
 		{
@@ -30482,7 +30482,7 @@ void idPlayer::Event_RemoveItemViaEntity(idEntity *ent)
 
 void idPlayer::Event_GetItemViaClassname(const char *itemClassname)
 {
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].carryPtr.IsValid())
 		{
@@ -30614,7 +30614,7 @@ int idPlayer::GetEmptyInventorySlots()
 {
 	//how many inventory slots are empty.
 	int count = 0;
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].weaponType <= 0)
 			count++;
@@ -32165,7 +32165,7 @@ void idPlayer::DebugPrintInventory(int index)
 		common->Printf("Player position=(%f, %f, %f)\n", pos.x, pos.y, pos.z);
 	}
 
-	for ( int i = 0; i < min( MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots ); i++ )
+	for ( int i = 0; i < Min( MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots ); i++ )
 	{
 		if (index >= 0 && i != index)
 			continue;
@@ -32598,7 +32598,7 @@ void idPlayer::DoMemoryPalace()
 	else
 	{
 		//just one row. We can center it.
-		startAngle.yaw += (max(1, noteCount - 1) / 2.0f) * ANGLE_INTERVALDELTA;
+		startAngle.yaw += (Max(1, noteCount - 1) / 2.0f) * ANGLE_INTERVALDELTA;
 	}
 
 	idAngles currentAngle = startAngle;

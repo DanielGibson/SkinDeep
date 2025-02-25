@@ -844,7 +844,7 @@ void idTurret::Think(void)
 			if (idleSwayTimer > gameLocal.time)
 			{
 				float swayLerp = (idleSwayTimer - gameLocal.time) / (float)IDLE_MAXSWAYTIME;
-				swayLerp = min(1.0f - swayLerp, 1.0f);
+				swayLerp = Min(1.0f - swayLerp, 1.0f);
 				//swayAmount = idMath::Lerp(0.1f, MAXSWAYDISTANCE, swayLerp);				
 
 				//common->Printf("%f\n", swayAmount);

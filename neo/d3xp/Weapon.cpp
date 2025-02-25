@@ -1344,7 +1344,7 @@ void idWeapon::GetWeaponDef( const char *objectname, int ammoinclip )
 		gameLocal.Warning( "Unknown ammotype in object '%s'", objectname );
 	}
 
-	ammoClip = max(0,ammoinclip);
+	ammoClip = Max(0, ammoinclip);
 
 	if ( ( ammoClip < 0 ) || ( ammoClip > clipSize ) )
 	{

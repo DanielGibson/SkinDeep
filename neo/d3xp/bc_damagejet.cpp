@@ -225,7 +225,7 @@ void idDamageJet::Think(void)
         idEntity *entityList[MAX_GENTITIES];
 
 		
-        entityCount = gameLocal.EntitiesWithinRadius(this->GetPhysics()->GetOrigin(), max(enemyRange, range), entityList, MAX_GENTITIES);
+        entityCount = gameLocal.EntitiesWithinRadius(this->GetPhysics()->GetOrigin(), Max(enemyRange, range), entityList, MAX_GENTITIES);
 
         for (int i = 0; i < entityCount; i++)
         {

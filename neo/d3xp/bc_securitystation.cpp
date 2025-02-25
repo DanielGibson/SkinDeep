@@ -89,7 +89,7 @@ void idSecurityStation::Think(void)
 
 				Event_SetGuiParm(idStr::Format("entry%d_name", enemiesFound), entity->spawnArgs.GetString("displayname"));
 				Event_SetGuiParm(idStr::Format("entry%d_location", enemiesFound), (locationEntity != NULL) ? locationEntity->GetLocation() : "???" );
-				Event_SetGuiParm(idStr::Format("entry%d_health", enemiesFound), idStr::Format("%d/%d", max(entity->health, 0), entity->maxHealth) );
+				Event_SetGuiParm(idStr::Format("entry%d_health", enemiesFound), idStr::Format("%d/%d", Max(entity->health, 0), entity->maxHealth) );
 
 				enemiesFound++;
 

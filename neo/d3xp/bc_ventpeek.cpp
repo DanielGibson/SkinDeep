@@ -230,8 +230,8 @@ void idVentpeek::GetAngleRestrictions(float &yaw_min, float &yaw_max, float &pit
 		yaw_max = angs.yaw + (float)harc;
 		yaw_max = idMath::AngleNormalize180(yaw_max);
 
-		pitch_min = max(angs.pitch - (float)varc, -89.0f);
-		pitch_max = min(angs.pitch + (float)varc, 89.0f);
+		pitch_min = Max(angs.pitch - (float)varc, -89.0f);
+		pitch_max = Min(angs.pitch + (float)varc, 89.0f);
 
 	}
 	else
@@ -417,7 +417,7 @@ void idVentpeekTelescope::HandleFastForward(void)
 {
 	if (isFastForward)
 	{
-		fastForwardWait = max(fastForwardWait - (gameLocal.time - gameLocal.previousTime), 0);
+		fastForwardWait = Max(fastForwardWait - (gameLocal.time - gameLocal.previousTime), 0);
 		if (fastForwardWait == 0)
 		{
 			switch (zoomTransitionState)
@@ -433,7 +433,7 @@ void idVentpeekTelescope::HandleFastForward(void)
 				case (ZOOMIN_BLUROUT):
 				case (ZOOM_NONE):
 				{
-					fastForwardIteration = min(fastForwardIteration + 1, MAX_FASTFORWARD_SPEEDUPS);
+					fastForwardIteration = Min(fastForwardIteration + 1, MAX_FASTFORWARD_SPEEDUPS);
 					this->AutoAdvance();
 					break;
 				}
@@ -446,7 +446,7 @@ void idVentpeekTelescope::HandleZoomTransitions(void)
 {
 	if (zoomTransitionState != ZOOM_NONE)
 	{
-		zoomTransitionTimer = max(zoomTransitionTimer - (gameLocal.time - gameLocal.previousTime), 0);
+		zoomTransitionTimer = Max(zoomTransitionTimer - (gameLocal.time - gameLocal.previousTime), 0);
 		if (zoomTransitionTimer == 0)
 		{
 			// We're ready to change state, but to what? And what's the consequences?
@@ -987,7 +987,7 @@ void idVentpeekTelescope::ZoomIn()
 		{
 			// We can still zoom in within this scene, so do that
 			StartSound("snd_zoomin", SND_CHANNEL_ANY, SSF_GLOBAL, false, NULL);
-			currentFov = max(currentFov - fovStep, minFov);
+			currentFov = Max(currentFov - fovStep, minFov);
 		}
 		else if (this->HasNextTarget())
 		{
@@ -1062,7 +1062,7 @@ void idVentpeekTelescope::ZoomOut()
 		{
 			// We can still zoom out in this scene, so do that
 			StartSound("snd_zoomout", SND_CHANNEL_ANY, SSF_GLOBAL, false, NULL);
-			currentFov = min(currentFov + fovStep, maxFov);
+			currentFov = Min(currentFov + fovStep, maxFov);
 		}
 		else if (this->HasPreviousTarget())
 		{
@@ -1200,11 +1200,11 @@ float idVentpeekTelescope::GetApertureSize(void)
 {
 	if (cameraState == CAMERA_CLOSE_SHUTTER)
 	{
-		return max((float)(cameraTimer - gameLocal.time) / (CAMERA_CLOSE_SHUTTER_TIMER), 0.0f);
+		return Max((float)(cameraTimer - gameLocal.time) / (CAMERA_CLOSE_SHUTTER_TIMER), 0.0f);
 	}
 	else if (cameraState == CAMERA_OPEN_SHUTTER)
 	{
-		return 1.0f - max((float)(cameraTimer - gameLocal.time) / (CAMERA_OPEN_SHUTTER_TIMER), 0.0f);
+		return 1.0f - Max((float)(cameraTimer - gameLocal.time) / (CAMERA_OPEN_SHUTTER_TIMER), 0.0f);
 	}
 	else return 1.0f;
 }

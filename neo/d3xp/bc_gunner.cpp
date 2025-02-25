@@ -1242,7 +1242,7 @@ void idGunnerMonster::State_Suspicious()
 		}
 		else if (perceptionScale > 0)
 		{
-			amountExposed = max(1, amountExposed * perceptionScale);
+			amountExposed = Max(1.0f, amountExposed * perceptionScale);
 		}
 		else
 		{

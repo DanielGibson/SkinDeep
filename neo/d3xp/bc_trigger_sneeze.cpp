@@ -52,7 +52,7 @@ void idTrigger_sneeze::Event_Touch(idEntity* other, trace_t* trace)
 		if (!touchedByAI)
 		{
 			touchedByAI = true;
-			maxlifetime = min(gameLocal.time + AI_TOUCH_DESPAWNDELAY, maxlifetime);
+			maxlifetime = Min(gameLocal.time + AI_TOUCH_DESPAWNDELAY, maxlifetime);
 		}
 	}
 
