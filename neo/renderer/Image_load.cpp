@@ -1691,7 +1691,7 @@ void idImage::PurgeImage() {
 
 	//blendo eric: image cache
 	if (blendoCache) {
-		delete blendoCache;
+		delete[] blendoCache; // DG: use delete[]!
 		blendoCache = NULL;
 	}
 }
