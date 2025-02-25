@@ -1,3 +1,23 @@
+NOTE: This README (everything behind the line of dashes) was included in the SkinDeep sourcecode
+(skindeep_sourcecode_2025_02_13.zip)
+
+SkinDeep isn't really based on dhewm3 1.5.4, but some older version.
+
+Building SkinDeep on Linux should work as expected with CMake.
+
+The only thing you need to change to run the Demo is to go to the skindeep_demo/ directory from Steam,
+there into basedemo/glsl/ and 
+rename "motionBlurBlendo.frag" to "motionblurBlendo.frag" (note the lowercase "b" in "blur")
+and "motionBlurBlendo.vert" to "motionblurBlendo.vert"
+
+This is necessary because unlike on Windows, filesystems on Linux are case-sensitive,
+and materials/fx.mtr in pak000.pk4 has the line "program            motionblurBlendo.vfp" where
+it's written like that.
+
+Get the SkinDeep demo at https://store.steampowered.com/app/3483180/Skin_Deep_Demo/
+
+-------------
+
 dhewm 3 version 1.5.4 for Windows
 
 Released August 3rd 2024 - celebrating 20 years of Doom3!
