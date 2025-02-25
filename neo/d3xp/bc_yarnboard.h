@@ -28,7 +28,7 @@ private:
 
 	idFuncEmitter			*sparkleParticles;
 
-	void					SetYarnInfo(const char* startModel, const char* endModel, idVec3 lookOffset, const char* voString );
+	void					SetYarnInfo(const char* startModel, const char* endModel, const idVec3 &lookOffset, const char* voString );
 
 	idStr					model_endName;
 	idVec3					lookOffset;

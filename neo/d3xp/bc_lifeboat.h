@@ -47,7 +47,7 @@ protected:
 
 protected:
 
-	void				Event_LaunchPod(idVec3 originPos, idVec3 destinationPos);
+	void				Event_LaunchPod(const idVec3 &originPos, const idVec3 &destinationPos);
 
 	typedef enum
 	{

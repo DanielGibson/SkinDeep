@@ -1317,7 +1317,7 @@ void idThread::Event_SpawnFloat( const char *key, float defaultvalue ) {
 idThread::Event_SpawnVector
 ================
 */
-void idThread::Event_SpawnVector( const char *key, idVec3 &defaultvalue ) {
+void idThread::Event_SpawnVector( const char *key, const idVec3 &defaultvalue ) {
 	idVec3 result;
 
 	spawnArgs.GetVector( key, va( "%f %f %f", defaultvalue.x, defaultvalue.y, defaultvalue.z ), result );
@@ -1384,7 +1384,7 @@ void idThread::Event_GetPersistantVector( const char *key ) {
 idThread::Event_AngToForward
 ================
 */
-void idThread::Event_AngToForward( idAngles &ang ) {
+void idThread::Event_AngToForward( const idAngles &ang ) {
 	ReturnVector( ang.ToForward() );
 }
 
@@ -1393,7 +1393,7 @@ void idThread::Event_AngToForward( idAngles &ang ) {
 idThread::Event_AngToRight
 ================
 */
-void idThread::Event_AngToRight( idAngles &ang ) {
+void idThread::Event_AngToRight( const idAngles &ang ) {
 	idVec3 vec;
 
 	ang.ToVectors( NULL, &vec );
@@ -1405,7 +1405,7 @@ void idThread::Event_AngToRight( idAngles &ang ) {
 idThread::Event_AngToUp
 ================
 */
-void idThread::Event_AngToUp( idAngles &ang ) {
+void idThread::Event_AngToUp( const idAngles &ang ) {
 	idVec3 vec;
 
 	ang.ToVectors( NULL, NULL, &vec );
@@ -1468,7 +1468,7 @@ void idThread::Event_GetSquareRoot( float theSquare ) {
 idThread::Event_VecNormalize
 ================
 */
-void idThread::Event_VecNormalize( idVec3 &vec ) {
+void idThread::Event_VecNormalize( const idVec3 &vec ) {
 	idVec3 n;
 
 	n = vec;
@@ -1481,7 +1481,7 @@ void idThread::Event_VecNormalize( idVec3 &vec ) {
 idThread::Event_VecLength
 ================
 */
-void idThread::Event_VecLength( idVec3 &vec ) {
+void idThread::Event_VecLength( const idVec3 &vec ) {
 	ReturnFloat( vec.Length() );
 }
 
@@ -1490,7 +1490,7 @@ void idThread::Event_VecLength( idVec3 &vec ) {
 idThread::Event_VecDotProduct
 ================
 */
-void idThread::Event_VecDotProduct( idVec3 &vec1, idVec3 &vec2 ) {
+void idThread::Event_VecDotProduct( const idVec3 &vec1, const idVec3 &vec2 ) {
 	ReturnFloat( vec1 * vec2 );
 }
 
@@ -1499,7 +1499,7 @@ void idThread::Event_VecDotProduct( idVec3 &vec1, idVec3 &vec2 ) {
 idThread::Event_VecCrossProduct
 ================
 */
-void idThread::Event_VecCrossProduct( idVec3 &vec1, idVec3 &vec2 ) {
+void idThread::Event_VecCrossProduct( const idVec3 &vec1, const idVec3 &vec2 ) {
 	ReturnVector( vec1.Cross( vec2 ) );
 }
 
@@ -1508,7 +1508,7 @@ void idThread::Event_VecCrossProduct( idVec3 &vec1, idVec3 &vec2 ) {
 idThread::Event_VecToAngles
 ================
 */
-void idThread::Event_VecToAngles( idVec3 &vec ) {
+void idThread::Event_VecToAngles( const idVec3 &vec ) {
 	idAngles ang = vec.ToAngles();
 	ReturnVector( idVec3( ang[0], ang[1], ang[2] ) );
 }
@@ -1721,7 +1721,7 @@ void idThread::Event_GetTraceBody( void ) {
 idThread::Event_FadeIn
 ================
 */
-void idThread::Event_FadeIn( idVec3 &color, float time ) {
+void idThread::Event_FadeIn( const idVec3 &color, float time ) {
 	idVec4		fadeColor;
 	idPlayer	*player;
 
@@ -1737,7 +1737,7 @@ void idThread::Event_FadeIn( idVec3 &color, float time ) {
 idThread::Event_FadeOut
 ================
 */
-void idThread::Event_FadeOut( idVec3 &color, float time ) {
+void idThread::Event_FadeOut( const idVec3 &color, float time ) {
 	idVec4		fadeColor;
 	idPlayer	*player;
 
@@ -1753,7 +1753,7 @@ void idThread::Event_FadeOut( idVec3 &color, float time ) {
 idThread::Event_FadeTo
 ================
 */
-void idThread::Event_FadeTo( idVec3 &color, float alpha, float time ) {
+void idThread::Event_FadeTo( const idVec3 &color, float alpha, float time ) {
 	idVec4		fadeColor;
 	idPlayer	*player;
 
@@ -2416,7 +2416,7 @@ void idThread::Event_MakeItemZoo()
 	}
 }
 
-void idThread::Event_PlayFX(const char *fxName, idVec3 position, idVec3 angle)
+void idThread::Event_PlayFX(const char *fxName, const idVec3 &position, const idVec3 &angle)
 {
 	idMat3 dir;
 	idAngles ang;
@@ -2432,7 +2432,7 @@ void idThread::Event_PlayFX(const char *fxName, idVec3 position, idVec3 angle)
 	idThread::ReturnEntity(fx);
 }
 
-void idThread::Event_PlayParticle(const char *particleName, idVec3 position, idVec3 angle)
+void idThread::Event_PlayParticle(const char *particleName, const idVec3 &position, const idVec3 &angle)
 {
 	idMat3 dir;
 	idAngles ang;
@@ -2585,7 +2585,7 @@ void idThread::Event_DebugArrowsimple(const idVec3 &end)
 	gameRenderWorld->DebugArrow(idVec4(0,1,0, 0.0f),end  + idVec3(0,0,128), end, 4, 10000);
 }
 
-void idThread::Event_SpawnInterestpoint(const char *interestDefname, idVec3 position)
+void idThread::Event_SpawnInterestpoint(const char *interestDefname, const idVec3 &position)
 {
 	gameLocal.SpawnInterestPoint(NULL, position, interestDefname);
 }
@@ -2646,7 +2646,7 @@ void idThread::Event_getworldspawnint(const char *keyname)
 }
 
 //Return entity if it's within a specified bounds value
-void idThread::Event_getEntityInBounds(const char *name, idVec3 mins, idVec3 maxs)
+void idThread::Event_getEntityInBounds(const char *name, const idVec3 &mins, const idVec3 &maxs)
 {
 	if (mins == vec3_zero && maxs == vec3_zero)
 	{
@@ -2735,14 +2735,14 @@ void idThread::Event_RandomChar(void)
 	idThread::ReturnString(va("%c", randomChar));
 }
 
-void idThread::Event_IsAirlessAtPoint(idVec3 point)
+void idThread::Event_IsAirlessAtPoint(const idVec3 &point)
 {
 	idThread::ReturnFloat((float)gameLocal.GetAirlessAtPoint(point));
 }
 
 // SW: Removes all entities matching the match string (wildcard supported) within the provided bounds.
 // Intended for room cleanup/reset in tutorial
-void idThread::Event_RemoveEntitiesWithinBounds(const char* matchString, idVec3 mins, idVec3 maxs)
+void idThread::Event_RemoveEntitiesWithinBounds(const char* matchString, const idVec3 &mins, const idVec3 &maxs)
 {
 	idEntity* entityList[MAX_GENTITIES];
 	idEntity* ent;

@@ -94,7 +94,7 @@ public:
 
 	idEntity			*lkpEnt; //last-known position
 	void				SetLKPPosition(idVec3 pos);
-	void				SetLKPReachablePosition(idVec3 pos);
+	void				SetLKPReachablePosition(const idVec3 &pos);
 	void				SetLKPPositionByEntity(idEntity *enemyEnt);
 
 	void				UpdateMetaLKP(bool hasGainedLOS);

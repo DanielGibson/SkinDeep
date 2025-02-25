@@ -850,7 +850,7 @@ public:
 	void					SetViewYawLerp(float targetYaw, int transitiontime = 250);
 	void					SetViewPitchLerp(float targetPitch, int transitiontime = 250 /*default transition time, MAKE SURE this syncs with VIEWPOS_OFFSET_MOVETIME*/  );
 	void					SetViewRollLerp(float targetPitch, int transitiontime = 250);
-	void					SetViewLerp(idVec3 targetPosition, int moveTime);
+	void					SetViewLerp(const idVec3 &targetPosition, int moveTime);
 	void					SetViewLerpAngles(idAngles angles, int moveTime);
 
 	void					SetConfinedState(float baseAngle, float sneezeMultiplier, bool isConfined);
@@ -934,8 +934,8 @@ public:
 	void					SetHudNamedEvent(const char * eventName);
 	void					SetHudParmInt(const char * parmName, int value);
 
-	void					SetViewposAbsLerp(idVec3 _target, int _duration);
-	void					SetViewposAbsLerp2(idVec3 _target, int _duration);
+	void					SetViewposAbsLerp(const idVec3 &_target, int _duration);
+	void					SetViewposAbsLerp2(const idVec3 &_target, int _duration);
 
 
 	idEntityPtr<idEntity>	peekObject;
@@ -1854,7 +1854,7 @@ private:
 	bool					signalLock; // Is signal locked on?
 	int						lastSignalLockUpdate; // When did we last update the signal lock-on state?
 	idVec3					lastBeaconPosition; // What is the beacon vector's position?
-	void					ActivateBeacon(int beaconType, idVec3 beaconSpawnPos);
+	void					ActivateBeacon(int beaconType, const idVec3 &beaconSpawnPos);
 	bool					beaconFlashState;
 	int						beaconFlashTimer;
 	bool					beaconUIBlink;
@@ -2141,7 +2141,7 @@ private:
 	int						vo_reloadchecktimer;
 	bool					hasSaidReloadcheckVO;
 
-	void					Event_flytext(idVec3 position, const char *text);
+	void					Event_flytext(const idVec3 &position, const char *text);
 
 	
 	void					EventlogMenuOpen(bool value);
@@ -2314,7 +2314,7 @@ private:
 
 
 
-	void					Event_ParticleStream(const char* particlename, idVec3 destination, int duration);
+	void					Event_ParticleStream(const char* particlename, const idVec3 &destination, int duration);
 	int						particlestreamTimer;
 	idVec3					particleStreamDestination;
 	idEntity*				particleStreamEnt;

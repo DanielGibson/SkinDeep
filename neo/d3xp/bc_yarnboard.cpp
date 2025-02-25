@@ -224,7 +224,7 @@ void idYarnBoard::Think(void)
 }
 
 //Gets called via script when map is loaded.
-void idYarnBoard::SetYarnInfo(const char* startModel, const char* endModel, idVec3 _lookOffset, const char* voString )
+void idYarnBoard::SetYarnInfo(const char* startModel, const char* endModel, const idVec3 &_lookOffset, const char* voString )
 {
 	SetModel(startModel);
 	model_endName = endModel;

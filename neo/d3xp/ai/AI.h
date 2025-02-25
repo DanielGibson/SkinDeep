@@ -855,10 +855,10 @@ protected:
 	void					Event_HeardSuspiciousPriority();
 	void					Event_GetThrowableObject(const idVec3 &mins, const idVec3 &maxs, float speed, float minDist, float offset);
 	void					Event_ThrowObjectAtEnemy(idEntity *ent, float speed);
-	bool					Event_ThrowObjectAtPosition(idEntity *ent, idVec3 targetPos);
+	bool					Event_ThrowObjectAtPosition(idEntity *ent, const idVec3 &targetPos);
 	void					Event_GetSearchNode();
 	idEntity *				GetSearchNode();
-	void					Event_SetLaserLock(idVec3 laserPos);
+	void					Event_SetLaserLock(const idVec3 &laserPos);
 	void					Event_SetLaserSkin(const char* laserSkinName);
 	void					Event_GetEnemyCenter();
 	void					Event_SetFlyBobStrength(int value);
@@ -872,14 +872,14 @@ protected:
 	void					Event_DoDamage(const char *damageDefName);
 	void					Event_ResetLookPoint();
 	void					LaunchProjectileAtPos(const char *jointname, idVec3 fireTarget);
-	void					Event_CanHitFromAnim(const char *animname, idVec3 targetPos);
+	void					Event_CanHitFromAnim(const char *animname, const idVec3 &targetPos);
 	bool					CanHitFromAnim(const char *animname, idVec3 targetPos);
 	void					Event_SetLaserActive(int active);
-	void					Event_CheckSearchLook(idVec3 lookPoint, int useFacing);
+	void					Event_CheckSearchLook(const idVec3 &lookPoint, int useFacing);
 	bool					CheckSearchLook(idVec3 lookPoint, int useFacing, bool doProximityCheck);
 	void					Event_SetLastVisiblePos(idVec3 pos);
-	void					Event_CheckForwardDot(idVec3 lookPoint);
-	void					Event_SetLaserEndLock(idVec3 pos);
+	void					Event_CheckForwardDot(const idVec3 &lookPoint);
+	void					Event_SetLaserEndLock(const idVec3 &pos);
 	void					Event_StartStunState(const char* damageDefName);
 	void					Event_IsBleedingOut(void);
 	void					Event_GetSkullsaver(void);
@@ -943,7 +943,7 @@ protected:
 
 
 	virtual void			OnShieldHit();
-	void					Event_GetObservationViaNodes(idVec3 pointToObserve);
+	void					Event_GetObservationViaNodes(const idVec3 &pointToObserve);
 	idVec3					GetObservationViaNodes(idVec3 pointToObserve);
 	void					SetCombatState(int value, bool restartCombatTimer = false);
 

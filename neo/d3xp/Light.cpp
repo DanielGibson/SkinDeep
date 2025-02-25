@@ -1613,7 +1613,7 @@ void idLight::SetAffectLightmeter(bool value)
 	renderLight.affectLightMeter = value;
 }
 
-void idLight::Event_SetSpotlightTarget(idVec3 vec)
+void idLight::Event_SetSpotlightTarget(const idVec3 &vec)
 {
 	SetLightTarget(vec);
 
