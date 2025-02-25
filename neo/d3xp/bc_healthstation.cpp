@@ -84,7 +84,12 @@ void idHealthstation::Spawn(void)
 	if (downTr.fraction >= 1.0f)
 		return; //Wasn't able to find a piece of floor..... this should never happen.
 	
-	static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->SpawnIdleTask(this, downTr.endpos, "idletask_healthstation"); //spawn the idletask.
+	idMeta* meta = static_cast<idMeta *>(gameLocal.metaEnt.GetEntity());
+	if ( meta != NULL ) {
+		meta->SpawnIdleTask(this, downTr.endpos, "idletask_healthstation"); //spawn the idletask.
+	} else {
+		common->Warning("idHealthstation::Spawn(): metaEnt is NULL?!\n");
+	}
 
 	//renderlight.
 	if (1)
