@@ -42,6 +42,7 @@ class idRenderModelManager;
 class idUserInterface;
 class idUserInterfaceManager;
 class idNetworkSystem;
+class LoadingContext;
 
 /*
 ===============================================================================
