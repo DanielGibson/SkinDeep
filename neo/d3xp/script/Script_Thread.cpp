@@ -164,7 +164,9 @@ const idEventDef EV_Thread_CacheFX("cacheFX", "s");
 const idEventDef EV_Thread_CacheSkin("cacheSkin", "s");
 const idEventDef EV_Thread_CacheEntityDef("cacheEntityDef", "s");
 
-
+// DG: this one was missing, script/doom_events.script needs
+// scriptEvent void steamOpenStoreOverlay();
+const idEventDef EV_Thread_SteamOpenStoreOverlay("steamOpenStoreOverlay", NULL);
 
 CLASS_DECLARATION( idClass, idThread )
 	EVENT( EV_Thread_Execute,				idThread::Event_Execute )
@@ -296,8 +298,8 @@ CLASS_DECLARATION( idClass, idThread )
 	EVENT(EV_Thread_CacheFX,				idThread::Event_CacheFX)
 	EVENT(EV_Thread_CacheSkin,				idThread::Event_CacheSkin)
 	EVENT(EV_Thread_CacheEntityDef,			idThread::Event_CacheEntityDef)
-	
 
+	EVENT(EV_Thread_SteamOpenStoreOverlay,	idThread::Event_SteamOpenStoreOverlay)
 
 
 END_CLASS
@@ -2859,3 +2861,8 @@ void idThread::Event_CacheEntityDef(const char* defName)
 	}
 }
 
+void idThread::Event_SteamOpenStoreOverlay()
+{
+	// TODO: steam stuff (or not)
+	printf("if built with libsteam, I'd open the overlay\n");
+}
