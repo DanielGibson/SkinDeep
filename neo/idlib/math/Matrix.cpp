@@ -37,6 +37,10 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "idlib/math/Matrix.h"
 
+#ifndef _WIN32 // DG: at least on Linux this is needed to get FLT_EPSILON
+#include <float.h> // FLT_EPSILON
+#endif
+
 //===============================================================
 //
 //	idMat2

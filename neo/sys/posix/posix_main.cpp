@@ -46,6 +46,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "framework/EditField.h"
 #include "sys/sys_local.h"
 
+#include "renderer/tr_local.h" // GLimp_WindowActive()
+
 #include "sys/posix/posix_public.h"
 
 #define					COMMAND_HISTORY 64
@@ -814,4 +816,13 @@ void Sys_Error(const char *error, ...) {
 	Sys_Printf( "\n" );
 
 	Posix_Exit( EXIT_FAILURE );
+}
+
+/*
+==============
+Sys_IsWindowActive
+==============
+*/
+bool Sys_IsWindowActive( void ) {
+	return GLimp_WindowActive();
 }

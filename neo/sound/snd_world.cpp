@@ -629,6 +629,7 @@ void idSoundWorldLocal::MixLoop( int current44kHz, int numSpeakers, float *final
 
 		// SW: Because this is being called by an async thread, trying to print to console will hang the game
 		// Instead, we print to the Visual Studio output window
+		// DG: TODO: newer dhewm3 versions fix this
 		if (idSoundSystemLocal::s_showReverbBlend.GetInteger())
 		{
 			char listenerStr[255];
@@ -636,9 +637,12 @@ void idSoundWorldLocal::MixLoop( int current44kHz, int numSpeakers, float *final
 
 			sprintf(listenerStr, "ListenerEffect: %d (Gain: %f) -- ", listenerEffect, invBlendFactor);
 			sprintf(lerpStr, "LerpEffect: %d (Gain: %f)\n", lerpEffect, lerpBlendFactor);
-
+#ifdef _WIN32
 			OutputDebugString(listenerStr);
 			OutputDebugString(lerpStr);
+#else
+			printf("%s\n%s\n", listenerStr, lerpStr);
+#endif
 		}
 		
 

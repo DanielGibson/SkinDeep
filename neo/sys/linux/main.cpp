@@ -55,26 +55,34 @@ bool Sys_GetPath(sysPath_t type, idStr &path) {
 
 	switch(type) {
 	case PATH_BASE:
+#if 0 // DG: no relevance for skin deep
 		if (stat(BUILD_DATADIR, &st) != -1 && S_ISDIR(st.st_mode)) {
 			path = BUILD_DATADIR;
 			return true;
 		}
 
 		common->Warning("base path '" BUILD_DATADIR "' does not exist");
-
+#endif // 0
 		// try next to the executable..
 		if (Sys_GetPath(PATH_EXE, path)) {
 			path = path.StripFilename();
 			// the path should have a base dir in it, otherwise it probably just contains the executable
+			
+#ifdef DEMO
+			idStr testPath = path + "/basedemo";
+#else
 			idStr testPath = path + "/" BASE_GAMEDIR;
+#endif
 			if (stat(testPath.c_str(), &st) != -1 && S_ISDIR(st.st_mode)) {
-				common->Warning("using path of executable: %s", path.c_str());
+				// DG: don't warn about this.. TODO: use newer dhewm3 code that caches that path
+				//common->Warning("using path of executable: %s", path.c_str());
 				return true;
 			} else {
 				path.Clear();
 			}
 		}
 
+#if 0 // DG: not relevant either
 		// fallback to vanilla doom3 install
 		if (stat(LINUX_DEFAULT_PATH, &st) != -1 && S_ISDIR(st.st_mode)) {
 			common->Warning("using hardcoded default base path: " LINUX_DEFAULT_PATH);
@@ -82,15 +90,16 @@ bool Sys_GetPath(sysPath_t type, idStr &path) {
 			path = LINUX_DEFAULT_PATH;
 			return true;
 		}
+#endif // 0
 
 		return false;
 
 	case PATH_CONFIG:
 		s = getenv("XDG_CONFIG_HOME");
 		if (s)
-			idStr::snPrintf(buf, sizeof(buf), "%s/dhewm3", s);
+			idStr::snPrintf(buf, sizeof(buf), "%s/skindeep", s);
 		else
-			idStr::snPrintf(buf, sizeof(buf), "%s/.config/dhewm3", getenv("HOME"));
+			idStr::snPrintf(buf, sizeof(buf), "%s/.config/skindeep", getenv("HOME"));
 
 		path = buf;
 		return true;
@@ -98,9 +107,9 @@ bool Sys_GetPath(sysPath_t type, idStr &path) {
 	case PATH_SAVE:
 		s = getenv("XDG_DATA_HOME");
 		if (s)
-			idStr::snPrintf(buf, sizeof(buf), "%s/dhewm3", s);
+			idStr::snPrintf(buf, sizeof(buf), "%s/skindeep", s);
 		else
-			idStr::snPrintf(buf, sizeof(buf), "%s/.local/share/dhewm3", getenv("HOME"));
+			idStr::snPrintf(buf, sizeof(buf), "%s/.local/share/skindeep", getenv("HOME"));
 
 		path = buf;
 		return true;
