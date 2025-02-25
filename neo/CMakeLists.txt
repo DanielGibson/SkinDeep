@@ -1,5 +1,8 @@
-cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.6...3.22 FATAL_ERROR)
+#cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 project(dhewm3)
+
+set (CMAKE_CXX_STANDARD 20)
 
 # TODO
 
@@ -30,7 +33,7 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/sys/cmake")
 set(CMAKE_SKIP_RPATH ON CACHE BOOL "Skip RPATH" FORCE)
 
-set(DHEWM3BINARY "dhewm3")
+set(DHEWM3BINARY "skindeep")
 
 include(CheckCXXCompilerFlag)
 include(GNUInstallDirs OPTIONAL RESULT_VARIABLE GNUINSTALLDIRS)
@@ -40,6 +43,9 @@ option(D3XP			"Build the d3xp game code" ON)
 option(DEDICATED	"Build the dedicated server" OFF)
 option(ONATIVE		"Optimize for the host CPU" OFF)
 option(SDL2			"Use SDL2 instead of SDL1.2" ON)
+option(SDDEMO		"This is the skindeep demo version" ON)
+
+option(SANITIZERS	"Use ASAN and USBSAN" OFF)
 
 if(NOT CMAKE_SYSTEM_PROCESSOR)
 	message(FATAL_ERROR "No target CPU architecture set")
@@ -142,6 +148,15 @@ else()
 	set(CURL_LIBRARY "")
 endif()
 
+# DG: skindeep usees CMAKE_INTDIR, seems to hold the build type
+add_definitions(-DCMAKE_INTDIR="${CMAKE_BUILD_TYPE}")
+
+if(SDDEMO)
+	add_definitions(-DDEMO=1)
+endif()
+
+message(STATUS "XXX source dir: ${CMAKE_SOURCE_DIR}")
+
 # compiler specific flags
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 	add_compile_options(-pipe)
@@ -152,6 +167,13 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 	elseif(NOT APPLE AND cpu STREQUAL "x86")
 		add_compile_options(-march=pentium3)
 	endif()
+
+if(SANITIZERS)
+	add_compile_options(-fsanitize=address) # XXX just for testing
+	set(sys_libs ${sys_libs} -fsanitize=address) # xxx remove
+	add_compile_options(-fsanitize=undefined) # xxx remove
+	set(sys_libs ${sys_libs} -fsanitize=undefined) # xxx remove
+endif()
 
 	set(CMAKE_C_FLAGS_DEBUG "-g -D_DEBUG -O1")
 	set(CMAKE_C_FLAGS_DEBUGALL "-g -ggdb -D_DEBUG")
@@ -177,6 +199,7 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 	add_compile_options(-Wno-sign-compare)
 	add_compile_options(-Wno-switch)
 	add_compile_options(-Wno-format-security)
+	add_compile_options(-Wno-class-memaccess)
 
 	CHECK_CXX_COMPILER_FLAG("-Woverloaded-virtual" cxx_has_Woverload_virtual)
 	if(cxx_has_Woverload_virtual)
@@ -298,6 +321,7 @@ endif()
 
 set(src_renderer
 	renderer/Cinematic.cpp
+	renderer/Font.cpp
 	renderer/GuiModel.cpp
 	renderer/Image_files.cpp
 	renderer/Image_init.cpp
@@ -328,7 +352,9 @@ set(src_renderer
 	renderer/RenderWorld_load.cpp
 	renderer/RenderWorld_portals.cpp
 	renderer/VertexCache.cpp
-	renderer/draw_arb2.cpp
+	#renderer/draw_arb2.cpp
+	renderer/ShaderGL.cpp
+	renderer/draw_glsl.cpp
 	renderer/draw_common.cpp
 	renderer/tr_backend.cpp
 	renderer/tr_deform.cpp
@@ -453,6 +479,7 @@ set(src_ui
 	ui/ChoiceWindow.cpp
 	ui/DeviceContext.cpp
 	ui/EditWindow.cpp
+	ui/FeedAlertWindow.cpp
 	ui/FieldWindow.cpp
 	ui/GameBearShootWindow.cpp
 	ui/GameBustOutWindow.cpp
@@ -597,7 +624,12 @@ set(src_d3xp
 	d3xp/physics/Push.cpp
 	d3xp/Grabber.cpp
 	d3xp/physics/Force_Grab.cpp
+
+	d3xp/sw_skycontroller.cpp
 )
+
+file(GLOB src_bc "d3xp/bc_*.cpp")
+set(src_d3xp ${src_d3xp} ${src_bc})
 
 set(src_core
 	${src_renderer}
@@ -723,11 +755,14 @@ if(CORE)
 		${src_core}
 		${src_sys_base}
 		${src_sys_core}
+		${src_d3xp} # DG: skindeep hardlinks the gamecode
 	)
 
-	set_target_properties(${DHEWM3BINARY} PROPERTIES COMPILE_DEFINITIONS "__DOOM_DLL__")
+	# DG: added defines from d3xp, removed __DOOM_DLL__ because d3xp is hardlinked
+	set_target_properties(${DHEWM3BINARY} PROPERTIES COMPILE_DEFINITIONS "_D3XP;CTF")
 	set_target_properties(${DHEWM3BINARY} PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(${DHEWM3BINARY} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/sys/osx/Info.plist)
+	set_target_properties(${DHEWM3BINARY} PROPERTIES COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/d3xp") # DG: because hardlinking d3xp
 
 	target_link_libraries(${DHEWM3BINARY}
 		idlib
@@ -782,7 +817,7 @@ if(DEDICATED)
 	endif()
 endif()
 
-if(D3XP)
+if(FALSE) #(D3XP)
 	if (AROS)
 		add_executable(d3xp sys/aros/dll/dllglue.c ${src_d3xp})
 		set_target_properties(d3xp PROPERTIES OUTPUT_NAME "d3xp.aros-${AROS_ARCH}")
