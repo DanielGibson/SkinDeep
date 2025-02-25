@@ -34,6 +34,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "renderer/tr_local.h"
 
+// DG: make sure the Window.h `#define DrawText DrawTextA` doesn't rename our DrawText()
+#undef DrawText
 /*
 ===================
 R_ListRenderLightDefs_f

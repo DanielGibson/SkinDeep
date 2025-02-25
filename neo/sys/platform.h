@@ -193,6 +193,7 @@ If you have questions concerning this license or the applicable additional terms
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #undef FindText								// stupid namespace poluting Microsoft monkeys
+#undef DrawText
 #endif
 
 #define ID_TIME_T time_t

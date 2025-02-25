@@ -36,6 +36,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "renderer/Material.h"
 #include "renderer/trackedInteraction.h"
 
+// DG: make sure the Window.h `#define DrawText DrawTextA` doesn't leak into this header
+#undef DrawText
+
 class idDemoFile;
 class idRenderModel;
 
