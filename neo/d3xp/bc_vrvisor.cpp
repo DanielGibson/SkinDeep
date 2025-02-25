@@ -1,0 +1,278 @@
+#include "sys/platform.h"
+#include "gamesys/SysCvar.h"
+#include "Entity.h"
+#include "Light.h"
+#include "Player.h"
+#include "Fx.h"
+
+#include "ai/AI.h"
+
+#include "bc_vrvisor.h"
+
+
+CLASS_DECLARATION(idMoveableItem, idVRVisor)
+END_CLASS
+
+#define VISOR_MOVETIME 600
+#define VISOR_MOVEPAUSETIME 150
+#define VISOR_MOVINGTOEYES_TIME 300
+
+
+#define VISOR_RETURNTIME 500
+
+#define VISOR_FORWARDDIST 8
+
+idVRVisor::idVRVisor(void)
+{
+	state = VRV_IDLE;
+	stateTimer = 0;
+
+	visorStartPosition = vec3_zero;
+	visorStartAngle = idAngles(0, 0, 0);
+
+	visorFinalPosition = vec3_zero;
+	visorFinalAngle = idAngles(0, 0, 0);
+
+	playerStartPosition = vec3_zero;
+	playerStartAngle = 0;
+
+	arrowProp = NULL;
+}
+
+idVRVisor::~idVRVisor(void)
+{
+}
+
+void idVRVisor::Save(idSaveGame* savefile) const
+{
+}
+
+void idVRVisor::Restore(idRestoreGame* savefile)
+{
+}
+
+void idVRVisor::Spawn(void)
+{
+	isFrobbable = true;	
+
+	BecomeActive(TH_THINK);
+	fl.takedamage = false;
+
+
+	if (spawnArgs.GetBool("showarrow", "1"))
+	{
+		idDict args;
+		args.Set("classname", "func_static");
+		args.Set("model", spawnArgs.GetString("model_arrow"));
+		args.SetBool("spin", true);
+		args.Set("bind", GetName());
+		args.SetVector("origin", GetPhysics()->GetOrigin() + idVec3(0,0,3));
+		args.SetBool("solid", false);
+		gameLocal.SpawnEntityDef(args, &arrowProp);
+	}
+
+
+	PostEventMS(&EV_PostSpawn, 0);
+}
+
+void idVRVisor::Event_PostSpawn(void)
+{
+	//This does not work for some reason??????
+	//if (targets.Num() <= 0)
+	//{
+	//	int zz = targets.Num();
+	//	gameLocal.Error("visor '%s' has no targets.", GetName(), zz);
+	//}
+}
+
+
+
+void idVRVisor::Think(void)
+{
+	if (state == VRV_IDLE)
+	{
+		idMoveableItem::Think();
+	}
+	else if (state == VRV_MOVINGTOPLAYER)
+	{
+		Present();
+
+
+		//Get visor final position.
+		idAngles playerViewAngle = gameLocal.GetLocalPlayer()->viewAngles;
+		playerViewAngle.pitch = 0;
+		playerViewAngle.roll = 0;
+		idVec3 playerEyePos = gameLocal.GetLocalPlayer()->firstPersonViewOrigin;
+		visorFinalPosition = playerEyePos + playerViewAngle.ToForward() * VISOR_FORWARDDIST;
+		visorFinalPosition.z += .1f;
+
+		//Get visor final angle.
+		visorFinalAngle = idAngles(0, gameLocal.GetLocalPlayer()->viewAngles.yaw, 0);;
+		visorFinalAngle.pitch = 0;
+		visorFinalAngle.yaw += 180;
+		visorFinalAngle.roll = 0;
+		visorFinalAngle.Normalize180();
+
+
+		float lerp = (gameLocal.time - stateTimer) / (float)VISOR_MOVETIME;
+		lerp = idMath::ClampFloat(0, 1, lerp);
+		lerp = idMath::CubicEaseOut(lerp);
+
+
+
+		//Lerp visor position.
+		idVec3 visorLerpedPosition;
+		visorLerpedPosition.Lerp(visorStartPosition, visorFinalPosition, lerp);
+		SetOrigin(visorLerpedPosition);
+
+		//Lerp visor angle.
+		idAngles visorLerpedAngle;
+		visorLerpedAngle.pitch = idMath::Lerp(visorStartAngle.pitch, visorFinalAngle.pitch, lerp);
+		visorLerpedAngle.yaw = idMath::Lerp(visorStartAngle.yaw, visorFinalAngle.yaw, lerp);
+		visorLerpedAngle.roll = idMath::Lerp(visorStartAngle.roll, visorFinalAngle.roll, lerp);
+		SetAxis(visorLerpedAngle.ToMat3());		
+		
+		if (gameLocal.time > stateTimer + VISOR_MOVETIME)
+		{
+			state = VRV_MOVEPAUSE;
+			stateTimer = gameLocal.time;
+		}
+	}
+	else if (state == VRV_MOVEPAUSE)
+	{
+		if (gameLocal.time > stateTimer + VISOR_MOVEPAUSETIME)
+		{
+			state = VRV_MOVINGTOEYES;
+			stateTimer = gameLocal.time;
+			gameLocal.GetLocalPlayer()->Event_SetFOVLerp(-80, VISOR_MOVINGTOEYES_TIME);
+
+			StartSound("snd_enter", SND_CHANNEL_ANY);
+		}
+	}
+	else if (state == VRV_MOVINGTOEYES)
+	{
+		if (gameLocal.time > stateTimer + VISOR_MOVINGTOEYES_TIME)
+		{
+			state = VRV_ATTACHEDTOPLAYER;
+			gameLocal.GetLocalPlayer()->Event_setPlayerFrozen(0);
+
+			if (targets.Num() > 0)
+			{
+				gameLocal.GetLocalPlayer()->FlashScreenCustom(idVec4(0, .6f, .8f, 1), 600);
+				gameLocal.GetLocalPlayer()->Event_SetFOVLerp(40, 0);
+				gameLocal.GetLocalPlayer()->Event_SetFOVLerp(0, 500);
+				gameLocal.GetLocalPlayer()->Event_TeleportToEnt(targets[0].GetEntity());
+
+				//Call the script to start the sequence.
+				idStr startScript = spawnArgs.GetString("call_start");
+				if (startScript.Length() > 0)
+				{
+					if (!gameLocal.RunMapScriptArgs(startScript.c_str(), this, this))
+					{
+						gameLocal.Warning("visor '%s' failed to run script '%s'", GetName(), startScript.c_str());
+					}
+				}
+			}
+			else
+			{
+				gameLocal.Error("visor '%s' has no targets.", GetName());
+			}
+		}
+	}
+	else if (state == VRV_RETURNINGTOSTARTPOSITION)
+	{
+		Present();
+
+		float lerp = (gameLocal.time - stateTimer) / (float)VISOR_RETURNTIME;
+		lerp = idMath::ClampFloat(0, 1, lerp);
+
+		//Lerp visor position.
+		idVec3 visorLerpedPosition;
+		visorLerpedPosition.Lerp(visorFinalPosition, visorStartPosition,  lerp);
+		SetOrigin(visorLerpedPosition);
+
+		//Lerp visor angle.
+		idAngles visorLerpedAngle;
+		visorLerpedAngle.pitch = idMath::Lerp( visorFinalAngle.pitch, visorStartAngle.pitch, lerp);
+		visorLerpedAngle.yaw = idMath::Lerp( visorFinalAngle.yaw, visorStartAngle.yaw, lerp);
+		visorLerpedAngle.roll = idMath::Lerp(visorFinalAngle.roll, visorStartAngle.roll, lerp);
+		SetAxis(visorLerpedAngle.ToMat3());
+
+		if (gameLocal.time > stateTimer + VISOR_RETURNTIME)
+		{
+			state = VRV_IDLE;
+			//isFrobbable = true; //bc 11-12-2024 just make the vr visor be a one-use only item.
+		}
+	}
+
+}
+
+
+
+bool idVRVisor::DoFrob(int index, idEntity * frobber)
+{
+	//idMoveableItem::DoFrob(index, frobber);
+
+	if (frobber == NULL)
+		return false;
+
+	if (frobber != gameLocal.GetLocalPlayer())
+		return false;
+
+	if (state == VRV_IDLE)
+	{
+		if (arrowProp != nullptr)
+		{
+			arrowProp->Hide();
+		}
+
+		gameLocal.GetLocalPlayer()->Event_setPlayerFrozen(1);
+		gameLocal.GetLocalPlayer()->SetViewPitchLerp(0, VISOR_MOVETIME+ VISOR_MOVINGTOEYES_TIME + VISOR_MOVEPAUSETIME);
+		gameLocal.GetLocalPlayer()->SetViewYawLerp(gameLocal.GetLocalPlayer()->viewAngles.yaw, VISOR_MOVETIME + VISOR_MOVINGTOEYES_TIME + VISOR_MOVEPAUSETIME);
+
+		state = VRV_MOVINGTOPLAYER;
+		stateTimer = gameLocal.time;
+		visorStartPosition = GetPhysics()->GetOrigin();
+		visorStartAngle = GetPhysics()->GetAxis().ToAngles();
+
+		isFrobbable = false;
+
+		playerStartPosition = gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin();
+		playerStartAngle = gameLocal.GetLocalPlayer()->viewAngles.yaw;
+
+		//Get visor final position.
+		idAngles playerViewAngle = gameLocal.GetLocalPlayer()->viewAngles;
+		playerViewAngle.pitch = 0;
+		playerViewAngle.roll = 0;
+		idVec3 playerEyePos = gameLocal.GetLocalPlayer()->firstPersonViewOrigin;
+		visorFinalPosition = playerEyePos + playerViewAngle.ToForward() * VISOR_FORWARDDIST;
+		visorFinalPosition.z += .1f;
+
+		//Get visor final angle.
+		visorFinalAngle = idAngles(0, gameLocal.GetLocalPlayer()->viewAngles.yaw, 0);;
+		visorFinalAngle.pitch = 0;
+		visorFinalAngle.yaw += 180;
+		visorFinalAngle.roll = 0;
+		visorFinalAngle.Normalize180();
+
+		StartSound("snd_grab", SND_CHANNEL_ANY);
+	}
+
+
+	return true;
+}
+
+//If this visor is active, then deactivate it and return player to the hub.
+bool idVRVisor::SetExitVisor()
+{
+	if (state != VRV_ATTACHEDTOPLAYER)
+		return false;
+
+	state = VRV_RETURNINGTOSTARTPOSITION;
+	stateTimer = gameLocal.time;
+
+	gameLocal.GetLocalPlayer()->FlashScreenCustom(idVec4(0, 0, 0, 1), 200);	
+	gameLocal.GetLocalPlayer()->Teleport(playerStartPosition, idAngles(0, playerStartAngle,0), NULL);
+
+	return true;
+}
