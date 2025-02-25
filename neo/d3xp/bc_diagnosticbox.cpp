@@ -6,13 +6,13 @@
 #include "Player.h"
 #include "Fx.h"
 //#include "Moveable.h"
-//#include "trigger.h"
-\
-#include "ai\AI.h"
+//#include "Trigger.h"
+
+#include "ai/AI.h"
 #include "WorldSpawn.h"
 #include "framework/DeclEntityDef.h"
 
-#include "securitycamera.h"
+#include "SecurityCamera.h"
 #include "bc_sabotagepoint.h"
 #include "bc_meta.h"
 #include "bc_diagnosticbox.h"

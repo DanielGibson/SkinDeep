@@ -6,10 +6,10 @@
 #include "Player.h"
 #include "Fx.h"
 #include "Moveable.h"
-#include "trigger.h"
+#include "Trigger.h"
 
 #include "WorldSpawn.h"
-#include "mover.h"
+#include "Mover.h"
 #include "bc_meta.h"
 #include "bc_cryointerior.h"
 #include "bc_doorbarricade.h"

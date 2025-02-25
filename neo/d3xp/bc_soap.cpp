@@ -6,9 +6,9 @@
 #include "Player.h"
 #include "Fx.h"
 #include "Moveable.h"
-#include "trigger.h"
+#include "Trigger.h"
 
-//#include "item.h"
+//#include "Item.h"
 
 #include "bc_soap.h"
 

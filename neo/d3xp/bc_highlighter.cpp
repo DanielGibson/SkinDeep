@@ -2,9 +2,9 @@
 #include "framework/DeclEntityDef.h"
 #include "gamesys/SysCvar.h"
 
-#include "worldspawn.h"
-#include "player.h"
-#include "actor.h"
+#include "WorldSpawn.h"
+#include "Player.h"
+#include "Actor.h"
 #include "bc_meta.h"
 #include "bc_highlighter.h"
 
