@@ -132,7 +132,7 @@ void idAirlock::Spawn(void)
 		}
 
 
-		if (innerDoor)
+		if (innerdoor)
 		{
 			innerDoor[i] = (idDoor *)gameLocal.SpawnEntityType(idDoor::Type, &args);
 			//innerDoor[i]->SetAngles(this->GetPhysics()->GetAxis().ToAngles());
