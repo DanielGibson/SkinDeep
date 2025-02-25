@@ -2324,6 +2324,8 @@ idRenderSystemLocal::Shutdown
 void idRenderSystemLocal::Shutdown( void ) {
 	common->DPrintf( "idRenderSystem::Shutdown()\n" );
 
+	common->SetRefreshOnPrint( false ); // DG: without a renderer there's nothing to refresh
+
 	R_DoneFreeType( );
 
 	// SM reset the fonts when we shutdown so reloadEngine doesn't crash
