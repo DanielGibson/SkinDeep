@@ -5225,7 +5225,7 @@ void idEntity::Event_DistanceTo( idEntity *ent ) {
 idEntity::Event_DistanceToPoint
 ================
 */
-void idEntity::Event_DistanceToPoint( const idVec3 &point ) {
+void idEntity::Event_DistanceToPoint(const idVec3 &point) {
 	float dist = ( GetPhysics()->GetOrigin() - point ).LengthFast();
 	idThread::ReturnFloat( dist );
 }

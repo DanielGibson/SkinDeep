@@ -170,7 +170,7 @@ private:
 	void			Event_SetSoundHandles( void );
 	void			Event_FadeOut( float time );
 	void			Event_FadeIn( float time );
-	void			Event_SetSpotlightTarget(idVec3 vec);
+	void			Event_SetSpotlightTarget(const idVec3 &vec);
 	void			Event_GetLightHandle(void);
 
 	//BC

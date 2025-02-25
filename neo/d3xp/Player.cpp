@@ -8692,7 +8692,7 @@ void idPlayer::EnableBeaconUI()
 	beaconUITimer = gameLocal.time + 100;
 }
 
-void idPlayer::ActivateBeacon(int beaconType, idVec3 beaconSpawnPos)
+void idPlayer::ActivateBeacon(int beaconType, const idVec3 &beaconSpawnPos)
 {
 	const idDeclEntityDef *botDef;
 	idEntity *beaconlogicEnt;
@@ -16986,7 +16986,7 @@ void idPlayer::SetViewRollLerp(float targetRoll, int transitionTime)
 }
 
 //Make the player camera angle lerp toward a specific XYZ in the world.
-void idPlayer::SetViewLerp(idVec3 targetPosition, int moveTime)
+void idPlayer::SetViewLerp(const idVec3 &targetPosition, int moveTime)
 {
 	idAngles lerpviewInitialPosition = this->viewAngles;
 	lerpviewInitialPosition.Normalize180();
@@ -28788,7 +28788,7 @@ void idPlayer::SetHudParmInt(const char * parmName, int value)
 }
 
 //lerp from player eyeball to somewhere.
-void idPlayer::SetViewposAbsLerp(idVec3 _target, int _duration)
+void idPlayer::SetViewposAbsLerp(const idVec3 &_target, int _duration)
 {
 	viewposAbsStart = GetEyePosition();
 	viewposAbsTarget = _target;
@@ -28799,7 +28799,7 @@ void idPlayer::SetViewposAbsLerp(idVec3 _target, int _duration)
 }
 
 //lerp from somewhere to player eyeball
-void idPlayer::SetViewposAbsLerp2(idVec3 _target, int _duration)
+void idPlayer::SetViewposAbsLerp2(const idVec3 &_target, int _duration)
 {
 	viewposAbsStart = _target;
 	viewposAbsTarget = GetEyePosition();
@@ -30829,7 +30829,7 @@ void idPlayer::SetFlytextEvent(idVec3 position, const char *text, int textAlign 
 	common->Warning("Unable to allocate a free flytext index. Max: %d\n", FLYTEXT_COUNT);
 }
 
-void idPlayer::Event_flytext(idVec3 position, const char *text)
+void idPlayer::Event_flytext(const idVec3 &position, const char *text)
 {
 	SetFlytextEvent(position, text, idDeviceContext::ALIGN_CENTER);
 }
@@ -33373,7 +33373,7 @@ void idPlayer::Event_ResetMaterialTimer(const char* materialName)
 	material->ResetCinematicTime(0);
 }
 
-void idPlayer::Event_ParticleStream(const char* particlename, idVec3 destination, int duration)
+void idPlayer::Event_ParticleStream(const char* particlename, const idVec3 &destination, int duration)
 {
 	particleStreamDestination = destination;
 	particlestreamTimer = gameLocal.time + duration;

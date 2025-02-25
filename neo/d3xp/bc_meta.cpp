@@ -2238,7 +2238,7 @@ void idMeta::SetLKPPosition(idVec3 newPosition)
 }
 
 //We have the concept of LastKnownPosition (LKP) and LastKnownPositionReachable. The "reachable" variant is what the AI uses as a fallback in case they can't traverse to the LKP, i.e. if the LKP is floating in the air. The "reachable" variant stores position of the ground contacts.
-void idMeta::SetLKPReachablePosition(idVec3 newPosition)
+void idMeta::SetLKPReachablePosition(const idVec3 &newPosition)
 {
 	lkpReachablePosition = newPosition;
 	//gameRenderWorld->DebugArrow(colorGreen, newPosition + idVec3(0, 0, 128), newPosition, 4, 60000);

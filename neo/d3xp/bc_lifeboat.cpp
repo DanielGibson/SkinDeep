@@ -963,7 +963,7 @@ bool idLifeboat::DoFrob(int index, idEntity * frobber)
 }
 
 //This is for the script call.
-void idLifeboat::Event_LaunchPod(idVec3 originPos, idVec3 destinationPos)
+void idLifeboat::Event_LaunchPod(const idVec3 &originPos, const idVec3 &destinationPos)
 {
 	SetOrigin(originPos);
 
