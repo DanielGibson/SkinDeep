@@ -32921,7 +32921,7 @@ bool idPlayer::isInZoomMode()
 
 bool idPlayer::isInLabelInspectMode()
 {
-	return (zoominspect_LabelmodeActive == TRUE);
+	return (zoominspect_LabelmodeActive == true);
 }
 
 void idPlayer::SetDrawIngressPoints(bool value)
