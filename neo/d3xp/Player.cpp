@@ -2852,7 +2852,6 @@ idPlayer::idPlayer()
 
 	didInitialSpawn = false;
 
-	lastPlayerLookTrigger = nullptr;
 
 
 
@@ -2862,8 +2861,6 @@ idPlayer::idPlayer()
 	lastAvailableJockeyAttacktype = -1;
 
 	knockeddownLastSpeed = 0;
-
-	lastPlayerLookTrigger = nullptr;
 
 	zoominspectEntityPtr = NULL;
 
@@ -31785,7 +31782,7 @@ void idPlayer::UpdatePlayerLocboxTriggers()
 
 void idPlayer::UpdatePlayerLookTriggers()
 {
-	if ( lastPlayerLookTrigger && lastPlayerLookTrigger->IsHidden() )
+	if ( lastPlayerLookTrigger.IsValid() && lastPlayerLookTrigger.GetEntity()->IsHidden() )
 	{
 		lastPlayerLookTrigger = nullptr;
 	}
@@ -31808,21 +31805,21 @@ void idPlayer::UpdatePlayerLookTriggers()
 		float dist = frobTr.fraction * PLAYERLOOK_TRIGGER_DIST;
 		bool isInRange = range == 0.0f || range >= dist;
 		
-		if ( lastPlayerLookTrigger && ( lastPlayerLookTrigger != ent || !isInRange) )
+		if ( lastPlayerLookTrigger.IsValid() && ( lastPlayerLookTrigger.GetEntity() != ent || !isInRange) )
 		{
-			lastPlayerLookTrigger->PostEventMS( &EV_PlayerLookExit, 0 );
+			lastPlayerLookTrigger.GetEntity()->PostEventMS( &EV_PlayerLookExit, 0 );
 			lastPlayerLookTrigger = nullptr;
 		}
 
-		if ( lastPlayerLookTrigger != ent && isInRange )
+		if ( lastPlayerLookTrigger.GetEntity() != ent && isInRange )
 		{
 			lastPlayerLookTrigger = ent;
-			lastPlayerLookTrigger->PostEventMS( &EV_PlayerLookEnter, 0 );
+			lastPlayerLookTrigger.GetEntity()->PostEventMS( &EV_PlayerLookEnter, 0 );
 		}
 	}
-	else if ( lastPlayerLookTrigger )
+	else if ( lastPlayerLookTrigger.IsValid() )
 	{
-		lastPlayerLookTrigger->PostEventMS( &EV_PlayerLookExit, 0 );
+		lastPlayerLookTrigger.GetEntity()->PostEventMS( &EV_PlayerLookExit, 0 );
 		lastPlayerLookTrigger = nullptr;
 	}
 }

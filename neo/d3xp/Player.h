@@ -2092,7 +2092,7 @@ private:
 
 	bool					DoCarryablePlacerLogic();
 
-	idEntity*				lastPlayerLookTrigger;
+	idEntityPtr<idEntity>	lastPlayerLookTrigger;
 	void					UpdatePlayerLookTriggers();
 	void					DebugUnassignedLocations();
 
