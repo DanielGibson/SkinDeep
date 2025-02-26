@@ -384,6 +384,10 @@ void idGameLocal::Clear( void ) {
 	loadCount = 0;
 
 	lastDebugNoteIndex = -1;
+
+	for( int i=0; i<CT_NUM; ++i ) {
+		controllerButtonDicts[i].Clear();
+	}
 }
 
 /*

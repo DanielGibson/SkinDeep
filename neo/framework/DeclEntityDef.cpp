@@ -90,19 +90,22 @@ bool idDeclEntityDef::Parse( const char *text, const int textLength ) {
 	}
 
 	// blendo eric: aliased keywords
-	static idDict nameAliases;
-	if (nameAliases.GetNumKeyVals() == 0) {
-		nameAliases.Set("bouncyness", "bounce");
-		nameAliases.Set("friction", "contact_friction");
-	}
+	// DG: Turned from static idDict into array of structs
+	//     because static dicts cause crashes on shutdown
+	static const struct NameAlias {
+		const char* oldName;
+		const char* newName;
+	} nameAliases[] = {
+		{ "bouncyness", "bounce" },
+		{ "friction", "contact_friction" }
+	};
 
 	// blendo eric: aliasing replaces equivalent names
-	for (int idx = 0; idx < nameAliases.GetNumKeyVals(); idx++) {
-		const idKeyValue * kvAlias = nameAliases.GetKeyVal(idx);
-		const idKeyValue * kv = dict.FindKey(kvAlias->GetKey());
+	for (int idx = 0; idx < sizeof(nameAliases)/sizeof(nameAliases[0]); idx++) {
+		const idKeyValue * kv = dict.FindKey(nameAliases[idx].oldName);
 		if (kv) {
-			dict.Set(kvAlias->GetValue(), kv->GetValue());
-			dict.Delete(kvAlias->GetKey());
+			dict.Set(nameAliases[idx].newName, kv->GetValue());
+			dict.Delete(nameAliases[idx].oldName);
 		}
 	}
 
