@@ -392,6 +392,8 @@ if(D3_COMPILER_IS_GCC_OR_CLANG)
 	# TODO fix these warnings
 	add_compile_options(-Wno-sign-compare)
 	add_compile_options(-Wno-switch)
+	add_compile_options(-Wno-unused-function -Wno-unused-variable)
+	add_compile_options(-Wno-deprecated-enum-float-conversion)
 
 	CHECK_CXX_COMPILER_FLAG("-Woverloaded-virtual" cxx_has_Woverload_virtual)
 	if(cxx_has_Woverload_virtual)
