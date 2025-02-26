@@ -205,8 +205,7 @@ void idRadioCheckin::Think(void)
 				//assign the voiceprint.
 				//voiceprint
 
-				soundCue = idStr::Format("%s_%s", (voiceprint <= 0) ? "snd_a" : "snd_b", soundCue);
-
+				soundCue = va("%s_%s", (voiceprint <= 0) ? "snd_a" : "snd_b", soundCue);
 			}
 			else
 			{
