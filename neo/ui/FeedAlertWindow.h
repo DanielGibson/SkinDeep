@@ -12,7 +12,7 @@ class idFeedAlertWindow : public idWindow
 public:
 	idFeedAlertWindow(idUserInterfaceLocal *gui) : idWindow(gui){ CommonInit(); }
 	idFeedAlertWindow(idDeviceContext *d, idUserInterfaceLocal *gui) : idWindow(d, gui){ CommonInit(); }
-	virtual ~idFeedAlertWindow(){ disposedState = 0; idWindow::~idWindow(); }
+	virtual ~idFeedAlertWindow() { disposedState = 0; }
 	virtual bool ParseInternalVar(const char* name, idParser* src);
 	virtual void PostParse();
 	virtual void Redraw(float x, float y){ Update(); idWindow::Redraw(x, y); }
