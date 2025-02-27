@@ -27525,7 +27525,7 @@ void idPlayer::Event_TeleportToEnt(idEntity *ent)
 	GetPhysics()->SetLinearVelocity( prevVelocity * idAngles( 0, entityYaw - prevYaw, 0 ).ToMat3() );
 }
 
-void idPlayer::Event_Teleport(idVec3 destination)
+void idPlayer::Event_Teleport(const idVec3 &destination)
 {
 	idVec3 org;
 

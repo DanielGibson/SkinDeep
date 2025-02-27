@@ -1526,7 +1526,7 @@ void idAnimated::Event_PropAnim(const char *animName, int loop)
 }
 
 
-void idAnimated::Event_TurnJointToward(const char *jointName, idVec3 lookPoint)
+void idAnimated::Event_TurnJointToward(const char *jointName, const idVec3 &lookPoint)
 {
 	idVec3 lookVec, jointPos;
 	idMat3 jointAxis;

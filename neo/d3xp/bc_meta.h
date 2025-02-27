@@ -459,7 +459,7 @@ private:
 
 	void				Event_StartGlobalStunState(const char* aiDamageDef);
 
-	void				Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, idVec3 spawnPos, idVec3 spawnTrajectory);
+	void				Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, const idVec3 &spawnPos, const idVec3 &spawnTrajectory);
 
 	void				ReinforcementEndgameCheck();
 

@@ -2601,7 +2601,7 @@ void idAI::Event_TravelDistanceBetweenEntities( idEntity *source, idEntity *dest
 	idThread::ReturnFloat( time );
 }
 
-void idAI::Event_LookAtPoint(idVec3 _point, float duration)
+void idAI::Event_LookAtPoint(const idVec3 &_point, float duration)
 {	
 	focusEntity = NULL;
 	alignHeadTime = gameLocal.time;
@@ -3965,7 +3965,7 @@ bool idAI::CheckSearchLook(idVec3 lookPoint, int useFacing, bool doProximityChec
 
 
 
-void idAI::Event_SetLastVisiblePos(idVec3 pos)
+void idAI::Event_SetLastVisiblePos(const idVec3 &pos)
 {
 	lastVisibleEnemyPos = pos;
 }

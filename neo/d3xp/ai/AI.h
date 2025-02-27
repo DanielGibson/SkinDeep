@@ -847,7 +847,7 @@ protected:
 #endif
 
 	//BC PROTECTED. Put all private vars/funcs here.
-	void					Event_LookAtPoint(idVec3 _point, float duration);
+	void					Event_LookAtPoint(const idVec3 &_point, float duration);
 	void					LookAtPointMS(idVec3 _point, int durationMS);
 	void					Event_GetCoverNode(void);
 	void					Event_GetLastEnemyPosition(void);
@@ -877,7 +877,7 @@ protected:
 	void					Event_SetLaserActive(int active);
 	void					Event_CheckSearchLook(const idVec3 &lookPoint, int useFacing);
 	bool					CheckSearchLook(idVec3 lookPoint, int useFacing, bool doProximityCheck);
-	void					Event_SetLastVisiblePos(idVec3 pos);
+	void					Event_SetLastVisiblePos(const idVec3 &pos);
 	void					Event_CheckForwardDot(const idVec3 &lookPoint);
 	void					Event_SetLaserEndLock(const idVec3 &pos);
 	void					Event_StartStunState(const char* damageDefName);
