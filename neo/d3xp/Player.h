@@ -1393,7 +1393,7 @@ private:
 	void					Event_Gibbed( void );
 
 	
-	void					Event_Teleport(idVec3 destination);
+	void					Event_Teleport(const idVec3 &destination);
 	
 
 #ifdef _D3XP //BSM: Event to remove inventory items. Useful with powercells.

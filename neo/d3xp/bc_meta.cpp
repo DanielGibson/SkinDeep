@@ -5747,7 +5747,7 @@ void idMeta::SkipHighlighter()
 	return highlighterEnt->DoSkip();
 }
 
-void idMeta::Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, idVec3 spawnPos, idVec3 spawnTrajectory)
+void idMeta::Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, const idVec3 &spawnPos, const idVec3 &spawnTrajectory)
 {
 	idThread::ReturnEntity(gameLocal.LaunchProjectile(owner, damageDef, spawnPos, spawnTrajectory));
 }

@@ -4381,7 +4381,7 @@ Exposes teleport method to scripting.
 Using this instead of setOrigin() ensures that the entity correctly updates its gravity to match the destination.
 ================
 */
-void idEntity::Event_EntityTeleport(idVec3 origin, idVec3 angleVec)
+void idEntity::Event_EntityTeleport(const idVec3 &origin, const idVec3 &angleVec)
 {
 	idAngles angles = idAngles(angleVec);
 	Teleport(origin, angles, NULL);

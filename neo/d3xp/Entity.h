@@ -663,7 +663,7 @@ private:
 
 	void					Event_RepairEntity();
 
-	void					Event_EntityTeleport(idVec3 origin, idVec3 angles);
+	void					Event_EntityTeleport(const idVec3 &origin, const idVec3 &angles);
 
 	void					Event_SetSystemicVoEnabled(int value);
 

@@ -289,7 +289,7 @@ public:
 	bool					StartRagdoll( void );
 	virtual bool			GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis );
 
-	void					Event_TurnJointToward(const char* jointName, idVec3 lookPoint); //BC
+	void					Event_TurnJointToward(const char* jointName, const idVec3 &lookPoint); //BC
 
 private:
 	int						num_anims;
