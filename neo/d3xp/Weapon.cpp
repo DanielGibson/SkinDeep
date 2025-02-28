@@ -4677,7 +4677,7 @@ bool idWeapon::IsInspectingChamber()
 
 int idWeapon::Event_RoundIsChambered(void)
 {
-	bool chambered = owner->inventory.hotbarSlots[owner->currentWeaponSlot].chambered;
+	bool chambered = (owner->currentWeaponSlot != -1) ? owner->inventory.hotbarSlots[owner->currentWeaponSlot].chambered : false;
 	
 	idThread::ReturnInt(chambered);
 	return chambered;

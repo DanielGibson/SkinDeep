@@ -5480,7 +5480,7 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 	}
 	else if (weapon.IsValid())
 	{
-		int currentWeapon = inventory.hotbarSlots[currentWeaponSlot].weaponType;
+		int currentWeapon = (currentWeaponSlot != -1) ? inventory.hotbarSlots[currentWeaponSlot].weaponType : 0;
 		if (currentWeapon > 0)
 		{
 			int equippedSlot = inventory.GetHotbarSelection();
