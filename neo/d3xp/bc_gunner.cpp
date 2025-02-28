@@ -476,7 +476,7 @@ void idGunnerMonster::Think(void)
 			State_Jockeyed();
 			break;
 		default:
-			common->Error("invalid AI state %d in '%s'", state, GetName());
+			common->Error("invalid AI state %d in '%s'", aiState, GetName());
 			break;
 	}
 
@@ -4197,7 +4197,7 @@ void idGunnerMonster::GotoState(int _state)
 			stateTimer = gameLocal.time;
 			break;
 		default:
-			common->Error("invalid AI state %d in '%s'", state, GetName());
+			common->Error("invalid AI state %d in '%s'", aiState, GetName());
 			break;
 	}
 

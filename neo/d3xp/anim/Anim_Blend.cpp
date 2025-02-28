@@ -2485,7 +2485,7 @@ void idAnimBlend::BlendDelta( int fromtime, int totime, idVec3 &blendDelta, floa
 		float maxTravelDist = DEBUG_ANIM_MOVE_MAX * (gameLocal.msec / 1000.0f);
 		if( delta.LengthFast() > maxTravelDist || blendDelta.LengthFast() > maxTravelDist ) {
 
-			gameLocal.Warning( "entity AI anim move speed exceeded %d m/s (is origin joint starting at 0?) ", (int)DEBUG_ANIM_MOVE_MAX*DOOM_TO_METERS );
+			gameLocal.Warning( "entity AI anim move speed exceeded %d m/s (is origin joint starting at 0?) ", (int)(DEBUG_ANIM_MOVE_MAX*DOOM_TO_METERS) );
 		}
 	}
 #endif
@@ -3383,7 +3383,7 @@ bool idDeclModelDef::Parse( const char *text, const int textLength ) {
 		jointnum = jointList[ i ];
 		if ( joints[ jointnum ].channel == ANIMCHANNEL_ALL ) {
 			src.Warning( "!!! joint unassigned to an animation channel in %s (ie  model model_x { channel torso ( left_arm ) } ), model may fail to animate joint: '%s'\n",
-				filename.c_str(), modelHandle->GetJointName( jointnum ), modelHandle->GetJointName( jointnum ) );
+				filename.c_str(), modelHandle->GetJointName( jointnum ) );
 		}
 	}
 #endif

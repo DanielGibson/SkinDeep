@@ -98,7 +98,7 @@ void idTrashExit::SetupChute(idEntity * ent, bool isOpen)
 		gameLocal.SpawnEntityDef(args, &tempEnt);
 		if (!tempEnt)
 		{
-			gameLocal.Error("ventdoor '%s' failed to spawn ventpeek.");
+			gameLocal.Error("ventdoor '%s' failed to spawn ventpeek.", GetName());
 		}
 		peekEnt = static_cast<idVentpeek*>(tempEnt);
 		

@@ -1703,13 +1703,13 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	// let the renderSystem load all the geometry
 	if ( !rw->InitFromMap( fullMapName ) ) {
 
-		common->Warning("----------------------------------", mapString.c_str()); //BC
+		common->Warning("----------------------------------"); //, mapString.c_str()); //BC
 		common->Warning("");
 		common->Warning("*** Map needs to be rebuilt ***"); //BC
 		common->Warning("PLEASE TYPE THIS IN:");
 		common->Warning("dmap %s", mapString.c_str()); //BC
 		common->Warning("");
-		common->Warning("----------------------------------\n", mapString.c_str()); //BC
+		common->Warning("----------------------------------\n"); //, mapString.c_str()); //BC
 
 		common->Error( "couldn't load %s", fullMapName.c_str() );
 		

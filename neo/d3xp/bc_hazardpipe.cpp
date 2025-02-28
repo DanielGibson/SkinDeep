@@ -207,7 +207,7 @@ void idHazardPipe::AddDamageEffect(const trace_t &collision, const idVec3 &veloc
 
 	if (!damageJet)
 	{
-		gameLocal.Error("hazardpipe '%s' failed to spawn damagejet.");
+		gameLocal.Error("hazardpipe '%s' failed to spawn damagejet.", GetName());
 	}
 
 

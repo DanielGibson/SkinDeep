@@ -680,7 +680,7 @@ void idActor::Spawn( void ) {
 
 		if (kv->GetValue().Length() <= 0)
 		{
-			gameLocal.Printf("def_attach on entity '%s' is empty field.\n", kv->GetValue().c_str(), name.c_str());
+			gameLocal.Printf("def_attach on entity '%s' is empty field.\n", name.c_str());
 		}
 		else
 		{
