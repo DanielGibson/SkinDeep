@@ -1685,6 +1685,11 @@ RB_STD_DrawView
 =============
 */
 void	RB_STD_DrawView( void ) {
+	// SM: We get to RB_STD_DrawView on level load when it's the default buffer,
+	// but that's an error so don't render then
+	if (backEnd.frameBufferId == FRAME_DEFAULT_BACKBUFFER)
+		return;
+
 	drawSurf_t	 **drawSurfs;
 	int			numDrawSurfs;
 
