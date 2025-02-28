@@ -375,7 +375,7 @@ idFeedAlertWindow::alert_t& idFeedAlertWindow::ActivateNewAlert()
 	// reverse iterate so new slots are always at the first index position in queue
 	alertQueueIterator = alertQueueIterator > 0 ? alertQueueIterator - 1 : alertQueueSize - 1;
 	alert_t& newAlert = GetAlert(0);
-	assert(newAlert.ended = true);
+	assert(newAlert.ended == true);
 	newAlert.ended = false;
 	newAlert.debugID = debugAlertTotalCount++;
 	UpdateAlertQueues();
