@@ -261,7 +261,7 @@ void R_SetLightProject( idPlane lightProject[4], const idVec3 origin, const idVe
 	scale = -( 0.5f * dist ) / uLen;
 	up *= scale;
 
-	memset(lightProject, 0, sizeof(lightProject));
+	memset(lightProject, 0, sizeof(idPlane)*4);
 
 	if (isParallel)
 	{
