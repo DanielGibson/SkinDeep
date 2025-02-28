@@ -4487,7 +4487,7 @@ idEntity * idMeta::SpawnIdleTask(idEntity *ownerEnt, idVec3 position, const char
 	idEntity				*idletaskEnt;
 	const idDeclEntityDef	*idleDef;
 
-	if (idletaskName[0] == '/0') //if def is empty, then skip.
+	if (idletaskName[0] == '\0') //if def is empty, then skip.
 		return NULL;
 
 	idleDef = gameLocal.FindEntityDef(idletaskName);
