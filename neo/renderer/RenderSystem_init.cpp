@@ -292,7 +292,8 @@ PFNGLDEPTHBOUNDSEXTPROC                 qglDepthBoundsEXT;
 PFNGLOBJECTLABELPROC					qglObjectLabel;
 PFNGLPUSHDEBUGGROUPPROC					qglPushDebugGroup;
 PFNGLPOPDEBUGGROUPPROC					qglPopDebugGroup;
-
+// GL_ARB_debug_output
+PFNGLDEBUGMESSAGECALLBACKARBPROC        qglDebugMessageCallback;
 
 // blendo eric: frame/render buffers
 PFNGLGENFRAMEBUFFERSPROC				qglGenFramebuffers;
@@ -335,6 +336,61 @@ PFNGLDISABLEVERTEXATTRIBARRAYPROC		qglDisableVertexAttribArray;
 PFNGLVERTEXATTRIBPOINTERPROC			qglVertexAttribPointer;
 PFNGLACTIVETEXTUREPROC					qglActiveTexture;
 PFNGLBINDBUFFERBASEPROC					qglBindBufferBase;
+
+
+enum {
+	// Not all GL.h header know about GL_DEBUG_SEVERITY_NOTIFICATION_*.
+	QGL_DEBUG_SEVERITY_NOTIFICATION = 0x826B
+};
+
+/*
+ * Callback function for debug output.
+ */
+static void APIENTRY
+DebugCallback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
+              const GLchar *message, const void *userParam )
+{
+	const char* sourceStr = "Source: Unknown";
+	const char* typeStr = "Type: Unknown";
+	const char* severityStr = "Severity: Unknown";
+
+	switch (severity)
+	{
+#define SVRCASE(X, STR)  case GL_DEBUG_SEVERITY_ ## X ## _ARB : severityStr = STR; break;
+		case QGL_DEBUG_SEVERITY_NOTIFICATION: return;
+		SVRCASE(HIGH, "Severity: High")
+		SVRCASE(MEDIUM, "Severity: Medium")
+		SVRCASE(LOW, "Severity: Low")
+#undef SVRCASE
+	}
+
+	switch (source)
+	{
+#define SRCCASE(X)  case GL_DEBUG_SOURCE_ ## X ## _ARB: sourceStr = "Source: " #X; break;
+		SRCCASE(API);
+		SRCCASE(WINDOW_SYSTEM);
+		SRCCASE(SHADER_COMPILER);
+		SRCCASE(THIRD_PARTY);
+		SRCCASE(APPLICATION);
+		SRCCASE(OTHER);
+#undef SRCCASE
+	}
+
+	switch(type)
+	{
+#define TYPECASE(X)  case GL_DEBUG_TYPE_ ## X ## _ARB: typeStr = "Type: " #X; break;
+		TYPECASE(ERROR);
+		TYPECASE(DEPRECATED_BEHAVIOR);
+		TYPECASE(UNDEFINED_BEHAVIOR);
+		TYPECASE(PORTABILITY);
+		TYPECASE(PERFORMANCE);
+		TYPECASE(OTHER);
+#undef TYPECASE
+	}
+
+	common->Warning( "GLDBG %s %s %s: %s\n", sourceStr, typeStr, severityStr, message );
+
+}
 
 /*
 =================
@@ -510,10 +566,16 @@ static void R_CheckPortableExtensions( void ) {
 		qglPushDebugGroup = (PFNGLPUSHDEBUGGROUPPROC)GLimp_ExtensionPointer( "glPushDebugGroup" );
 		qglPopDebugGroup = (PFNGLPOPDEBUGGROUPPROC)GLimp_ExtensionPointer( "glPopDebugGroup" );
 
+		qglDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKARBPROC)GLimp_ExtensionPointer( "glDebugMessageCallback" );
+
 		// SM: Enable debug output if requested
 #ifdef _DEBUG
 		if ( r_debugGLContext.GetBool() ) {
 			qglEnable( GL_DEBUG_OUTPUT );
+			// logging synchronous means that you can put breakpoints in DebugCallback()
+			// to see what caused the warning/error
+			qglEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+			qglDebugMessageCallback(DebugCallback, NULL);
 		}
 #endif
 	}
