@@ -156,8 +156,18 @@ void Sys_Quit(void) {
 Sys_Mkdir
 ================
 */
-void Sys_Mkdir( const char *path ) {
-	mkdir(path, 0777);
+int Sys_Mkdir( const char *path ) {
+	return mkdir(path, 0777);
+}
+
+/*
+==============
+Sys_Access
+==============
+*/
+// modes: 00 Existence, 02 Write, 04 Read, 06 Read+write
+int Sys_Access( const char *path, SYS_ACCESS_MODE mode ) {
+	return access(path, mode);
 }
 
 /*

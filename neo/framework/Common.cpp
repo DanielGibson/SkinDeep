@@ -2714,7 +2714,11 @@ void idCommonLocal::InitSIMD( void ) {
 	if (SDL_HasSSE41() == SDL_FALSE)
 	{
 		idStr errorMsg = idStr::Format("Skin Deep requires a CPU that supports SSE4.1 or higher.\n\n- Please ensure your CPU supports SSE4.1 or higher.\n- If your computer has multiple video cards, please ensure it is using its dedicated video card (not the integrated video card).\n\nExiting now.");
+#ifdef _WIN32
 		MessageBox(NULL, errorMsg.c_str(), "Fatal Error", MB_OK | MB_ICONERROR);
+#else
+		printf("FATAL ERROR: %s\n", errorMsg.c_str());
+#endif
 		exit(1);
 	}
 

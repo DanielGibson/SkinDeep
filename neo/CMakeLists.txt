@@ -265,6 +265,11 @@ set (CMAKE_CXX_STANDARD 20) # skindeep needs C++20 for some string stuff
 	set(CURL_LIBRARY "")
 #endif()
 
+# TODO: define __BLENDO_SIMD_INLINE__;__BLENDO_SIMD__
+# DG: maybe make this configurable?
+add_definitions(-DNOSTEAM)
+add_definitions(-D__BLENDO_SIMD_INLINE__ -D__BLENDO_SIMD__)
+
 # DG: skindeep uses CMAKE_INTDIR, seems to hold the build type
 add_definitions(-DCMAKE_INTDIR="${CMAKE_BUILD_TYPE}")
 
@@ -819,6 +824,7 @@ set(src_idlib
 	idlib/math/Simd_SSE.cpp
 	idlib/math/Simd_SSE2.cpp
 	idlib/math/Simd_SSE3.cpp
+	idlib/math/Simd_Blendo.cpp
 	idlib/math/Vector.cpp
 	idlib/BitMsg.cpp
 	idlib/LangDict.cpp

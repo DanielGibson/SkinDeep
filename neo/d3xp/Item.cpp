@@ -3988,7 +3988,7 @@ void idMoveableItem::JustThrown()
 	// So, to accommodate for this, we cheat the dropTimer somewhat for thrown weapons
 	if (spawnArgs.GetBool("isweapon") && dropTimer == gameLocal.time)
 	{
-		dropTimer = gameLocal.time - max(JUST_SPAWNED_GRACEPERIOD, INTERESTPOINT_DISABLETIME);
+		dropTimer = gameLocal.time - Max(JUST_SPAWNED_GRACEPERIOD, INTERESTPOINT_DISABLETIME);
 	}
 }
 

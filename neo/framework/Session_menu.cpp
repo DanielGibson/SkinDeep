@@ -782,7 +782,7 @@ bool idSessionLocal::HandleSaveGameMenuCommand( idCmdArgs &args, int &icmd ) {
 			//BC 4-3-2025: select item in list. This is so that after deleting a file, it auto selects the next item in list.
 			if (loadGameList.Num() > 0)
 			{
-				int newselection = min(loadGameList.Num() - 1, choice);
+				int newselection = Min(loadGameList.Num() - 1, choice);
 
 				guiActive->SetStateInt("loadgame_sel_0", newselection); //Select item in list.
 				ShowSavegameInfo(); //simulate clicking the selection so its info appears in the info panel.

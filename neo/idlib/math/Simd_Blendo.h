@@ -37,9 +37,18 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 #define SIMD_INLINE						inline
-#define SIMD_FORCE_INLINE				__forceinline
 #define SIMD_INLINE_EXTERN				static inline //extern inline
+#ifdef _WIN32
+#define SIMD_FORCE_INLINE				__forceinline
 #define SIMD_FORCE_INLINE_EXTERN		static __forceinline //	extern __forceinline
+#else
+#define SIMD_FORCE_INLINE				inline // TODO: attribute?
+#define SIMD_FORCE_INLINE_EXTERN		static inline //	extern __forceinline
+#endif
+
+#ifndef _WIN32
+#define UINT_PTR uintptr_t
+#endif
 
 #define SIMD_PI	3.14159265358979323846f
 
@@ -202,8 +211,24 @@ PC Windows
 ================================================
 */
 
+// DG: _CRT_ALIGN seems to be MSVC specific, so provide implementation..
+#ifndef _CRT_ALIGN
+	#if defined(__GNUC__) // also applies for clang
+		#define _CRT_ALIGN(x) __attribute__ ((__aligned__ (x)))
+	#elif defined(_MSC_VER) // also for MSVC, just to be sure
+		#define _CRT_ALIGN(x) __declspec(align(x))
+	#endif
+#endif
+// DG: make sure __declspec(intrin_type) is only used on MSVC (it's not available on GCC etc
+#ifdef _MSC_VER
+	#define DECLSPEC_INTRINTYPE __declspec( intrin_type )
+#else
+	#define DECLSPEC_INTRINTYPE
+#endif
+// DG end
+
 // make the intrinsics "type unsafe"
-typedef union __declspec(intrin_type)_CRT_ALIGN(16) __m128c {
+typedef union DECLSPEC_INTRINTYPE _CRT_ALIGN( 16 ) __m128c {
 	__m128c() {}
 	__m128c(__m128 f) { m128 = f; }
 	__m128c(__m128i i) { m128i = i; }

@@ -11,6 +11,8 @@
 #include "bc_meta.h"
 #include "bc_glasspiece.h"
 
+#include <float.h>
+
 
 #define GLASSWOUND_COOLDOWNTIME 100 //if player has received a glass wound, have a cooldown period before another glasswound happens.
 #define BREAK_THRESHOLD 400 //if collide & above this velocity, then shatter it.

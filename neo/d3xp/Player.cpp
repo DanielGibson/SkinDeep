@@ -32024,7 +32024,7 @@ bool idPlayer::HasItemViaEntityname(const char* itemname)
 	idStr strName = itemname;
 	int subIndex = strName.Find("*", false, 0, -1);
 
-	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	for (int i = 0; i < Min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
 	{
 		if (inventory.hotbarSlots[i].carryPtr.IsValid())
 		{
