@@ -54,7 +54,7 @@ public:
 							idPhysics_Static( void );
 							~idPhysics_Static( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 public:	// common physics interface

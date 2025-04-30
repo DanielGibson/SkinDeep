@@ -135,6 +135,68 @@ void idAI_Spearbot::Spawn(void)
 }
 
 
+void idAI_Spearbot::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteInt( suspicionPips ); // int suspicionPips
+	savefile->WriteInt( suspicionTimer ); // int suspicionTimer
+
+	savefile->WriteInt( beamTimer ); // int beamTimer
+
+	savefile->WriteObject( ramTargetEnt ); // idEntityPtr<idEntity> ramTargetEnt
+	savefile->WriteVec3( ramPosition ); // idVec3 ramPosition
+	savefile->WriteVec3( ramDirection ); // idVec3 ramDirection
+
+	SaveFileWriteArray( beamOrigin, SCANBEAMS, WriteObject ); // idBeam*	beamOrigin[SCANBEAMS]
+	SaveFileWriteArray( beamTarget, SCANBEAMS, WriteObject ); // idBeam* beamTarget[SCANBEAMS]
+
+	SaveFileWriteArray( beamOffsets, SCANBEAMS, WriteVec3 ); // idVec3 beamOffsets[SCANBEAMS]
+	SaveFileWriteArray( beamRandomAngles, SCANBEAMS, WriteVec3 ); // idVec3 beamRandomAngles[SCANBEAMS]
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteObject( scanchargeParticles ); // idFuncEmitter * scanchargeParticles
+
+	savefile->WriteObject( targetinglineStart ); // idBeam* targetinglineStart
+	savefile->WriteObject( targetinglineEnd ); // idBeam* targetinglineEnd
+
+	savefile->WriteBool( isplayingLockBuzz ); // bool isplayingLockBuzz
+}
+void idAI_Spearbot::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadInt( suspicionPips ); // int suspicionPips
+	savefile->ReadInt( suspicionTimer ); // int suspicionTimer
+
+	savefile->ReadInt( beamTimer ); // int beamTimer
+
+	savefile->ReadObject( ramTargetEnt ); // idEntityPtr<idEntity> ramTargetEnt
+	savefile->ReadVec3( ramPosition ); // idVec3 ramPosition
+	savefile->ReadVec3( ramDirection ); // idVec3 ramDirection
+
+	SaveFileReadArrayCast( beamOrigin, ReadObject, idClass*& ); // idBeam* beamOrigin[SCANBEAMS]
+	SaveFileReadArrayCast( beamTarget, ReadObject, idClass*& ); // idBeam* beamTarget[SCANBEAMS]
+
+	SaveFileReadArray( beamOffsets, ReadVec3 ); // idVec3 beamOffsets[SCANBEAMS]
+	SaveFileReadArray( beamRandomAngles, ReadVec3 );  // idVec3 beamRandomAngles[SCANBEAMS]
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadObject( CastClassPtrRef(scanchargeParticles) ); // idFuncEmitter * scanchargeParticles
+
+	savefile->ReadObject( CastClassPtrRef(targetinglineStart) ); // idBeam* targetinglineStart
+	savefile->ReadObject( CastClassPtrRef(targetinglineEnd) ); // idBeam* targetinglineEnd
+
+	savefile->ReadBool( isplayingLockBuzz ); // bool isplayingLockBuzz
+}
+
 void idAI_Spearbot::Think(void)
 {
 	idAI::Think();
@@ -276,7 +338,7 @@ void idAI_Spearbot::Think(void)
 		if (headlightHandle <= -1)
 		{
 			// Create light source. We use a renderlight (i.e. not a real light entity) to prevent weird physics binding jitter
-			headlight.shader = declManager->FindMaterial("lights/flames_ambient", false);
+			headlight.shader = declManager->FindMaterial(spawnArgs.GetString("mtr_scanlight"), false); // SW 16th April 2025: made this data-driven
 			headlight.pointLight = true;
 			headlight.lightRadius[0] = headlight.lightRadius[1] = headlight.lightRadius[2] = LIGHT_RADIUS;
 
@@ -289,6 +351,7 @@ void idAI_Spearbot::Think(void)
 			headlight.noShadows = true;
 			headlight.isAmbient = false;
 			headlight.axis = mat3_identity;
+			headlight.affectLightMeter = true; // SW 16th April 2025: Light should affect player if they're shadowy
 			headlightHandle = gameRenderWorld->AddLightDef(&headlight);
 		}
 
@@ -512,6 +575,12 @@ void idAI_Spearbot::Killed(idEntity *inflictor, idEntity *attacker, int damage, 
 	scanchargeParticles->SetModel("smoke_sparks_03.prt");
 	scanchargeParticles->SetActive(true);
 
+	// SW 16th April 2025: Woah woah woah wait! Is our scanning light currently active? Make sure to shut that off first!!
+	if (headlightHandle != -1)
+	{
+		gameRenderWorld->FreeLightDef(headlightHandle);
+		headlightHandle = -1;
+	}
 
 	//Yellow spark light.
 	headlight.shader = declManager->FindMaterial("lights/defaultPointLight", false);

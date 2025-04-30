@@ -5,6 +5,7 @@
 #include "Player.h"
 #include "Fx.h"
 #include "framework/DeclEntityDef.h"
+#include "idlib/LangDict.h"
 
 #include "bc_cassetteplayer.h"
 
@@ -21,10 +22,13 @@ idCassettePlayer::idCassettePlayer(void)
 {
 	isFrobbable = false;
 	soundshaderList.Clear();
+
+	tracklist = uiManager->AllocListGUI();
 }
 
 idCassettePlayer::~idCassettePlayer(void)
 {
+	uiManager->FreeListGUI(tracklist);
 }
 
 void idCassettePlayer::Spawn(void)
@@ -47,8 +51,6 @@ int CassetteSort(const int* a, const int* b)
 void idCassettePlayer::Event_PostSpawn(void)
 {
 	//Populate the list with cassette tapes the player has obtained.
-
-	tracklist = uiManager->AllocListGUI();
 	tracklist->Config(renderEntity.gui[0], "tracklist");
 	tracklist->Clear();
 
@@ -87,7 +89,7 @@ void idCassettePlayer::Event_PostSpawn(void)
 			if (trackShader.Length() <= 0 || trackName.Length() <= 0)
 				break; //no more tracks left. exit
 
-			tracklist->Add(tracklistIndex, trackName.c_str());
+			tracklist->Add(tracklistIndex, common->GetLanguageDict()->GetString(trackName.c_str()));
 			soundshaderList.Append(trackShader);
 			tracklistIndex++;
 		}
@@ -106,10 +108,14 @@ void idCassettePlayer::Event_PostSpawn(void)
 
 void idCassettePlayer::Save(idSaveGame *savefile) const
 {
+	tracklist->Save( savefile ); //  idListGUI* tracklist
+	SaveFileWriteArray( soundshaderList, soundshaderList.Num(), WriteString ); //  idList<idStr> soundshaderList
 }
 
 void idCassettePlayer::Restore(idRestoreGame *savefile)
 {
+	tracklist->Restore( savefile ); //  idListGUI* tracklist
+	SaveFileReadArray( soundshaderList, ReadString ); //  idList<idStr> soundshaderList
 }
 
 void idCassettePlayer::Think(void)

@@ -40,7 +40,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Game_local.h"
 #include "d3xp/Player.h"
 
-
+#include "d3xp/platformutilties.h"
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 
@@ -82,8 +82,8 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 
 	guiMainMenu->HandleNamedEvent("menustart");
 	
-	//BC remove legacy stuff.
-	//guiMainMenu->HandleNamedEvent( playIntro ? "playIntro" : "noIntro" );
+	//BC 3-5-2025: re-enable the intro video logic.
+	guiMainMenu->HandleNamedEvent( playIntro ? "playIntro" : "noIntro" );
 
 
 	//if(fileSystem->HasD3XP()) {
@@ -96,6 +96,32 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 
 	cvarSystem->SetCVarBool("g_hideHudInternal", true); //blendo eric: hide hud in main menu
 }
+
+void idSessionLocal::LoadGameMenu()
+{
+	if (guiActive == guiMainMenu) {
+		return;
+	}
+
+	// pause the game sound world
+	if (sw != NULL && !sw->IsPaused()) {
+		sw->Pause();
+	}
+
+	// start playing the menu sounds
+	soundSystem->SetPlayingSoundWorld(menuSoundWorld);
+
+	SetGUI(guiMainMenu, NULL);
+
+	guiMainMenu->HandleNamedEvent("menustart");
+	guiMainMenu->HandleNamedEvent("noIntro");
+	guiMainMenu->HandleNamedEvent("showLoadMenu");
+
+	console->Close();
+
+	cvarSystem->SetCVarBool("g_hideHudInternal", true); //blendo eric: hide hud in main menu
+}
+
 
 /*
 =================
@@ -182,9 +208,14 @@ void idSessionLocal::GetSaveGameList( idStrList &fileList, idList<fileTIME_T> &f
 	fileSystem->FreeFileList( files );
 
 	for ( i = 0; i < fileList.Num(); i++ ) {
-		ID_TIME_T timeStamp;
 
-		fileSystem->ReadFile( "savegames/" + fileList[i], NULL, &timeStamp );
+		// use save game name session id time if available
+		ID_TIME_T timeStamp = ExtractTimeFromSaveGameUniqueID( ExtractSaveGameUniqueId( fileList[i] ) );
+
+		if ( timeStamp <= 0 ) { // fallback to modified time
+			fileSystem->ReadFile("savegames/" + fileList[i], NULL, &timeStamp);
+		}
+
 		fileList[i].StripLeading( '/' );
 		fileList[i].StripFileExtension();
 
@@ -202,6 +233,7 @@ void idSessionLocal::GetSaveGameList( idStrList &fileList, idList<fileTIME_T> &f
 idSessionLocal::SetSaveGameGuiVars
 ===============
 */
+//BC Set the information to appear in the 'loadgame' listDef, for the mainmenu load GUI.
 void idSessionLocal::SetSaveGameGuiVars( void ) {
 	int i;
 	idStr name;
@@ -220,15 +252,27 @@ void idSessionLocal::SetSaveGameGuiVars( void ) {
 
 		idStr description, screenshot;//BC
 
+		//BC Load the savegame TXT file. The TXT file has some info for the savegame.
 		idLexer src(LEXFL_NOERRORS|LEXFL_NOSTRINGCONCAT);
 		if ( src.LoadFile( va("savegames/%s.txt", loadGameList[i].c_str()) ) ) {
 			idToken tok;
 			src.ReadToken( &tok );
-			name = tok;
+			name = tok; //BC 4-1-2025: note: this isn't used any more; we instead use the "description" field below to grab the localized level name.
 
 			src.ReadToken(&tok);
 			description = tok;
 
+			//BC 4-1-2025: get level displayname.
+			if (name.Find("autosave") != -1) {
+				name = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_save_autosave"), gameLocal.GetMapdisplaynameViaMapfile(description).c_str());
+			} else {
+				name = gameLocal.GetMapdisplaynameViaMapfile(description);
+			}
+
+			src.ReadToken(&tok);
+
+			// SW 10th April 2025: Build number is now saved to the .txt, so we need to skip over its token to get to the screenshot path
+			// The screenshot isn't used here anyway, but I don't want this to be a landmine for anyone else.
 			src.ReadToken(&tok);
 			screenshot = tok;
 		}
@@ -239,45 +283,51 @@ void idSessionLocal::SetSaveGameGuiVars( void ) {
 
 		name += "\t";
 
-		idStr date = Sys_TimeStampToStr( fileTimes[i].timeStamp );
+		//idStr date = Sys_TimeStampToStr( fileTimes[i].timeStamp );
 		//name += date;
 
 		//BC don't show the date. Instead, print string of how long ago the save was relative to now.
-		time_t		timediff;
-		time_t		today;
-		time_t filetimestamp;
-		struct tm* timeinfo = nullptr;
-		idStr		diffString;
-		int			days;
+		ID_TIME_T curTime = time(nullptr);
+		localtime(&curTime);
 
-		filetimestamp = fileTimes[i].timeStamp;
-		time(&today);
-		timediff = (today - filetimestamp);
-		timeinfo = gmtime(&timediff);		
-		
-		days = timeinfo->tm_yday;
-		
-		if (days > 0)
+		ID_TIME_T timeDiff = difftime( curTime, fileTimes[i].timeStamp );
+
+		const ID_TIME_T dayLimit = 9999*24*60*60; // 9999 days in seconds
+		if ( timeDiff < 0 ) {
+			timeDiff = 0;
+		} else if ( timeDiff > dayLimit ) {
+			timeDiff = dayLimit;
+		}
+
+		int days = timeDiff / (24*60*60);
+		int hours = timeDiff / (60*60);
+		int mins = timeDiff / (60);
+		int seconds = timeDiff;
+
+		idStr diffString;
+		if ( days > 1 )
 		{
-			if (days > 1)
-				diffString = va("%d days ago", days);
-			else
-				diffString = "Yesterday";
+			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_daysago"), days);
+		}
+		else if ( days == 1 )
+		{
+			diffString = common->GetLanguageDict()->GetString("#str_loadgame_yesterday");
+		}
+		else if ( hours > 0 )
+		{
+			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_hoursago"), hours);
+		}
+		else if ( mins > 0 )
+		{
+			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_minutesago"), mins);
+		}
+		else if ( seconds > 0 )
+		{
+			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_secondsago"), seconds);
 		}
 		else
 		{
-			if (timeinfo->tm_hour > 0)
-			{
-				diffString = va("%d hours ago", timeinfo->tm_hour);
-			}
-			else if (timeinfo->tm_min > 0)
-			{
-				diffString = va("%d minutes ago", timeinfo->tm_min);
-			}
-			else
-			{
-				diffString = va("%d seconds ago", timeinfo->tm_sec);
-			}
+			diffString = "";
 		}
 
 		name += diffString; //Add the relative time elapsed to the savegame display name in the list.
@@ -346,40 +396,144 @@ void idSessionLocal::SetModsMenuGuiVars( void ) {
 	int i;
 	idModList *list = fileSystem->ListMods();
 
+	bool foundActiveMod = false;
 	int totalNumberOfMods = list->GetNumMods();
 	
 
+	//add steam workshop mods. This isn't actually adding it to list; this is just gathering the steam workshop infos...
+	int workshopInstalledAmount = 0;
+	idStrList modpaths;
+
+	if (common->g_SteamUtilities)
+	{
+		if (common->g_SteamUtilities->IsSteamInitialized())
+		{
+			int workshopTotal = common->g_SteamUtilities->GetSteamWorkshopAmount();
+			common->DPrintf("[steam] subscribed workshop items: %d\n", workshopTotal);
+
+			for (i = 0; i < workshopTotal; i++)
+			{
+				idStr path = common->g_SteamUtilities->GetWorkshopPathAtIndex(i);
+
+				if (path.Length() <= 0)
+					continue;
+
+				workshopInstalledAmount++;
+				modpaths.Append(path);
+			}
+
+			common->DPrintf("[steam] installed workshop items:  %d\n", workshopInstalledAmount);
+			totalNumberOfMods += workshopInstalledAmount;
+		}
+	}
 
 
 
 
-	modsList.SetNum( list->GetNumMods() );
+	modsList.SetNum(totalNumberOfMods);
 
 	// Build the local mods gui list
 	for ( i = 0; i < list->GetNumMods(); i++ )
 	{
+		idStr path = list->GetMod(i);
 		idStr modName = list->GetDescription(i);
+
+		// SW 6th March 2025
+		// Figure out the active mod for displaying at the top of the list
+		if (!foundActiveMod && path.Icmp(cvarSystem->GetCVarString("fs_game")) == 0)
+		{
+			foundActiveMod = true;
+			guiActive->SetStateString("activemodname", modName);
+		}
+
 		modName += "\t";
 		modName += common->GetLanguageDict()->GetString("#str_gui_mainmenu_mod_local");
-		guiActive->SetStateString(va("modsList_item_%i", i), modName.c_str());
+		guiActive->SetStateString(idStr::Format("modsList_item_%d", i).c_str(), modName.c_str());
 
-		common->DPrintf("MOD: local mod path: %s\n", list->GetMod(i));
+		common->Printf("MODS: #%d local    path: '%s'\n", i, path.c_str());
+
 		modsList[i] = list->GetMod(i);
 	}
 
 
 	
+	//Build the steam workshop mod gui list.
+	if (common->g_SteamUtilities && common->g_SteamUtilities->IsSteamInitialized())
+	{
+		for (i = 0; i < workshopInstalledAmount; i++)
+		{
+			idStr descPath = modpaths[i].c_str();
+
+#if 1
+#ifdef _WIN32
+#define PATH_SLASH "\\"
+#else
+#define PATH_SLASH "/"
+#endif
+			descPath.Append(PATH_SLASH"description.txt");
+
+			//generate a relative folder path.
+			int foldernameIndex = idStr::FindText(modpaths[i], PATH_SLASH "steamapps" PATH_SLASH "workshop" PATH_SLASH, false);
+			int steamappsFolderLength = 10;
+			modpaths[i] = modpaths[i].Right(modpaths[i].Length() - foldernameIndex - steamappsFolderLength);
+#ifdef __APPLE__
+			modpaths[i] = ".." PATH_SLASH ".." PATH_SLASH ".." PATH_SLASH ".." PATH_SLASH ".." + modpaths[i]; //append the ..
+#else
+			modpaths[i] = ".." PATH_SLASH ".." + modpaths[i]; //append the ..
+#endif
+
+#undef PATH_SLASH
+#else
+			descPath.Append("/description.txt");
+#endif
+			idStr modTitle = fileSystem->GetModDescription(descPath);
+
+			// SW 6th March 2025
+			// Figure out the active mod for displaying at the top of the list
+			if (!foundActiveMod && modpaths[i].Icmp(cvarSystem->GetCVarString("fs_game")) == 0)
+			{
+				foundActiveMod = true;
+				guiActive->SetStateString("activemodname", modTitle);
+			}
+
+			idStr modName;
+			modName = modTitle.c_str();
+			modName += "\t";
+			modName += common->GetLanguageDict()->GetString("#str_gui_mainmenu_mod_workshop");
+			guiActive->SetStateString(idStr::Format("modsList_item_%d", i + list->GetNumMods()).c_str(), modName.c_str());
+
+			common->Printf("MODS: #%d workshop path: %s\n", list->GetNumMods() + i, modpaths[i].c_str());
+
+			modsList[list->GetNumMods() + i] = modpaths[i].c_str();
+		}
+
+		for (i = 0; i < totalNumberOfMods; i++)
+		{
+			common->DPrintf("[steam] mod path %d: %s\n", i, modsList[i].c_str());
+		}
+	}
+
+	// SW 6th March 2025:
+	// We couldn't find the active mod. This is weird and shouldn't happen but let's try to be graceful about it.
+	if (!foundActiveMod)
+	{
+		common->Warning("SetModsMenuGuiVars: could not determine the current active mod!");
+		guiActive->SetStateString("activemodname", "#str_loc_unknown_00104");
+	}
 
 
-
-
-
-	guiActive->DeleteStateVar( va("modsList_item_%i", list->GetNumMods()) );
+	//guiActive->DeleteStateVar( idStr::Format("modsList_item_%d", list->GetNumMods()).c_str() );
 	guiActive->SetStateString( "modsList_sel_0", "-1" );
 
 	fileSystem->FreeModList( list );
 
-	common->Printf("MODS: total mods = '%d'\n", totalNumberOfMods);
+#ifdef STEAM
+	guiMainMenu->SetStateString("allowWorkshop", "1");
+#else
+	guiMainMenu->SetStateString("allowWorkshop", "0");
+#endif
+
+	common->Printf("MODS: total amount=%d (local amount=%d ; steamworkshop amount=%d)\n", totalNumberOfMods, (totalNumberOfMods - workshopInstalledAmount), workshopInstalledAmount);
 }
 
 
@@ -449,40 +603,7 @@ void idSessionLocal::SetMainMenuGuiVars( void ) {
 		guiMainMenu->SetStateString( "inGame", "0" );
 	}
 
-	//Create Resume Campaign button in main menu.
-#ifndef DEMO
-	if (fileSystem->FindFile("savegames/progression.sav") == FIND_YES)
-	{
-		guiMainMenu->SetStateString("hasProgressionSave", "1");
-
-		//Draw the name of the next level in the main menu.
-		idFile* fileIn = fileSystem->OpenFileRead("savegames/progression.sav");
-		if (fileIn)
-		{
-			idDict filedict;
-			filedict.ReadFromFileHandle(fileIn);
-			idStr nextmapname = filedict.GetString("nextMap");
-			int campaignprogressindex = filedict.GetInt("levelProgressIndex");
-			delete fileIn;
-			
-
-			if (idStr::Icmp(nextmapname.c_str(), "vig_hub") == 0)
-			{
-				nextmapname = "Hub";
-			}
-			else
-			{
-				nextmapname = gameLocal.GetMapdisplaynameViaProgressIndex(campaignprogressindex);
-			}
-
-			guiMainMenu->SetStateString("resumemapname", idStr::Format("Chapter %d: %s", campaignprogressindex, nextmapname.c_str()).c_str());						
-		}
-	}
-	else
-#endif // DEMO
-	{
-		guiMainMenu->SetStateString("hasProgressionSave", "0");
-	}
+	SetResumeButton();
 
 	SetCDKeyGuiVars( );
 	guiMainMenu->SetStateString( "nightmare", cvarSystem->GetCVarBool( "g_nightmare" ) ? "1" : "0" );
@@ -500,7 +621,71 @@ void idSessionLocal::SetMainMenuGuiVars( void ) {
 	guiMainMenu->SetStateString( "driver_prompt", "0" );
 
 	SetPbMenuGuiVars();
+
+	guiMainMenu->SetStateString("builddate", cvarSystem->GetCVarString("g_versionShort"));
 }
+
+void idSessionLocal::SetResumeButton()
+{
+	//Create Resume Campaign button in main menu.
+#ifndef DEMO
+
+	//BC 4-1-2025: see if savegames exist in the savegame folder.
+	idStrList fileList;
+	idList<fileTIME_T> fileTimes;
+	GetSaveGameList(fileList, fileTimes);
+
+	if (fileList.Num() > 0) //If there is at least 1 file in the save folder...
+	{
+		guiMainMenu->SetStateString("hasProgressionSave", "1");
+
+		idStrList loadGameList;
+		loadGameList.Clear();
+		loadGameList.SetNum(fileList.Num());
+
+		for (int i = 0; i < fileList.Num(); i++)
+		{
+			loadGameList[i] = fileList[fileTimes[i].index]; //This sorts by date.
+
+			idStr filename = idStr::Format("savegames/%s.txt", loadGameList[i].c_str());
+
+			idStr savemapname = "";
+			idLexer src(LEXFL_NOERRORS | LEXFL_NOSTRINGCONCAT);
+			if (src.LoadFile(filename.c_str()))
+			{
+				idStr text;
+
+				idToken tok;
+				src.ReadToken(&tok);
+				text = tok;
+
+				src.ReadToken(&tok);
+				savemapname = tok;
+			}
+
+			savemapname = gameLocal.GetMapdisplaynameViaMapfile(savemapname);
+
+			if (savemapname.Length() > 0) //BC 4-3-2025: if there is a valid map name, then print it. Otherwise, leave it blank.
+			{
+				guiMainMenu->SetStateString("resumemapname", idStr::Format("%s: %s", common->GetLanguageDict()->GetString("#str_gui_mainmenu_chapter"), savemapname.c_str()).c_str());
+			}
+			else
+			{
+				guiMainMenu->SetStateString("resumemapname", "");
+			}
+
+			i = fileList.Num() + 100; //break out of the loop
+		}
+
+
+	}
+	else
+#endif // DEMO
+	{
+		guiMainMenu->SetStateString("hasProgressionSave", "0");
+	}
+}
+
 
 /*
 ==============
@@ -574,92 +759,136 @@ bool idSessionLocal::HandleSaveGameMenuCommand( idCmdArgs &args, int &icmd ) {
 		int choice = guiActive->State().GetInt( "loadgame_sel_0" );
 		if ( choice >= 0 && choice < loadGameList.Num() )
 		{
+			if (common->g_SteamUtilities)
+			{
+				idStr basegame = cvarSystem->GetCVarString("fs_game");
+				if (basegame.IsEmpty())
+				{
+					basegame = "base";
+				}
 
+				common->g_SteamUtilities->SteamCloudDeleteFile(idStr::Format("%s/savegames/%s.save", basegame.c_str(), loadGameList[choice].c_str()).c_str());
+				common->g_SteamUtilities->SteamCloudDeleteFile(idStr::Format("%s/savegames/%s.tga", basegame.c_str(), loadGameList[choice].c_str()).c_str());
+				common->g_SteamUtilities->SteamCloudDeleteFile(idStr::Format("%s/savegames/%s.txt", basegame.c_str(), loadGameList[choice].c_str()).c_str());
+			}
 
 
 			fileSystem->RemoveFile( va("savegames/%s.save", loadGameList[choice].c_str()) );
 			fileSystem->RemoveFile( va("savegames/%s.tga", loadGameList[choice].c_str()) );
 			fileSystem->RemoveFile( va("savegames/%s.txt", loadGameList[choice].c_str()) );
-			SetSaveGameGuiVars( );
+			
+			SetSaveGameGuiVars();
+
+			//BC 4-3-2025: select item in list. This is so that after deleting a file, it auto selects the next item in list.
+			if (loadGameList.Num() > 0)
+			{
+				int newselection = min(loadGameList.Num() - 1, choice);
+
+				guiActive->SetStateInt("loadgame_sel_0", newselection); //Select item in list.
+				ShowSavegameInfo(); //simulate clicking the selection so its info appears in the info panel.
+			}
+			else
+			{
+				guiActive->SetStateBool("loadbuttonsvisible", false);
+			}
+			
 			guiActive->StateChanged( com_frameTime );
+
+			SetResumeButton();
 		}
+
+		
+
 		return true;
 	}
 
 	//BC Player clicked on a save file in the loadgame list. Display info for the selected savefile.
-	if ( !idStr::Icmp( cmd, "updateSaveGameInfo" ) ) {
-		int choice = guiActive->State().GetInt( "loadgame_sel_0" );
-		if ( choice >= 0 && choice < loadGameList.Num() ) {
-			const idMaterial *material;
-
-			idStr saveName, description, screenshot;
-			idLexer src(LEXFL_NOERRORS|LEXFL_NOSTRINGCONCAT);
-
-
-			if ( src.LoadFile( va("savegames/%s.txt", loadGameList[choice].c_str()) ) )
-			{
-				idToken tok;
-
-				src.ReadToken( &tok );
-				saveName = tok; //The savegame name.
-
-				src.ReadToken( &tok );
-				description = tok; //The internal map name.
-
-				src.ReadToken( &tok );
-				screenshot = tok; //BC the map loading image.
-
-
-			}
-			else
-			{
-				saveName = loadGameList[choice];
-				description = loadGameList[choice];
-				screenshot = "";
-			}
-
-			if ( screenshot.Length() <= 0 )
-			{
-				screenshot = "guis/assets/teapot"; //BC fallback image.
-			}
-
-			material = declManager->FindMaterial( screenshot );
-			if ( material ) {
-				material->ReloadImages( false );
-			}
-			guiActive->SetStateString( "loadgame_shot",  screenshot );
-
-			saveName.RemoveColors();
-			guiActive->SetStateString( "saveGameName", saveName );
-			guiActive->SetStateString( "saveGameDescription", description );
-
-			int num = declManager->GetNumDecls(DECL_MAPDEF);
-			for (int i = 0; i < num; i++)
-			{
-				const idDeclEntityDef* mapDef = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_MAPDEF, i));
-				if (mapDef)
-				{
-					if (!idStr::Icmp(mapDef->GetName(), description))
-					{
-						guiActive->SetStateString("saveGameDisplayname", common->GetLanguageDict()->GetString(mapDef->dict.GetString("name")));
-						guiActive->SetStateString("saveGameMapDescription", common->GetLanguageDict()->GetString(mapDef->dict.GetString("description")));
-					}
-				}
-			}
-
-
-			ID_TIME_T timeStamp;
-			fileSystem->ReadFile( va("savegames/%s.save", loadGameList[choice].c_str()), NULL, &timeStamp );
-			idStr date = Sys_TimeStampToStr(timeStamp);
-			int tab = date.Find( '\t' );
-			idStr time = date.Right( date.Length() - tab - 1);
-			guiActive->SetStateString( "saveGameDate", date.Left( tab ) );
-			guiActive->SetStateString( "saveGameTime", time );
-		}
+	if ( !idStr::Icmp( cmd, "updateSaveGameInfo" ) )
+	{
+		ShowSavegameInfo();
 		return true;
 	}
 
 	return false;
+}
+
+void idSessionLocal::ShowSavegameInfo()
+{
+	int choice = guiActive->State().GetInt("loadgame_sel_0");
+	if (choice >= 0 && choice < loadGameList.Num())
+	{
+		const idMaterial* material;
+
+		idStr saveName, description, screenshot;
+		idLexer src(LEXFL_NOERRORS | LEXFL_NOSTRINGCONCAT);
+
+		if (src.LoadFile(va("savegames/%s.txt", loadGameList[choice].c_str())))
+		{
+			idToken tok;
+
+			src.ReadToken(&tok);
+			saveName = tok; //The savegame name.
+
+			src.ReadToken(&tok);
+			description = tok; //The internal map name.
+
+			// SW 10th April 2025: Build number is now saved to the .txt, so we need to skip over its token to get to the screenshot path.
+			// If you need to do anything with the build number, this is the place.
+			src.ReadToken(&tok);
+			src.ReadToken(&tok);
+			screenshot = tok; //BC the map loading image.
+		}
+		else
+		{
+			saveName = loadGameList[choice];
+			description = loadGameList[choice];
+			screenshot = "";
+		}
+
+		if (screenshot.Length() <= 0)
+		{
+			screenshot = "guis/assets/teapot"; //BC fallback image.
+		}
+
+		material = declManager->FindMaterial(screenshot);
+		if (material) {
+			material->ReloadImages(false);
+		}
+		guiActive->SetStateString("loadgame_shot", screenshot);
+
+		saveName.RemoveColors();
+		guiActive->SetStateString("saveGameName", saveName);
+		guiActive->SetStateString("saveGameDescription", description);
+
+		int num = declManager->GetNumDecls(DECL_MAPDEF);
+		for (int i = 0; i < num; i++)
+		{
+			const idDeclEntityDef* mapDef = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_MAPDEF, i));
+			if (mapDef)
+			{
+				if (!idStr::Icmp(mapDef->GetName(), description))
+				{
+					guiActive->SetStateString("saveGameDisplayname", common->GetLanguageDict()->GetString(mapDef->dict.GetString("name")));
+					guiActive->SetStateString("saveGameMapDescription", common->GetLanguageDict()->GetString(mapDef->dict.GetString("description")));
+				}
+			}
+		}
+
+
+		ID_TIME_T timeStamp;
+		fileSystem->ReadFile(va("savegames/%s.save", loadGameList[choice].c_str()), NULL, &timeStamp);
+		idStr date = Sys_TimeStampToStr(timeStamp);
+		int tab = date.Find('\t');
+		idStr time = date.Right(date.Length() - tab - 1);
+		guiActive->SetStateString("saveGameDate", date.Left(tab));
+		guiActive->SetStateString("saveGameTime", time);
+
+		guiActive->SetStateBool("loadbuttonsvisible", true); //Show the Load/Delete buttons.
+	}
+	else
+	{
+		guiActive->SetStateBool("loadbuttonsvisible", false); //Hide the Load/Delete buttons.
+	}
 }
 
 /*
@@ -800,6 +1029,25 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			continue;
 		}
 
+		if (!idStr::Icmp(cmd, "openstorepage"))
+		{
+			common->g_SteamUtilities->OpenSteamOverlaypageStore();
+		}
+
+		if (!idStr::Icmp(cmd, "openreportabug"))
+		{
+			//open reportabug overlay.
+
+			idStr infostring = GetPlayerLocationString();
+
+			common->g_SteamUtilities->OpenSteamOverlaypage(idStr::Format("https://docs.google.com/forms/d/e/1FAIpQLScejbJ0SFfkHb0iWhFagXAikLwnyHOSie-n7tHUtFheFQ6oiQ/viewform?usp=dialog&entry.561524408=%s", infostring.c_str()).c_str());
+		}
+
+		//BC 2-26-2025: open steam workshop page.
+		if (!idStr::Icmp(cmd, "loadSteamWorkshop"))
+		{
+			common->g_SteamUtilities->OpenSteamOverlaypage("http://steamcommunity.com/app/301280/workshop");
+		}
 
 		//BC restart current mission.
 		if (!idStr::Icmp(cmd, "restartmission"))
@@ -834,6 +1082,15 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 				return;
 			}
 
+			// Reset email state in case it's not at the initial
+			// (could happen if you were further along, go to main menu, start new game)
+			int count = declManager->GetNumDecls(DECL_PDA); //total email count.
+			for (int i = 0; i < count; i++)
+			{
+				const idDeclPDA* pda = static_cast<const idDeclPDA*>(declManager->DeclByIndex(DECL_PDA, i));
+				pda->ResetEmails();
+			}
+
 			cvarSystem->SetCVarInteger("g_skill", guiMainMenu->State().GetInt("skill"));
 
 			StartNewGame(levelnameToLoad.c_str());
@@ -843,17 +1100,36 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 
 		if (!idStr::Icmp(cmd, "loadCampaignProgression"))
 		{
-			idFile* fileIn = fileSystem->OpenFileRead("savegames/progression.sav");
-			if (fileIn)
-			{
-				gameLocal.persistentLevelInfo.ReadFromFileHandle(fileIn);
-				// Not sure which one we have to write to, so do both just in case?
-				gameLocal.persistentPlayerInfo[0].ReadFromFileHandle(fileIn);
-				mapSpawnData.persistentPlayerInfo[0] = gameLocal.persistentPlayerInfo[0];
-				delete fileIn;
+			//BC 4-2-2025: load latest save game.
 
-				StartNewGame(gameLocal.persistentLevelInfo.GetString("nextMap", "vig_tutorial"));
+			//First, ensure there are savegame files in the folder
+			idStrList fileList;
+			idList<fileTIME_T> fileTimes;
+			GetSaveGameList(fileList, fileTimes);
+
+			if (fileList.Num() <= 0)
+			{
+				common->Warning("loadCampaignProgression: savegame folder is empty.");
+				continue; //folder is empty, so do early exit here.
 			}
+
+			idStrList loadGameList;
+			loadGameList.Clear();
+			loadGameList.SetNum(fileList.Num());
+
+			//Iterate over the files until we find one that successfully loads.
+			for (int i = 0; i < fileList.Num(); i++)
+			{
+				loadGameList[i] = fileList[fileTimes[i].index]; //This sorts by date.
+
+				//idStr savefilename = idStr::Format("savegames/%s.txt", fileList[i].c_str());
+				if (sessLocal.LoadGame(loadGameList[i]))
+				{
+					common->Printf("loadCampaignProgression: loading %s\n", loadGameList[i].c_str());
+					i = fileList.Num() + 100; //break out of loop.
+				}
+			}
+
 			continue;
 		}
 
@@ -1173,7 +1449,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		if ( !idStr::Icmp( cmd, "play" ) ) {
 			if ( args.Argc() - icmd >= 1 ) {
 				idStr snd = args.Argv( icmd++ );
-				int channel = 1;
+				int channel = SND_CHANNEL_BODY; // SW 18th Feb 2025: changing default GUI sound channel so it isn't affected by global voice volume scaling
 				if ( snd.Length() == 1 ) {
 					channel = atoi( snd );
 					snd = args.Argv( icmd++ );
@@ -1269,6 +1545,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			if ( idStr::Icmp( vcmd, "restart" )  == 0) {
 				guiActive->HandleNamedEvent( "cvar write render" );
 				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart partial\n" );
+				guiActive->HandleNamedEvent( "resolution refresh" );
 			}
 
 			continue;
@@ -1355,6 +1632,33 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			continue;
 		}
 
+		//BC 2-24-2025
+		if (!idStr::Icmp(cmd, "updategamepadpic"))
+		{
+			DisplayGamepadBind("joy1");
+			DisplayGamepadBind("joy2");
+			DisplayGamepadBind("joy3");
+			DisplayGamepadBind("joy4");
+			DisplayGamepadBind("joy5");
+			DisplayGamepadBind("joy6");
+			DisplayGamepadBind("joy7");
+			DisplayGamepadBind("joy8");
+			DisplayGamepadBind("joy9");
+			DisplayGamepadBind("joy10");
+
+			DisplayGamepadBind("joy_trigger1");
+			DisplayGamepadBind("joy_trigger2");
+
+			DisplayGamepadBind("joy_dpad_up");
+			DisplayGamepadBind("joy_dpad_down");
+			DisplayGamepadBind("joy_dpad_left");
+			DisplayGamepadBind("joy_dpad_right");	
+
+			//guiMainMenu->sets
+			continue;
+		}
+
+
 		if ( !idStr::Icmp( cmd, "systemCvars" ) ) {
 			guiActive->HandleNamedEvent( "cvar read render" );
 			guiActive->HandleNamedEvent( "cvar read sound" );
@@ -1422,6 +1726,28 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 	}
 }
 
+//BC 2-25-2025: make the gamepad display show what the current binds are.
+void idSessionLocal::DisplayGamepadBind(idStr key)
+{
+	idStr guiVar = idStr::Format("gp_%s", key.c_str());
+	idStr rawbind = common->BindingFromKey(key);
+	if (rawbind.Length() > 0)
+	{
+		idStr locstr = gameLocal.GetBindingnameViaBind(rawbind);
+		if (locstr.Length() > 0)
+		{
+			idStr displaybind = common->GetLanguageDict()->GetString(locstr);
+			if (displaybind.Length() > 0)
+			{
+				guiMainMenu->SetStateString(guiVar.c_str(), displaybind.c_str());
+				return;
+			}
+		}
+	}
+
+	guiMainMenu->SetStateString(guiVar.c_str(), " ");
+}
+
 idStr idSessionLocal::GetSanitizedURLArgument(idStr rawText)
 {
 	rawText.StripTrailingWhitespace();
@@ -1457,13 +1783,49 @@ idStr idSessionLocal::GetSanitizedURLArgument(idStr rawText)
 	rawText.Replace("}", "%7d");
 	rawText.Replace("~", "%7e");
 
-	rawText.Replace("=", "%61");
+	rawText.Replace("=", "%3d");
 
 	rawText.Replace("\"", "%93");
 	rawText.Replace("\"", "%94");
 	rawText.Replace("-", "%97");
+	rawText.Replace("\n", "%0A");
 
 	return rawText;
+}
+
+
+idStr idSessionLocal::GetPlayerLocationString()
+{
+	idStr infostring = "";
+	bool foundLevel = false;
+	if (session->GetCurrentMapName() && strlen(session->GetCurrentMapName()))
+	{
+		infostring += idStr::Format("%s ", session->GetCurrentMapName());
+		foundLevel = true;
+	}
+
+	if (!foundLevel)
+	{
+		infostring += idStr::Format("mainmenu ");
+	}
+
+	if (gameLocal.GetLocalPlayer())
+	{
+		const renderView_t* view = gameLocal.GetLocalPlayer()->GetRenderView();
+		if (view) {
+			infostring += idStr::Format("View: %.1f %.1f %.1f  %.0f -%.0f\n", view->vieworg.x, view->vieworg.y, view->vieworg.z, view->viewaxis[0].ToYaw(), view->viewaxis[0].ToPitch());
+		}
+		else
+		{
+			idVec3		origin;
+			idMat3		axis;
+			gameLocal.GetLocalPlayer()->GetViewPos(origin, axis);
+			infostring += idStr::Format("View: %.1f %.1f %.1f  %.0f -%.0f\n", origin.x, origin.y, origin.z, axis[0].ToYaw(), axis[0].ToPitch());
+		}
+	}
+
+	infostring = GetSanitizedURLArgument(infostring);
+	return infostring;
 }
 
 /*

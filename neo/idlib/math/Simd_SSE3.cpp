@@ -28,6 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "sys/platform.h"
 
+#if !defined(__BLENDO_SIMD_INLINE__)
 #include "idlib/math/Simd_SSE3.h"
 
 //===============================================================
@@ -36,7 +37,20 @@ If you have questions concerning this license or the applicable additional terms
 //
 //===============================================================
 
-#if defined(__GNUC__) && defined(__SSE3__)
+#if defined(__BLENDO_SIMD__) // blendo eric: SIMD using newer header/api
+
+#include <immintrin.h>
+
+/*
+============
+idSIMD_SSE3::GetName
+============
+*/
+const char * idSIMD_SSE3::GetName( void ) const {
+	return "MMX & SSE & SSE2 & SSE3";
+}
+
+#elif defined(__GNUC__) && defined(__SSE3__)
 
 /*
 ============
@@ -363,3 +377,5 @@ void VPCALL idSIMD_SSE3::TransformVerts( idDrawVert *verts, const int numVerts, 
 }
 
 #endif /* _MSC_VER */
+
+#endif

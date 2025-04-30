@@ -49,7 +49,7 @@ public:
 							idIK( void );
 	virtual					~idIK( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	bool					IsInitialized( void ) const;
@@ -85,7 +85,7 @@ public:
 							idIK_Walk( void );
 	virtual					~idIK_Walk( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual bool			Init( idEntity *self, const char *anim, const idVec3 &modelOffset );
@@ -156,7 +156,7 @@ public:
 							idIK_Reach( void );
 	virtual					~idIK_Reach( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual bool			Init( idEntity *self, const char *anim, const idVec3 &modelOffset );

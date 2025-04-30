@@ -78,13 +78,6 @@ If you have questions concerning this license or the applicable additional terms
 // use a different major for each game
 #define ASYNC_PROTOCOL_MAJOR			1
 
-// Savegame Version
-// Update when you can no longer maintain compatibility with previous savegames
-// NOTE: a seperate core savegame version and game savegame version could be useful
-// 16: Doom v1.1
-// 17: Doom v1.2 / D3XP. Can still read old v16 with defaults for new data
-#define SAVEGAME_VERSION				17
-
 // <= Doom v1.1: 1. no DS_VERSION token ( default )
 // Doom v1.2: 2
 #define RENDERDEMO_VERSION				2

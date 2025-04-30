@@ -15,7 +15,7 @@ public:
 							idAirlock(void);
 	virtual					~idAirlock(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -79,12 +79,12 @@ private:
 
 	int						thinkTimer;
 
-	idLight *				sirenLight;
+	idLight *				sirenLight = 0;
 
-	idVacuumSeparatorEntity * vacuumSeparators[2];
+	idVacuumSeparatorEntity* vacuumSeparators[2] = {};
 
-	idDoor *				innerDoor[2];
-	idDoor *				outerDoor[2];
+	idDoor*					innerDoor[2] = {};
+	idDoor*					outerDoor[2] = {};
 
 	bool					lastOuterdoorOpenState; //true = open;
 
@@ -99,23 +99,23 @@ private:
 	void					DoEmergencyPurge();
 	idList<int>				accumulatorList;
 
-	idEntity *				gauges[MAX_GAUGES];
+	idEntity*				gauges[MAX_GAUGES] = {};
 	int						gaugeCount;
 
 	bool					accumulatorsAllBroken;
 	bool					doorslowmodeActivated;
 
 	//Airlock lockdown.
-	idAnimatedEntity*		gateProps[2];
+	idAnimatedEntity*		gateProps[2] = {};
 	int						lockdownPreambleState;
 	enum					{LDPA_NONE, LDPA_DISPATCH, LDPA_ANNOUNCER};
 	int						lockdownPreambleTimer;
 
-	idAnimatedEntity*		warningsigns[2];
+	idAnimatedEntity*		warningsigns[2] = {};
 
 	//idEntity *				ftlDoorSign;
-	idEntity *				CCTV_monitor;
-	idEntity *				CCTV_camera;
+	idEntity *				CCTV_monitor = 0;
+	idEntity *				CCTV_camera = 0;
 
 	bool					ShouldButtonsWork();
 	
@@ -124,9 +124,20 @@ private:
 	void					VacuumSuckItems(idVec3 suctionInteriorPosition, idVec3 suctionExteriorPosition);
 	int						itemVacuumSuckTimer;
 
-	idEntity *				fuseboxGates[2];
-
 	bool					hasPulledActors;
+
+	int						lastVoiceprint;
+
+
+	idEntity*				fuseboxGates[2] = {};
+
+	//BC 2-18-2025: fusebox shutter
+	enum { SHT_IDLE, SHT_SHUTTERING, SHT_SHUTTERED };
+	int						shutterState;
+	int						shutterTimer;
+
+
+	//private end
 
 };
 //#pragma once

@@ -12,7 +12,7 @@ public:
 							idTrashExit(void);
 	virtual					~idTrashExit(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -34,9 +34,9 @@ private:
 
 	idEntityPtr<idEntity>	myChute;
 
-	class idVentpeek		*peekEnt;
+	class idVentpeek		*peekEnt = nullptr;
 
-	idEntity				*gateModel;
+	idEntity				*gateModel = nullptr;
 
 };
 //#pragma once

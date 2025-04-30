@@ -27,6 +27,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "sys/platform.h"
+#include "gamesys/SaveGame.h"
 #include "Entity.h"
 
 #include "Sound.h"
@@ -73,14 +74,14 @@ idSound::Save
 ================
 */
 void idSound::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( lastSoundVol );
-	savefile->WriteFloat( soundVol );
-	savefile->WriteFloat( random );
-	savefile->WriteFloat( wait );
-	savefile->WriteBool( timerOn );
-	savefile->WriteVec3( shakeTranslate );
-	savefile->WriteAngles( shakeRotate );
-	savefile->WriteInt( playingUntilTime );
+	savefile->WriteFloat( lastSoundVol ); // float lastSoundVol
+	savefile->WriteFloat( soundVol ); // float soundVol
+	savefile->WriteFloat( random ); // float random
+	savefile->WriteFloat( wait ); // float wait
+	savefile->WriteBool( timerOn ); // bool timerOn
+	savefile->WriteVec3( shakeTranslate ); // idVec3 shakeTranslate
+	savefile->WriteAngles( shakeRotate ); // idAngles shakeRotate
+	savefile->WriteInt( playingUntilTime ); // int playingUntilTime
 }
 
 /*
@@ -89,14 +90,14 @@ idSound::Restore
 ================
 */
 void idSound::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( lastSoundVol );
-	savefile->ReadFloat( soundVol );
-	savefile->ReadFloat( random );
-	savefile->ReadFloat( wait );
-	savefile->ReadBool( timerOn );
-	savefile->ReadVec3( shakeTranslate );
-	savefile->ReadAngles( shakeRotate );
-	savefile->ReadInt( playingUntilTime );
+	savefile->ReadFloat( lastSoundVol ); // float lastSoundVol
+	savefile->ReadFloat( soundVol ); // float soundVol
+	savefile->ReadFloat( random ); // float random
+	savefile->ReadFloat( wait ); // float wait
+	savefile->ReadBool( timerOn ); // bool timerOn
+	savefile->ReadVec3( shakeTranslate ); // idVec3 shakeTranslate
+	savefile->ReadAngles( shakeRotate ); // idAngles shakeRotate
+	savefile->ReadInt( playingUntilTime ); // int playingUntilTime
 }
 
 /*

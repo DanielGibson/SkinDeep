@@ -37,6 +37,11 @@ void idMech::Spawn(void)
 	deathTimer = 0;
 	aiState = AISTATE_IDLE;
 
+	fireParticles = nullptr;
+	fireParticlesFlyTime = 0;
+	countdownGui = nullptr;
+	fireLight = nullptr;
+
 	// Get projectile info
 	playerProjectile = gameLocal.FindEntityDefDict( spawnArgs.GetString( "def_projectile_player" ), false );
 	if ( !playerProjectile ) {
@@ -78,6 +83,85 @@ void idMech::Spawn(void)
 	playerChambered = true;
 
 	SetDrawBall(true);
+}
+
+void idMech::Save(idSaveGame* savefile) const
+{
+	savefile->WriteBool( mounted ); // bool mounted
+
+	savefile->WriteInt( animState ); // int animState
+
+	savefile->WriteInt( strafeState ); // int strafeState
+
+	savefile->WriteInt( deathCountdownState ); // int deathCountdownState
+	savefile->WriteInt( deathTimer ); // int deathTimer
+
+	savefile->WriteParticle( fireParticles ); // const idDeclParticle * fireParticles
+	savefile->WriteInt( fireParticlesFlyTime ); // int fireParticlesFlyTime
+
+	savefile->WriteObject( countdownGui ); // idEntity* countdownGui
+
+	savefile->WriteObject( fireLight ); // idLight * fireLight
+	savefile->WriteFloat( playerWeaponLastFireTime ); // float playerWeaponLastFireTime
+	savefile->WriteFloat( playerWeaponFireDelay ); // float playerWeaponFireDelay
+	savefile->WriteFloat( playerWeaponReloadDuration ); // float playerWeaponReloadDuration
+	savefile->WriteFloat( playerWeaponReloadFinishTime ); // float playerWeaponReloadFinishTime
+	savefile->WriteFloat( playerWeaponRackDuration ); // float playerWeaponRackDuration
+	savefile->WriteFloat( playerWeaponRackFinishTime ); // float playerWeaponRackFinishTime
+
+	// const idDict* playerProjectile; // const idDict* playerProjectile
+	//playerProjectile = gameLocal.FindEntityDefDict( spawnArgs.GetString( "def_projectile_player" ), false );
+	//if ( !playerProjectile ) {
+	//	gameLocal.Warning( "Invalid player projectile on idMech." );
+	//}
+	savefile->WriteSoundShader( playerSoundFireWeapon ); // const idSoundShader* playerSoundFireWeapon
+	savefile->WriteSoundShader( playerSoundLastShot ); // const idSoundShader* playerSoundLastShot
+	savefile->WriteSoundShader( playerSoundDryFire ); // const idSoundShader* playerSoundDryFire
+	savefile->WriteSoundShader( playerSoundReload ); // const idSoundShader* playerSoundReload
+	savefile->WriteSoundShader( playerSoundRack ); // const idSoundShader* playerSoundRack
+	savefile->WriteInt( playerAmmo ); // int playerAmmo
+	savefile->WriteInt( playerClip ); // int playerClip
+	savefile->WriteInt( playerClipSize ); // int playerClipSize
+	savefile->WriteBool( playerChambered ); // bool playerChambered
+}
+void idMech::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadBool( mounted ); // bool mounted
+
+	savefile->ReadInt( animState ); // int animState
+
+	savefile->ReadInt( strafeState ); // int strafeState
+
+	savefile->ReadInt( deathCountdownState ); // int deathCountdownState
+	savefile->ReadInt( deathTimer ); // int deathTimer
+
+	savefile->ReadParticle( fireParticles ); // const idDeclParticle * fireParticles
+	savefile->ReadInt( fireParticlesFlyTime ); // int fireParticlesFlyTime
+
+	savefile->ReadObject( countdownGui ); // idEntity* countdownGui
+
+	savefile->ReadObject( CastClassPtrRef(fireLight) ); // idLight * fireLight
+	savefile->ReadFloat( playerWeaponLastFireTime ); // float playerWeaponLastFireTime
+	savefile->ReadFloat( playerWeaponFireDelay ); // float playerWeaponFireDelay
+	savefile->ReadFloat( playerWeaponReloadDuration ); // float playerWeaponReloadDuration
+	savefile->ReadFloat( playerWeaponReloadFinishTime ); // float playerWeaponReloadFinishTime
+	savefile->ReadFloat( playerWeaponRackDuration ); // float playerWeaponRackDuration
+	savefile->ReadFloat( playerWeaponRackFinishTime ); // float playerWeaponRackFinishTime
+
+	// const idDict* playerProjectile
+	playerProjectile = gameLocal.FindEntityDefDict( spawnArgs.GetString( "def_projectile_player" ), false );
+	if ( !playerProjectile ) {
+		gameLocal.Warning( "Invalid player projectile on idMech." );
+	}
+	savefile->ReadSoundShader( playerSoundFireWeapon ); // const idSoundShader* playerSoundFireWeapon
+	savefile->ReadSoundShader( playerSoundLastShot ); // const idSoundShader* playerSoundLastShot
+	savefile->ReadSoundShader( playerSoundDryFire ); // const idSoundShader* playerSoundDryFire
+	savefile->ReadSoundShader( playerSoundReload ); // const idSoundShader* playerSoundReload
+	savefile->ReadSoundShader( playerSoundRack ); // const idSoundShader* playerSoundRack
+	savefile->ReadInt( playerAmmo ); // int playerAmmo
+	savefile->ReadInt( playerClip ); // int playerClip
+	savefile->ReadInt( playerClipSize ); // int playerClipSize
+	savefile->ReadBool( playerChambered ); // bool playerChambered
 }
 
 void idMech::Think(void)
@@ -413,8 +497,8 @@ void idMech::Dismount(void)
 	//SetPhysics(&physicsObj);
 	//physicsObj.Activate();
 
-	//TODO: This isn't working, sometimes does an animation hitch.
-	torsoAnim.PlayAnim(7); //Play flap open anim.
+	// SW 19th Feb 2025: replaced hardcoded integer with GetAnim call
+	torsoAnim.PlayAnim(GetAnim(ANIMCHANNEL_TORSO, "flap_close")); //Play flap close anim.
 
 	UpdateGravity();
 }
@@ -453,8 +537,8 @@ bool idMech::DoFrob(int index, idEntity * frobber)
 		isFrobbable = false;
 		move.moveType = MOVETYPE_PUPPET;
 
-		
-		torsoAnim.PlayAnim(6); //Play flap open anim.
+		// SW 19th Feb 2025: replaced hardcoded integer with GetAnim call
+		torsoAnim.PlayAnim(GetAnim(ANIMCHANNEL_TORSO, "flap_open")); //Play flap open anim.
 		AI_FORWARD = false;
 		AI_BACKWARD = false;
 		AI_LEFT = false;

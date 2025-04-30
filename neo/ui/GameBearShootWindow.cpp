@@ -29,6 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "sys/platform.h"
 #include "framework/Session_local.h"
 #include "sound/sound.h"
+
+#include "idlib/LangDict.h"
+
 #include "ui/DeviceContext.h"
 #include "ui/Window.h"
 #include "ui/UserInterfaceLocal.h"
@@ -87,9 +90,10 @@ BSEntity::~BSEntity() {
 BSEntity::WriteToSaveGame
 ======================
 */
-void BSEntity::WriteToSaveGame( idFile *savefile ) {
+void BSEntity::WriteToSaveGame( idSaveGame *savefile ) const {
+	//savefile->WriteMiscPtr( CastWriteVoidPtrPtr(game) );
 
-	game->WriteSaveGameString( materialName, savefile );
+	savefile->WriteString( materialName );
 
 	savefile->Write( &width, sizeof(width) );
 	savefile->Write( &height, sizeof(height) );
@@ -110,10 +114,13 @@ void BSEntity::WriteToSaveGame( idFile *savefile ) {
 BSEntity::ReadFromSaveGame
 ======================
 */
-void BSEntity::ReadFromSaveGame( idFile *savefile, idGameBearShootWindow* _game ) {
+void BSEntity::ReadFromSaveGame( idRestoreGame *savefile, idGameBearShootWindow* _game ) {
+
+	//savefile->ReadMiscPtr( CastReadVoidPtrPtr(game) );
+
 	game = _game;
 
-	game->ReadSaveGameString( materialName, savefile );
+	savefile->ReadString( materialName );
 	SetMaterial( materialName );
 
 	savefile->Read( &width, sizeof(width) );
@@ -232,53 +239,47 @@ idGameBearShootWindow::~idGameBearShootWindow() {
 idGameBearShootWindow::WriteToSaveGame
 =============================
 */
-void idGameBearShootWindow::WriteToSaveGame( idFile *savefile ) {
+void idGameBearShootWindow::WriteToSaveGame( idSaveGame *savefile ) const {
 	idWindow::WriteToSaveGame( savefile );
 
-	gamerunning.WriteToSaveGame( savefile );
-	onFire.WriteToSaveGame( savefile );
-	onContinue.WriteToSaveGame( savefile );
-	onNewGame.WriteToSaveGame( savefile );
+	gamerunning.WriteToSaveGame( savefile ); // idWinBool gamerunning
+	onFire.WriteToSaveGame( savefile ); // idWinBool onFire
+	onContinue.WriteToSaveGame( savefile ); // idWinBool onContinue
+	onNewGame.WriteToSaveGame( savefile ); // idWinBool onNewGame
 
-	savefile->Write( &timeSlice, sizeof(timeSlice) );
-	//savefile->Write( &timeRemaining, sizeof(timeRemaining) );
-	savefile->Write( &gameOver, sizeof(gameOver) );
+	savefile->WriteFloat( timeSlice ); // float timeSlice
+	savefile->WriteBool( gameOver ); // bool gameOver
 
-	savefile->Write( &currentLevel, sizeof(currentLevel) );
-	//savefile->Write( &goalsHit, sizeof(goalsHit) );
-	savefile->Write( &updateScore, sizeof(updateScore) );
-	savefile->Write( &bearHitTarget, sizeof(bearHitTarget) );
+	savefile->WriteInt( currentLevel ); // int currentLevel
+	savefile->WriteBool( updateScore ); // bool updateScore
+	savefile->WriteBool( bearHitTarget ); // bool bearHitTarget
 
-	savefile->Write( &bearScale, sizeof(bearScale) );
-	savefile->Write( &bearIsShrinking, sizeof(bearIsShrinking) );
-	savefile->Write( &bearShrinkStartTime, sizeof(bearShrinkStartTime) );
+	savefile->WriteFloat( bearScale ); // float bearScale
+	savefile->WriteBool( bearIsShrinking ); // bool bearIsShrinking
+	savefile->WriteInt( bearShrinkStartTime ); // int bearShrinkStartTime
 
-	savefile->Write( &turretAngle, sizeof(turretAngle) );
-	savefile->Write( &turretForce, sizeof(turretForce) );
+	savefile->WriteFloat( turretAngle ); // float turretAngle
+	savefile->WriteFloat( turretForce ); // float turretForce
 
-	//savefile->Write( &windForce, sizeof(windForce) );
-	//savefile->Write( &windUpdateTime, sizeof(windUpdateTime) );
-
-	int numberOfEnts = entities.Num();
-	savefile->Write( &numberOfEnts, sizeof(numberOfEnts) );
-
+	int numberOfEnts = entities.Num(); // idList<BSEntity*> entities
+	savefile->WriteInt( numberOfEnts );
 	for ( int i=0; i<numberOfEnts; i++ ) {
 		entities[i]->WriteToSaveGame( savefile );
 	}
 
-	int index;
-	index = entities.FindIndex( turret );
-	savefile->Write( &index, sizeof(index) );
-	index = entities.FindIndex( bear );
-	savefile->Write( &index, sizeof(index) );
-	index = entities.FindIndex( helicopter );
-	savefile->Write( &index, sizeof(index) );
-	index = entities.FindIndex( goal );
-	savefile->Write( &index, sizeof(index) );
-	//index = entities.FindIndex( wind );
-	//savefile->Write( &index, sizeof(index) );
-	index = entities.FindIndex( gunblast );
-	savefile->Write( &index, sizeof(index) );
+	savefile->WriteInt( entities.FindIndex( turret ) ); // BSEntity * turret
+	savefile->WriteInt( entities.FindIndex( bear ) ); // BSEntity * bear
+	savefile->WriteInt( entities.FindIndex( helicopter ) ); // BSEntity * helicopter
+	savefile->WriteInt( entities.FindIndex( goal ) );// BSEntity * goal
+	savefile->WriteInt( entities.FindIndex( gunblast ) ); // BSEntity * gunblast
+	//savefile->WriteInt( entities.FindIndex( wind ) );
+
+	savefile->WriteInt( bananasLeft ); // int bananasLeft
+	savefile->WriteInt( baseEnemyY ); // int baseEnemyY
+
+	savefile->WriteInt( highScore ); // int highScore
+
+	savefile->WriteCheckSizeMarker();
 }
 
 /*
@@ -286,60 +287,55 @@ void idGameBearShootWindow::WriteToSaveGame( idFile *savefile ) {
 idGameBearShootWindow::ReadFromSaveGame
 =============================
 */
-void idGameBearShootWindow::ReadFromSaveGame( idFile *savefile ) {
+void idGameBearShootWindow::ReadFromSaveGame( idRestoreGame *savefile ) {
 	idWindow::ReadFromSaveGame( savefile );
 
-	// Remove all existing entities
-	entities.DeleteContents(true);
+	gamerunning.ReadFromSaveGame( savefile ); // idWinBool gamerunning
+	onFire.ReadFromSaveGame( savefile ); // idWinBool onFire
+	onContinue.ReadFromSaveGame( savefile ); // idWinBool onContinue
+	onNewGame.ReadFromSaveGame( savefile ); // idWinBool onNewGame
 
-	gamerunning.ReadFromSaveGame( savefile );
-	onFire.ReadFromSaveGame( savefile );
-	onContinue.ReadFromSaveGame( savefile );
-	onNewGame.ReadFromSaveGame( savefile );
+	savefile->ReadFloat( timeSlice ); // float timeSlice
+	savefile->ReadBool( gameOver ); // bool gameOver
 
-	savefile->Read( &timeSlice, sizeof(timeSlice) );
-	//savefile->Read( &timeRemaining, sizeof(timeRemaining) );
-	savefile->Read( &gameOver, sizeof(gameOver) );
+	savefile->ReadInt( currentLevel ); // int currentLevel
+	savefile->ReadBool( updateScore ); // bool updateScore
+	savefile->ReadBool( bearHitTarget ); // bool bearHitTarget
 
-	savefile->Read( &currentLevel, sizeof(currentLevel) );
-	//savefile->Read( &goalsHit, sizeof(goalsHit) );
-	savefile->Read( &updateScore, sizeof(updateScore) );
-	savefile->Read( &bearHitTarget, sizeof(bearHitTarget) );
+	savefile->ReadFloat( bearScale ); // float bearScale
+	savefile->ReadBool( bearIsShrinking ); // bool bearIsShrinking
+	savefile->ReadInt( bearShrinkStartTime ); // int bearShrinkStartTime
 
-	savefile->Read( &bearScale, sizeof(bearScale) );
-	savefile->Read( &bearIsShrinking, sizeof(bearIsShrinking) );
-	savefile->Read( &bearShrinkStartTime, sizeof(bearShrinkStartTime) );
+	savefile->ReadFloat( turretAngle ); // float turretAngle
+	savefile->ReadFloat( turretForce ); // float turretForce
 
-	savefile->Read( &turretAngle, sizeof(turretAngle) );
-	savefile->Read( &turretForce, sizeof(turretForce) );
-
-	//savefile->Read( &windForce, sizeof(windForce) );
-	//savefile->Read( &windUpdateTime, sizeof(windUpdateTime) );
-
-	int numberOfEnts;
-	savefile->Read( &numberOfEnts, sizeof(numberOfEnts) );
-
+	int numberOfEnts; // idList<BSEntity*> entities
+	savefile->ReadInt( numberOfEnts );
 	for ( int i=0; i<numberOfEnts; i++ ) {
-		BSEntity *ent;
-
-		ent = new BSEntity( this );
-		ent->ReadFromSaveGame( savefile, this );
-		entities.Append( ent );
+		entities[i]->ReadFromSaveGame( savefile, this );
 	}
 
+
 	int index;
-	savefile->Read( &index, sizeof(index) );
+	savefile->ReadInt( index ); // BSEntity * turret
 	turret = entities[index];
-	savefile->Read( &index, sizeof(index) );
+	savefile->ReadInt( index ); // BSEntity * bear
 	bear = entities[index];
-	savefile->Read( &index, sizeof(index) );
+	savefile->ReadInt( index ); // BSEntity * helicopter
 	helicopter = entities[index];
-	savefile->Read( &index, sizeof(index) );
+	savefile->ReadInt( index ); // BSEntity * goal
 	goal = entities[index];
-	//savefile->Read( &index, sizeof(index) );
-	//wind = entities[index];
-	savefile->Read( &index, sizeof(index) );
+	savefile->ReadInt( index ); // BSEntity * gunblast
 	gunblast = entities[index];
+	//savefile->ReadInt( index );
+	//wind = entities[index];
+
+	savefile->ReadInt( bananasLeft ); // int bananasLeft
+	savefile->ReadInt( baseEnemyY ); // int baseEnemyY
+
+	savefile->ReadInt( highScore ); // int highScore
+
+	savefile->ReadCheckSizeMarker();
 }
 
 /*
@@ -456,6 +452,19 @@ void idGameBearShootWindow::CommonInit() {
 	entities.Append( ent );
 }
 
+// SW 3rd March 2025:
+// We pass through a special event from idGameBlock::Think so that the game only updates when the game block is capable of thinking.
+// This means that the game should pause correctly whenever the world is paused.
+void idGameBearShootWindow::RunNamedEvent(const char* namedEvent)
+{
+	idWindow::RunNamedEvent(namedEvent);
+
+	if (idStr::Icmp(namedEvent, "updateGame") == 0)
+	{
+		UpdateGame();
+	}
+}
+
 /*
 =============================
 idGameBearShootWindow::HandleEvent
@@ -549,9 +558,6 @@ idGameBearShootWindow::Draw
 */
 void idGameBearShootWindow::Draw(int time, float x, float y) {
 	int i;
-
-	//Update the game every frame before drawing
-	UpdateGame();
 
 	for( i = entities.Num()-1; i >= 0; i-- ) {
 		entities[i]->Draw(dc);
@@ -990,7 +996,10 @@ void idGameBearShootWindow::UpdateScore() {
 	//	//timeRemaining += 30;
 	//}
 
-
+	if (currentLevel >= 25 && common->g_SteamUtilities && common->g_SteamUtilities->IsSteamInitialized())
+	{
+		common->g_SteamUtilities->SetAchievement("ach_primatez");
+	}
 }
 
 /*
@@ -1126,12 +1135,12 @@ void idGameBearShootWindow::DoHighscoreLogic()
 	if (currentLevel > highScore)
 	{
 		//Player has a new high score.
-		highscorestringToDisplay = "NEW HIGH SCORE!";
+		highscorestringToDisplay = common->GetLanguageDict()->GetString("#str_gui_arcade_newhighscore");
 		highScore = currentLevel;
 	}
 	else
 	{
-		highscorestringToDisplay = idStr::Format("Current high score: %d", highScore);
+		highscorestringToDisplay = idStr::Format(common->GetLanguageDict()->GetString("#str_gui_arcade_currenthighscore"), highScore);
 	}
 
 	gui->SetStateString("highscoretext", highscorestringToDisplay.c_str());

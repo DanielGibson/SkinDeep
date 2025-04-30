@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "renderer/tr_local.h"
 
 #include "sys/sys_public.h"
+#include "d3xp/Game_local.h"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 0)
 #define SDL_Keycode SDLKey
@@ -599,6 +600,7 @@ sysEvent_t Sys_GetEvent() {
 					break;
 				case SDL_WINDOWEVENT_FOCUS_LOST:
 					GLimp_GrabInput(0);
+					gameLocal.requestPauseMenu = true;
 					break;
 			}
 
@@ -679,6 +681,11 @@ sysEvent_t Sys_GetEvent() {
 				key = mapkey(ev.key.keysym.sym);
 			}
 
+			// SM: I feel like we should just always ignore repeats, but to be safe
+			// only gonna ignore repeats on ESC. Fixes pause menu flickering when holding down ESC
+			if (sc == SDL_SCANCODE_ESCAPE && ev.key.repeat != 0)
+				continue;
+
 			if(!key) {
 				if (ev.key.keysym.scancode == SDL_SCANCODE_GRAVE) { // TODO: always do this check?
 					key = Sys_GetConsoleKey(true);
@@ -731,12 +738,16 @@ sysEvent_t Sys_GetEvent() {
 
 		case SDL_MOUSEMOTION:
 			if (!windowActive) return res;
-			res.evType = SE_MOUSE;
-			res.evValue = ev.motion.xrel;
-			res.evValue2 = ev.motion.yrel;
+			
+			if (ev.motion.xrel != 0 || ev.motion.yrel != 0)
+			{
+				res.evType = SE_MOUSE;
+				res.evValue = ev.motion.xrel;
+				res.evValue2 = ev.motion.yrel;
 
-			mouse_polls.Append(mouse_poll_t(M_DELTAX, ev.motion.xrel));
-			mouse_polls.Append(mouse_poll_t(M_DELTAY, ev.motion.yrel));
+				mouse_polls.Append(mouse_poll_t(M_DELTAX, ev.motion.xrel));
+				mouse_polls.Append(mouse_poll_t(M_DELTAY, ev.motion.yrel));
+			}
 
 			return res;
 
@@ -812,10 +823,19 @@ sysEvent_t Sys_GetEvent() {
 		case SDL_CONTROLLERBUTTONDOWN:
 		case SDL_CONTROLLERBUTTONUP:
 		{
+			// SM: Ignore controller events when window is not active
+			if (!GLimp_WindowActive())
+				continue;
+
 			sys_jEvents jEvent = mapjoybutton((SDL_GameControllerButton)ev.cbutton.button);
 			joystick_polls.Append(joystick_poll_t(jEvent,
 				ev.cbutton.state == SDL_PRESSED ? 1 : 0));
-			controller_type = mapcontrollertype(ev.cbutton.which);
+
+			SDL_Joystick* joystick = SDL_JoystickFromInstanceID(ev.cbutton.which);
+			if (joystick)
+			{
+				controller_type = mapcontrollertype(SDL_JoystickGetPlayerIndex(joystick));
+			}
 
 			res.evType = SE_KEY;
 			res.evValue2 = ev.cbutton.state == SDL_PRESSED ? 1 : 0;
@@ -834,6 +854,10 @@ sysEvent_t Sys_GetEvent() {
 
 		case SDL_CONTROLLERAXISMOTION:
 		{
+			// SM: Ignore controller events when window is not active
+			if (!GLimp_WindowActive())
+				continue;
+
 			const int RANGE = 32767;
 			const int BUTTONTHRESHOLD = RANGE/2;
 
@@ -844,7 +868,12 @@ sysEvent_t Sys_GetEvent() {
 
 			sys_jEvents jEvent = mapjoyaxis((SDL_GameControllerAxis)ev.caxis.axis);
 			joystick_polls.Append(joystick_poll_t(jEvent, axisVal));
-			controller_type = mapcontrollertype(ev.caxis.which);
+
+			SDL_Joystick* joystick = SDL_JoystickFromInstanceID(ev.cbutton.which);
+			if (joystick && (reachedThresholdPos || reachedThresholdNeg))
+			{
+				controller_type = mapcontrollertype(SDL_JoystickGetPlayerIndex(joystick));
+			}
 
 			if (jEvent == J_AXIS_LEFT_X) {
 				PushButton(K_JOY_STICK1_LEFT, reachedThresholdNeg);
@@ -890,6 +919,10 @@ sysEvent_t Sys_GetEvent() {
 			break;
 
 		case SDL_JOYDEVICEREMOVED:
+			if (usercmdGen && usercmdGen->IsUsingJoystick())
+			{
+				gameLocal.requestPauseMenu = true;
+			}
 			// TODO: hot swapping maybe.
 			//lbOnControllerUnPlug(event.jdevice.which);
 			break;
@@ -1056,6 +1089,9 @@ void Sys_EndJoystickInputEvents() {
 }
 
 controllerType_t Sys_GetLastControllerType() {
+	if (common->g_SteamUtilities && common->g_SteamUtilities->IsOnSteamDeck())
+		return CT_STEAMDECK;
+
 	return controller_type;
 }
 

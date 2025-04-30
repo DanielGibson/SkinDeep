@@ -36,12 +36,25 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 const char * sysLanguageNames[] = {
-	"english", "spanish", "italian", "german", "french", "russian",
-	"polish", "korean", "japanese", "chinese", "tradchinese", 
-	"brportuguese", "turkish", NULL
+	"english",
+	"chinese",
+	"tradchinese",
+	"french",
+	"german",	
+	"italian",
+	"japanese",
+	"korean",
+	"polish",	
+	"brportuguese",	
+	"portuguese",
+	"russian",
+	"latam",
+	"spanish",
+	"turkish",	
+	NULL
 };
 
-idCVar sys_lang( "sys_lang", "english", CVAR_SYSTEM | CVAR_ARCHIVE,  "Sets language. Values:\nenglish, spanish, italian, german, french, russian, polish, korean, japanese, chinese, tradchinese, brportuguese, turkish\n\nUse 'reloadEngine' to restart with new language.", sysLanguageNames, idCmdSystem::ArgCompletion_String<sysLanguageNames> );
+idCVar sys_lang( "sys_lang", "english", CVAR_SYSTEM | CVAR_ARCHIVE,  "Sets language. Values:\nenglish, chinese, tradchinese,, french, german, italian, japanese, korean, polish, brportuguese, portuguese, russian, latam, spanish, turkish\n\nUse 'reloadEngine' to restart with new language.", sysLanguageNames, idCmdSystem::ArgCompletion_String<sysLanguageNames> );
 
 idSysLocal			sysLocal;
 idSys *				sys = &sysLocal;

@@ -53,7 +53,7 @@ public:
 							idItem();
 	virtual					~idItem();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -113,12 +113,12 @@ private:
 	// for rimlight shader
 	bool					showRimLight;
 	int						rimLightShellHandle;
-	const idMaterial*		rimLightMaterial; // This is the material that houses the fragment program and blend mode
-	idImage*				rimLightImage; // This is the image that will be used as the fragment program's map
+	const idMaterial*		rimLightMaterial = nullptr; // This is the material that houses the fragment program and blend mode
+	idImage*				rimLightImage  = nullptr; // This is the image that will be used as the fragment program's map
 
 	// for item pulse effect
 	int						itemShellHandle;
-	const idMaterial *		shellMaterial;
+	const idMaterial *		shellMaterial = nullptr;
 
 	// used to update the item pulse effect
 	mutable bool			inView;
@@ -136,6 +136,8 @@ private:
 	void					Event_RespawnFx( void );
 	// SM
 	void					Event_PostPhysicsRest();
+
+	void					SetupRimlightMaterial(); // blendo eric
 };
 
 class idItemPowerup : public idItem {
@@ -144,7 +146,7 @@ public:
 
 							idItemPowerup();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn();
@@ -161,7 +163,7 @@ public:
 
 							idObjective();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn();
@@ -197,12 +199,17 @@ public:
 							idMoveableItem();
 	virtual					~idMoveableItem();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
 	virtual void			Think( void );
 	virtual void			Present();
+
+	// SW 18th Feb 2025
+	virtual void			Show(void);
+	virtual void			Hide(void);
+
 #ifdef _D3XP
 	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity );
 #endif
@@ -253,8 +260,8 @@ protected:
 private:
 #endif
 	idPhysics_RigidBody		physicsObj;
-	idClipModel *			trigger;
-	const idDeclParticle *	smoke;
+	idClipModel *			trigger = nullptr;
+	const idDeclParticle *	smoke = nullptr;
 	int						smokeTime;
 	bool					smokeParticleAngleLock;
 
@@ -273,7 +280,7 @@ private:
 
 	//BC PRIVATE idMoveableItem
 	
-	idClipModel *			fireTrigger;
+	idClipModel *			fireTrigger = nullptr;
 	void					Event_Touch(idEntity *other, trace_t *trace);
 	void					Ignite(void);
 	int						fireTimer; //Determines how long an object stays on fire.
@@ -307,7 +314,7 @@ private:
 
 	int						sparkTimer;
 	bool					isSparking;
-	idFuncEmitter			*sparkEmitter;
+	idFuncEmitter			*sparkEmitter = nullptr;
 
 	int						outerspaceUpdateTimer;
 	int						outerspaceDeleteCounter;
@@ -333,6 +340,10 @@ public:
 	virtual					~idItemTeam();
 
 	void                    Spawn();
+
+	//void					Save( idSaveGame *savefile ) const; // blendo eric: CTF only?
+	//void					Restore( idRestoreGame *savefile );
+
 	virtual bool			Pickup( idPlayer *player );
 	virtual bool			ClientReceiveEvent( int event, int time, const idBitMsg &msg );
 	virtual void			Think(void );
@@ -359,19 +370,19 @@ private:
 	idMat3					returnAxis;
 	int						lastDrop;
 
-	const idDeclSkin *		skinDefault;
-	const idDeclSkin *		skinCarried;
+	const idDeclSkin *		skinDefault = nullptr;
+	const idDeclSkin *		skinCarried = nullptr;
 
-	const function_t *		scriptTaken;
-	const function_t *		scriptDropped;
-	const function_t *		scriptReturned;
-	const function_t *		scriptCaptured;
+	const function_t *		scriptTaken = nullptr;
+	const function_t *		scriptDropped = nullptr;
+	const function_t *		scriptReturned = nullptr;
+	const function_t *		scriptCaptured = nullptr;
 
 	renderLight_t           itemGlow;           // Used by flags when they are picked up
 	int                     itemGlowHandle;
 
 	int						lastNuggetDrop;
-	const char *			nuggetName;
+	const char *			nuggetName = nullptr;
 
 private:
 
@@ -422,7 +433,7 @@ public:
 
 							idObjectiveComplete();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn();

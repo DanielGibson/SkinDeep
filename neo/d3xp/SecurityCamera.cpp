@@ -84,6 +84,14 @@ idSecurityCamera::idSecurityCamera(void)
 
 	cameraID = cameraCount;
 	cameraCount++;
+
+	securitycameraNode.SetOwner(this);
+	securitycameraNode.AddToEnd(gameLocal.securitycameraEntities);
+
+	memset( boundingBeam, 0 ,sizeof(idBeam*)*CAMERA_SPOKECOUNT );
+	memset( boundingBeamTarget, 0 ,sizeof(idBeam*)*CAMERA_SPOKECOUNT );
+
+	spotLight = nullptr;
 }
 
 idSecurityCamera::~idSecurityCamera(void)
@@ -111,21 +119,61 @@ idSecurityCamera::Save
 ================
 */
 void idSecurityCamera::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( sweepAngle );
-	savefile->WriteInt( modelAxis );
-	savefile->WriteBool( flipAxis );
-	savefile->WriteFloat( scanDist );
-	savefile->WriteFloat( scanFov );
+	savefile->WriteBool( IsSpliced ); // bool IsSpliced
+	savefile->WriteInt( cameraIndex ); // int cameraIndex
 
-	
-	savefile->WriteBool( negativeSweep );	
-	savefile->WriteFloat( scanFovCos );
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( sweepAngle1 ); // int sweepAngle1
+	savefile->WriteInt( sweepAngle2 ); // int sweepAngle2
+	savefile->WriteInt( lerpStartAngle ); // int lerpStartAngle
+	savefile->WriteInt( lerpEndAngle ); // int lerpEndAngle
+	savefile->WriteInt( sweepTimerEnd ); // int sweepTimerEnd
+	savefile->WriteInt( sweepTimerInterruptionTime ); // int sweepTimerInterruptionTime
+	savefile->WriteInt( sweeptimeMax ); // int sweeptimeMax
 
-	savefile->WriteVec3( viewOffset );
+	savefile->WriteFloat( sweepAngle ); // float sweepAngle
+	savefile->WriteInt( modelAxis ); // int modelAxis
+	savefile->WriteBool( flipAxis ); // bool flipAxis
+	savefile->WriteFloat( scanDist ); // float scanDist
+	savefile->WriteFloat( scanFov ); // float scanFov
+	savefile->WriteFloat( frustumScale ); // float frustumScale
 
-	savefile->WriteInt( pvsArea );
-	savefile->WriteStaticObject( physicsObj );
-	savefile->WriteTraceModel( trm );
+	savefile->WriteBool( negativeSweep ); // bool negativeSweep
+	savefile->WriteFloat( scanFovCos ); // float scanFovCos
+
+	savefile->WriteVec3( viewOffset ); // idVec3 viewOffset
+
+	savefile->WriteInt( pvsArea ); // int pvsArea
+
+	savefile->WriteStaticObject( idSecurityCamera::physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteTraceModel( trm ); // idTraceModel trm
+
+	savefile->WriteInt( pauseTimer ); // int pauseTimer
+	savefile->WriteInt( cameraCheckTimer ); // int cameraCheckTimer
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( suspicionPips ); // int suspicionPips
+
+	SaveFileWriteArray( boundingBeam, CAMERA_SPOKECOUNT, WriteObject ); // idBeam* boundingBeam[CAMERA_SPOKECOUNT]
+	SaveFileWriteArray( boundingBeamTarget, CAMERA_SPOKECOUNT, WriteObject ); // idBeam* boundingBeamTarget[CAMERA_SPOKECOUNT]
+
+	savefile->WriteObject( spotLight ); // idLight * spotLight
+
+	savefile->WriteFloat( videoFOV ); // float videoFOV
+
+	savefile->WriteInt( enemyCheckTimer ); // int enemyCheckTimer
+
+	savefile->WriteFloat( enemycheckFovCos ); // float enemycheckFovCos
+
+	savefile->WriteFloat( spotlightScale ); // float spotlightScale
+
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteInt( damageSparkTimer ); // int damageSparkTimer
 }
 
 /*
@@ -134,21 +182,68 @@ idSecurityCamera::Restore
 ================
 */
 void idSecurityCamera::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( sweepAngle );
-	savefile->ReadInt( modelAxis );
-	savefile->ReadBool( flipAxis );
-	savefile->ReadFloat( scanDist );
-	savefile->ReadFloat( scanFov );
+	savefile->ReadBool( IsSpliced ); // bool IsSpliced
+	savefile->ReadInt( cameraIndex ); // int cameraIndex
+
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( sweepAngle1 ); // int sweepAngle1
+	savefile->ReadInt( sweepAngle2 ); // int sweepAngle2
+	savefile->ReadInt( lerpStartAngle ); // int lerpStartAngle
+	savefile->ReadInt( lerpEndAngle ); // int lerpEndAngle
+	savefile->ReadInt( sweepTimerEnd ); // int sweepTimerEnd
+	savefile->ReadInt( sweepTimerInterruptionTime ); // int sweepTimerInterruptionTime
+	savefile->ReadInt( sweeptimeMax ); // int sweeptimeMax
+
+	savefile->ReadFloat( sweepAngle ); // float sweepAngle
+	savefile->ReadInt( modelAxis ); // int modelAxis
+	savefile->ReadBool( flipAxis ); // bool flipAxis
+	savefile->ReadFloat( scanDist ); // float scanDist
+	savefile->ReadFloat( scanFov ); // float scanFov
+	savefile->ReadFloat( frustumScale ); // float frustumScale
+
+	savefile->ReadBool( negativeSweep ); // bool negativeSweep
+	savefile->ReadFloat( scanFovCos ); // float scanFovCos
+
+	savefile->ReadVec3( viewOffset ); // idVec3 viewOffset
+
+	savefile->ReadInt( pvsArea ); // int pvsArea
+
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadTraceModel( trm ); // idTraceModel trm
+
+	savefile->ReadInt( pauseTimer ); // int pauseTimer
+	savefile->ReadInt( cameraCheckTimer ); // int cameraCheckTimer
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( suspicionPips ); // int suspicionPips
+
+	SaveFileReadArrayCast( boundingBeam, ReadObject, idClass*& ); // idBeam* boundingBeam[CAMERA_SPOKECOUNT]
+	SaveFileReadArrayCast( boundingBeamTarget, ReadObject, idClass*& ); // idBeam* boundingBeamTarget[CAMERA_SPOKECOUNT]
+
+	savefile->ReadObject( CastClassPtrRef(spotLight) ); // idLight * spotLight
+
+	savefile->ReadFloat( videoFOV ); // float videoFOV
+
+	savefile->ReadInt( enemyCheckTimer ); // int enemyCheckTimer
+
+	savefile->ReadFloat( enemycheckFovCos ); // float enemycheckFovCos
+
+	savefile->ReadFloat( spotlightScale ); // float spotlightScale
 
 
-	savefile->ReadBool( negativeSweep );
-	savefile->ReadFloat( scanFovCos );
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
 
-	savefile->ReadVec3( viewOffset );
-
-	savefile->ReadInt( pvsArea );
-	savefile->ReadStaticObject( physicsObj );
-	savefile->ReadTraceModel( trm );
+	savefile->ReadInt( damageSparkTimer ); // int damageSparkTimer
 }
 
 /*
@@ -243,9 +338,6 @@ void idSecurityCamera::Spawn( void ) {
 	team = spawnArgs.GetInt("team", "1");
 	SetTeam(team);
 
-
-	securitycameraNode.SetOwner(this);
-	securitycameraNode.AddToEnd(gameLocal.securitycameraEntities);
 
 	IsSpliced = true; //BC all cameras are now instantly unlocked at level start.
 
@@ -645,7 +737,8 @@ void idSecurityCamera::SetAlertModeVis( int _newState )
 			break;
 	}
 
-	if(team == TEAM_FRIENDLY)
+	// SW 18th March 2025: friendly cameras don't get a free pass -- they're also disabled by power outages
+	if(team == TEAM_FRIENDLY && _newState != ELECTRICAL_DISABLED)
 	{
 		newColor = CAMERA_FRIENDLYCOLOR;
 	}
@@ -698,7 +791,9 @@ void idSecurityCamera::Think(void) {
 		}
 	}
 
-	if (canCheckSuspicion && (team == TEAM_FRIENDLY) && (gameLocal.time >= enemyCheckTimer))
+	// SW 18th March 2025:
+	// Friendly cameras in a power outage can't spot enemies either
+	if (canCheckSuspicion && (team == TEAM_FRIENDLY) && (gameLocal.time >= enemyCheckTimer) && state != ELECTRICAL_DISABLED)
 	{
 		//If on friendly team, then do checks to see if camera can see enemies.
 		CanSeeEnemy();
@@ -1196,6 +1291,9 @@ void idSecurityCamera::SetElectricalActive(bool value)
 		//turn OFF.
 		state = ELECTRICAL_DISABLED;
 		StopSound(SND_CHANNEL_BODY, false);
+		// SW 18th March 2025: turn off shader parms so a partially-suspicious camera doesn't keep showing pips
+		suspicionPips = 0; 
+		renderEntity.shaderParms[SHADERPARM_MODE] = 0;
 		SetAlertModeVis(state);
 		sweepTimerInterruptionTime = gameLocal.time;
 	}

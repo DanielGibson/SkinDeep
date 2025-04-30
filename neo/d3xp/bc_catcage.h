@@ -12,7 +12,7 @@ public:
 							idCatcage(void);
 	virtual					~idCatcage(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -41,11 +41,11 @@ private:
 	int						state;
 	int						timer;
 
-	idFuncEmitter			*soundwaves;
+	idFuncEmitter			*soundwaves = nullptr;
 
 	idEntityPtr<idEntity>	catPtr;
 
-	idEntity				*meowOverlay;
+	idEntity				*meowOverlay = nullptr;
 	int						overlayTimer;
 	enum					{MEOWSTATE_TRANSITIONON, MEOWSTATE_IDLE, MEOWSTATE_TRANSITIONOFF, MEOWSTATE_DONE};
 	int						overlayState;
@@ -73,4 +73,12 @@ private:
 	renderLight_t			headlight;
 	qhandle_t				headlightHandle;
 
+	int						helpmeRadius;
+
+	idStr					DoAskItemdefCheck();
+
+	//BC 2-23-2025: fallback arrow for key in room with no location.
+	idEntity*				arrowProp = nullptr;
+	int						arrowTimer;
+	bool					arrowActive;
 };

@@ -48,10 +48,14 @@ void idChembomb::Spawn(void)
 
 void idChembomb::Save(idSaveGame *savefile) const
 {
+	savefile->WriteParticle( smokeFly ); // const  idDeclParticle *	 smokeFly
+	savefile->WriteInt( smokeFlyTime ); //  int smokeFlyTime
 }
 
 void idChembomb::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadParticle( smokeFly ); // const  idDeclParticle *	 smokeFly
+	savefile->ReadInt( smokeFlyTime ); //  int smokeFlyTime
 }
 
 bool idChembomb::Collide(const trace_t &collision, const idVec3 &velocity)

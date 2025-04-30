@@ -59,6 +59,32 @@ void idMultiModelAF::Spawn( void ) {
 	physicsObj.SetSelf( this );
 }
 
+// blendo eric
+void idMultiModelAF::Save(idSaveGame* savefile) const {
+	savefile->WriteStaticObject( idMultiModelAF::physicsObj ); // idPhysics_AF physicsObj
+
+	savefile->WriteInt( modelHandles.Num() ); // idList<idRenderModel *> modelHandles
+	for (int idx = 0; idx < modelHandles.Num(); idx++) {
+		savefile->WriteString( modelHandles[idx]->Name() );
+	}
+
+	SaveFileWriteArray( modelDefHandles, modelDefHandles.Num(), WriteInt ); // idList<int> modelDefHandles
+}
+
+void idMultiModelAF::Restore(idRestoreGame* savefile) {
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_AF physicsObj
+
+	int num;
+	savefile->ReadInt( num ); // idList<idRenderModel *> modelHandles
+	for (int idx = 0; idx < modelHandles.Num(); idx++) {
+		idStr name;
+		savefile->ReadString( name );
+		modelHandles[idx] = renderModelManager->FindModel( name );
+	}
+
+	SaveFileReadArray( modelDefHandles, ReadInt ); // idList<int> modelDefHandles
+}
+
 /*
 ================
 idMultiModelAF::~idMultiModelAF
@@ -330,9 +356,10 @@ archive object for savegame file
 ================
 */
 void idAFAttachment::Save( idSaveGame *savefile ) const {
-	savefile->WriteObject( body );
-	savefile->WriteInt( idleAnim );
-	savefile->WriteJoint( attachJoint );
+	savefile->WriteObject( body ); // idEntity * body
+	savefile->WriteClipModel( combatModel ); // idClipModel * combatModel
+	savefile->WriteInt( idleAnim ); // int idleAnim
+	savefile->WriteJoint( attachJoint ); // saveJoint_t attachJoint
 }
 
 /*
@@ -343,9 +370,10 @@ unarchives object from save game file
 ================
 */
 void idAFAttachment::Restore( idRestoreGame *savefile ) {
-	savefile->ReadObject( reinterpret_cast<idClass *&>( body ) );
-	savefile->ReadInt( idleAnim );
-	savefile->ReadJoint( attachJoint );
+	savefile->ReadObject( body ); // idEntity * body
+	savefile->ReadClipModel( combatModel ); // idClipModel * combatModel
+	savefile->ReadInt( idleAnim ); // int idleAnim
+	savefile->ReadJoint( attachJoint ); // saveJoint_t attachJoint
 
 	SetCombatModel();
 	LinkCombat();
@@ -559,12 +587,19 @@ idAFEntity_Base::Save
 ================
 */
 void idAFEntity_Base::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( combatModelContents );
-	savefile->WriteClipModel( combatModel );
-	savefile->WriteVec3( spawnOrigin );
-	savefile->WriteMat3( spawnAxis );
-	savefile->WriteInt( nextSoundTime );
-	af.Save( savefile );
+	af.Save( savefile ); //  idAF af
+	savefile->WriteClipModel( combatModel ); //  idClipModel * combatModel
+	savefile->WriteInt( combatModelContents ); //  int combatModelContents
+	savefile->WriteVec3( spawnOrigin ); //  idVec3 spawnOrigin
+	savefile->WriteMat3( spawnAxis ); //  idMat3 spawnAxis
+	savefile->WriteInt( nextSoundTime ); //  int nextSoundTime
+
+	int numBodies = af.GetPhysics()->GetNumBodies();
+	savefile->WriteInt(numBodies);
+	for (int i = 0; i < numBodies; i++)
+	{
+		af.GetPhysics()->GetBody(i)->Save(savefile);
+	}
 }
 
 /*
@@ -573,14 +608,32 @@ idAFEntity_Base::Restore
 ================
 */
 void idAFEntity_Base::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( combatModelContents );
-	savefile->ReadClipModel( combatModel );
-	savefile->ReadVec3( spawnOrigin );
-	savefile->ReadMat3( spawnAxis );
-	savefile->ReadInt( nextSoundTime );
-	LinkCombat();
 
-	af.Restore( savefile );
+	//LoadAF();
+	af.Restore( savefile );  //  idAF af
+	savefile->ReadClipModel( combatModel ); //  idClipModel * combatModel
+	savefile->ReadInt( combatModelContents ); //  int combatModelContents
+	savefile->ReadVec3( spawnOrigin ); //  idVec3 spawnOrigin
+	savefile->ReadMat3( spawnAxis ); //  idMat3 spawnAxis
+	savefile->ReadInt( nextSoundTime ); //  int nextSoundTime
+
+
+	if (strlen(af.GetName()) > 0)
+	{
+		if (!af.Load(this, af.GetName())) {
+			gameLocal.Error("idAFEntity_Base::LoadAF: Couldn't load af file '%s' on entity '%s'", af.GetName(), name.c_str());
+		}
+	}
+
+	int numBodies = 0;
+	savefile->ReadInt(numBodies);
+	assert(af.GetPhysics()->GetNumBodies() == numBodies);
+	for (int i = 0; i < numBodies; i++)
+	{
+		af.GetPhysics()->GetBody(i)->Restore(savefile);
+	}
+
+	LinkCombat();
 }
 
 /*
@@ -1047,11 +1100,13 @@ idAFEntity_Gibbable::Save
 ================
 */
 void idAFEntity_Gibbable::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( gibbed );
-	savefile->WriteBool( combatModel != NULL );
-#ifdef _D3XP
-	savefile->WriteBool( wasThrown );
-#endif
+	savefile->WriteModel( skeletonModel ); //  saveidModel *			 skeletonModel
+	savefile->WriteInt( skeletonModelDefHandle ); //  int skeletonModelDefHandle
+
+	savefile->WriteBool( gibbed ); //  bool gibbed
+	savefile->WriteBool( wasThrown ); //  bool wasThrown
+
+	savefile->WriteBool( combatModel != NULL );  // extra setup
 }
 
 /*
@@ -1060,15 +1115,21 @@ idAFEntity_Gibbable::Restore
 ================
 */
 void idAFEntity_Gibbable::Restore( idRestoreGame *savefile ) {
+	savefile->ReadModel( skeletonModel ); //  saveidModel * skeletonModel
+	savefile->ReadInt( skeletonModelDefHandle ); //  int skeletonModelDefHandle
+	if (skeletonModelDefHandle != -1) {
+		renderEntity_t skeleton;
+		skeleton = renderEntity;
+		skeleton.hModel = skeletonModel;
+		gameRenderWorld->UpdateEntityDef(skeletonModelDefHandle, &skeleton);
+	}
+	savefile->ReadBool( gibbed ); //  bool gibbed
+	savefile->ReadBool( wasThrown ); //  bool wasThrown
+
 	bool hasCombatModel;
+	savefile->ReadBool( hasCombatModel ); // extra setup
 
-	savefile->ReadBool( gibbed );
-	savefile->ReadBool( hasCombatModel );
-#ifdef _D3XP
-	savefile->ReadBool( wasThrown );
-#endif
-
-	InitSkeletonModel();
+	//InitSkeletonModel(); // blendo eric: should regen instead of load?
 
 	if ( hasCombatModel ) {
 		SetCombatModel();
@@ -1439,7 +1500,7 @@ idAFEntity_Generic::Save
 ================
 */
 void idAFEntity_Generic::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( keepRunningPhysics );
+	savefile->WriteBool( keepRunningPhysics ); // bool keepRunningPhysics
 }
 
 /*
@@ -1448,7 +1509,7 @@ idAFEntity_Generic::Restore
 ================
 */
 void idAFEntity_Generic::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( keepRunningPhysics );
+	savefile->ReadBool( keepRunningPhysics ); // bool keepRunningPhysics
 }
 
 /*
@@ -1589,7 +1650,7 @@ idAFEntity_WithAttachedHead::Save
 ================
 */
 void idAFEntity_WithAttachedHead::Save( idSaveGame *savefile ) const {
-	head.Save( savefile );
+	head.Save( savefile ); // idEntityPtr<idAFAttachment> head
 }
 
 /*
@@ -1598,7 +1659,7 @@ idAFEntity_WithAttachedHead::Restore
 ================
 */
 void idAFEntity_WithAttachedHead::Restore( idRestoreGame *savefile ) {
-	head.Restore( savefile );
+	head.Restore( savefile ); // idEntityPtr<idAFAttachment> head
 }
 
 /*
@@ -1852,6 +1913,27 @@ void idAFEntity_Vehicle::Spawn( void ) {
 	}
 }
 
+// blendo eric
+void idAFEntity_Vehicle::Save(idSaveGame* savefile) const {
+	savefile->WriteObject( player ); // idPlayer * player
+	savefile->WriteJoint( eyesJoint ); // saveJoint_t eyesJoint
+	savefile->WriteJoint( steeringWheelJoint ); // saveJoint_t steeringWheelJoint
+	savefile->WriteFloat( wheelRadius ); // float wheelRadius
+	savefile->WriteFloat( steerAngle ); // float steerAngle
+	savefile->WriteFloat( steerSpeed ); // float steerSpeed
+	savefile->WriteParticle( dustSmoke ); // const idDeclParticle * dustSmoke
+}
+
+void idAFEntity_Vehicle::Restore(idRestoreGame* savefile) {
+	savefile->ReadObject( CastClassPtrRef(player) ); // idPlayer * player
+	savefile->ReadJoint( eyesJoint ); // saveJoint_t eyesJoint
+	savefile->ReadJoint( steeringWheelJoint ); // saveJoint_t steeringWheelJoint
+	savefile->ReadFloat( wheelRadius ); // float wheelRadius
+	savefile->ReadFloat( steerAngle ); // float steerAngle
+	savefile->ReadFloat( steerSpeed ); // float steerSpeed
+	savefile->ReadParticle( dustSmoke ); // const idDeclParticle * dustSmoke
+}
+
 /*
 ================
 idAFEntity_Vehicle::Use
@@ -1920,10 +2002,12 @@ END_CLASS
 idAFEntity_VehicleSimple::idAFEntity_VehicleSimple
 ================
 */
-idAFEntity_VehicleSimple::idAFEntity_VehicleSimple( void ) {
-	int i;
-	for ( i = 0; i < 4; i++ ) {
-		suspension[i] = NULL;
+idAFEntity_VehicleSimple::idAFEntity_VehicleSimple(void) {
+	wheelModel = nullptr;
+	for (int i = 0; i < 4; i++) {
+		suspension[i] = nullptr;
+		wheelJoints[i] = (jointHandle_t)0;
+		wheelAngles[i] = 0;
 	}
 }
 
@@ -1986,6 +2070,21 @@ void idAFEntity_VehicleSimple::Spawn( void ) {
 
 	memset( wheelAngles, 0, sizeof( wheelAngles ) );
 	BecomeActive( TH_THINK );
+}
+
+// blendo eric: not used?
+void idAFEntity_VehicleSimple::Save(idSaveGame* savefile) const {
+	savefile->WriteClipModel( wheelModel ); // idClipModel * wheelModel
+	// idAFConstraint_Suspension *	suspension[4]
+	SaveFileWriteArray( wheelJoints, 4, WriteInt ); // jointHandle_t wheelJoints[4]
+	SaveFileWriteArray( wheelAngles, 4, WriteFloat ); // float wheelAngles[4]
+}
+
+void idAFEntity_VehicleSimple::Restore(idRestoreGame* savefile) {
+	savefile->ReadClipModel( wheelModel ); // idClipModel * wheelModel
+	// idAFConstraint_Suspension *	suspension[4]
+	SaveFileReadArray( (int&)wheelJoints, ReadInt); // jointHandle_t wheelJoints[4]
+	SaveFileReadArray( wheelAngles, ReadFloat ); // float wheelAngles[4]
 }
 
 /*
@@ -2702,6 +2801,12 @@ idAFEntity_SteamPipe::Save
 ================
 */
 void idAFEntity_SteamPipe::Save( idSaveGame *savefile ) const {
+	savefile->WriteInt( steamBody ); // int steamBody
+	savefile->WriteFloat( steamForce ); // float steamForce
+	savefile->WriteFloat( steamUpForce ); // float steamUpForce
+	force.Save( savefile ); // idForce_Constant force
+	savefile->WriteRenderEntity( steamRenderEntity ); // renderEntity_t steamRenderEntity
+	savefile->WriteInt( steamModelDefHandle ); // int steamModelDefHandle
 }
 
 /*
@@ -2710,7 +2815,18 @@ idAFEntity_SteamPipe::Restore
 ================
 */
 void idAFEntity_SteamPipe::Restore( idRestoreGame *savefile ) {
-	Spawn();
+	savefile->ReadInt( steamBody ); // int steamBody
+	savefile->ReadFloat( steamForce ); // float steamForce
+	savefile->ReadFloat( steamUpForce ); // float steamUpForce
+	force.Restore( savefile ); // idForce_Constant force
+
+	savefile->ReadRenderEntity( steamRenderEntity ); // renderEntity_t steamRenderEntity
+	savefile->ReadInt( steamModelDefHandle ); // int steamModelDefHandle
+	if (steamModelDefHandle != -1) {
+		gameRenderWorld->UpdateEntityDef(steamModelDefHandle, &steamRenderEntity);
+	}
+
+	//Spawn();
 }
 
 /*
@@ -2847,7 +2963,7 @@ idAFEntity_ClawFourFingers::Save
 */
 void idAFEntity_ClawFourFingers::Save( idSaveGame *savefile ) const {
 	int i;
-
+	// idAFConstraint_Hinge *	fingers[4]
 	for ( i = 0; i < 4; i++ ) {
 		fingers[i]->Save( savefile );
 	}
@@ -2861,6 +2977,7 @@ idAFEntity_ClawFourFingers::Restore
 void idAFEntity_ClawFourFingers::Restore( idRestoreGame *savefile ) {
 	int i;
 
+	// idAFConstraint_Hinge *	fingers[4]
 	for ( i = 0; i < 4; i++ ) {
 		fingers[i] = static_cast<idAFConstraint_Hinge *>(af.GetPhysics()->GetConstraint( clawConstraintNames[i] ));
 		fingers[i]->Restore( savefile );
@@ -3377,37 +3494,37 @@ void idHarvestable::Init(idEntity* parent) {
 }
 
 void idHarvestable::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( triggersize );
-	savefile->WriteClipModel( trigger );
-	savefile->WriteFloat( giveDelay );
-	savefile->WriteFloat( removeDelay );
-	savefile->WriteBool( given );
+	parentEnt.Save(savefile); // idEntityPtr<idEntity> parentEnt
 
-	player.Save( savefile );
-	savefile->WriteInt( startTime );
+	savefile->WriteFloat( triggersize ); // float triggersize
+	savefile->WriteClipModel( trigger ); // idClipModel * trigger
+	savefile->WriteFloat( giveDelay ); // float giveDelay
+	savefile->WriteFloat( removeDelay ); // float removeDelay
+	savefile->WriteBool( given ); // bool given
 
-	savefile->WriteBool( fxFollowPlayer );
-	fx.Save( savefile );
-	savefile->WriteString( fxOrient );
+	player.Save( savefile ); // idEntityPtr<idPlayer> player
+	savefile->WriteInt( startTime ); // int startTime
 
-	parentEnt.Save(savefile);
+	savefile->WriteBool( fxFollowPlayer ); // bool fxFollowPlayer
+	fx.Save( savefile ); // idEntityPtr<idEntityFx> fx
+	savefile->WriteString( fxOrient ); // idString fxOrient
 }
 
 void idHarvestable::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( triggersize );
-	savefile->ReadClipModel( trigger );
-	savefile->ReadFloat( giveDelay );
-	savefile->ReadFloat( removeDelay );
-	savefile->ReadBool( given );
+	parentEnt.Restore(savefile); // idEntityPtr<idEntity> parentEnt
 
-	player.Restore( savefile );
-	savefile->ReadInt( startTime );
+	savefile->ReadFloat( triggersize ); // float triggersize
+	savefile->ReadClipModel( trigger ); // idClipModel * trigger
+	savefile->ReadFloat( giveDelay ); // float giveDelay
+	savefile->ReadFloat( removeDelay ); // float removeDelay
+	savefile->ReadBool( given ); // bool given
 
-	savefile->ReadBool( fxFollowPlayer );
-	fx.Restore( savefile );
-	savefile->ReadString( fxOrient );
+	player.Restore( savefile ); // idEntityPtr<idPlayer> player
+	savefile->ReadInt( startTime ); // int startTime
 
-	parentEnt.Restore(savefile);
+	savefile->ReadBool( fxFollowPlayer ); // bool fxFollowPlayer
+	fx.Restore( savefile ); // idEntityPtr<idEntityFx> fx
+	savefile->ReadString( fxOrient ); // idString fxOrient
 }
 
 void idHarvestable::SetParent(idEntity* parent) {
@@ -3756,7 +3873,7 @@ idAFEntity_Harvest::Save
 ================
 */
 void idAFEntity_Harvest::Save( idSaveGame *savefile ) const {
-	harvestEnt.Save(savefile);
+	harvestEnt.Save(savefile); // idEntityPtr<idHarvestable> harvestEnt
 }
 
 /*
@@ -3765,7 +3882,7 @@ idAFEntity_Harvest::Restore
 ================
 */
 void idAFEntity_Harvest::Restore( idRestoreGame *savefile ) {
-	harvestEnt.Restore(savefile);
+	harvestEnt.Restore(savefile); // idEntityPtr<idHarvestable> harvestEnt
 	//if(harvestEnt.GetEntity()) {
 	//	harvestEnt.GetEntity()->SetParent(this);
 	//}

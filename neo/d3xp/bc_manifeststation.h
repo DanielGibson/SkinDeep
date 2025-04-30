@@ -13,7 +13,7 @@ public:
 							idManifestStation(void);
 	virtual					~idManifestStation(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -37,7 +37,7 @@ private:
 	enum					{ STAT_ACTIVE, STAT_AWAITINGUPDATE, STAT_DEAD };
 	int						state;	
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	int						thinkTimer;
 

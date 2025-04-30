@@ -26,11 +26,19 @@ END_CLASS
 
 idElectricalBox::idElectricalBox(void)
 {
+	state = IDLE;
+	idleSmoke = nullptr;
+	hazardType = 0;
+
 	interestDelayActive = false;
 	interestDelayTimer = 0;
 
 	electricalboxNode.SetOwner(this);
 	electricalboxNode.AddToEnd(gameLocal.electricalboxEntities);
+
+	//make it repairable.
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idElectricalBox::~idElectricalBox(void)
@@ -46,10 +54,6 @@ void idElectricalBox::Spawn(void)
 	GetPhysics()->SetContents(CONTENTS_RENDERMODEL);
 	GetPhysics()->SetClipMask(MASK_SOLID | CONTENTS_MOVEABLECLIP);
 	idleSmoke = NULL;
-
-	//make it repairable.
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 	state = IDLE;
 	hazardType = PIPETYPE_ELECTRICAL;
@@ -94,8 +98,10 @@ void idElectricalBox::Event_PostSpawn(void)
 			if (modelname.Length() <= 0)
 			{
 				//This is a light entity, not a light fixture.
+				// SW 3rd April 2025: Need to rotate light_center around the light's axis, or else we might think it's in a wall when it isn't
 				idVec3 lightCenter = gameLocal.entities[i]->spawnArgs.GetVector("light_center", "0 0 0");
-				currentLoc = gameLocal.LocationForPoint(gameLocal.entities[i]->GetPhysics()->GetOrigin() + lightCenter);
+				idMat3 lightAxis = gameLocal.entities[i]->GetPhysics()->GetAxis();
+				currentLoc = gameLocal.LocationForPoint(gameLocal.entities[i]->GetPhysics()->GetOrigin() + (lightCenter * lightAxis));
 			}
 			else
 			{
@@ -158,10 +164,36 @@ void idElectricalBox::Event_PostSpawn(void)
 
 void idElectricalBox::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteObject( idleSmoke ); //  idFuncEmitter			* idleSmoke
+
+	SaveFileWriteArray(pipeIndexes, pipeIndexes.Num(), WriteInt);
+	SaveFileWriteArray(lightIndexes, lightIndexes.Num(), WriteInt);
+	SaveFileWriteArray(turretIndexes, turretIndexes.Num(), WriteInt);
+	SaveFileWriteArray(securitycameraIndexes, securitycameraIndexes.Num(), WriteInt);
+
+	savefile->WriteInt( hazardType ); //  int hazardType
+
+	savefile->WriteBool( interestDelayActive ); //  bool interestDelayActive
+	savefile->WriteInt( interestDelayTimer ); //  int interestDelayTimer
 }
 
 void idElectricalBox::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); //  idFuncEmitter * idleSmoke
+
+	SaveFileReadList(pipeIndexes, ReadInt); //  idList<int> pipeIndexes
+	SaveFileReadList(lightIndexes, ReadInt); //  idList<int> lightIndexes
+	SaveFileReadList(turretIndexes, ReadInt); //  idList<int> turretIndexes
+	SaveFileReadList(securitycameraIndexes, ReadInt); //  idList<int> securitycameraIndexes
+
+	savefile->ReadInt( hazardType ); //  int hazardType
+
+	savefile->ReadBool( interestDelayActive ); //  bool interestDelayActive
+	savefile->ReadInt( interestDelayTimer ); //  int interestDelayTimer
 }
 
 void idElectricalBox::Think(void)
@@ -219,7 +251,7 @@ void idElectricalBox::Damage(idEntity *inflictor, idEntity *attacker, const idVe
 	//Death.
 	if (health <= 0 && state == IDLE)
 	{
-		gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, damageDefName);
+		gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, damageDefName, EL_DESTROYED);
 
 		state = DEAD;
 		isFrobbable = false;

@@ -31,6 +31,18 @@ void idSpectateNode::Spawn(void)
 	//gameRenderWorld->DebugArrowSimple(GetPhysics()->GetOrigin());
 }
 
+
+void idSpectateNode::Save(idSaveGame* savefile) const
+{
+	savefile->WriteString( text ); // idString text
+	savefile->WriteString( timestamp ); // idString timestamp
+}
+void idSpectateNode::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadString( text ); // idString text
+	savefile->ReadString( timestamp ); // idString timestamp
+}
+
 void idSpectateNode::Think(void)
 {	
 	idEntity::Think();

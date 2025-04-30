@@ -112,10 +112,10 @@ idItem::~idItem
 idItem::~idItem() {
 	
 	//bc 11-11-2024 commenting this out for now as it's happening very frequently (when carrying a weapon like shotgun, rifle, etc)
-	//if (gameLocal.GetLocalPlayer())
-	//{
-	//	assert(!gameLocal.GetLocalPlayer()->HasEntityInCarryableInventory(this));
-	//}
+	if (gameLocal.GetLocalPlayer())
+	{
+		//assert(!gameLocal.GetLocalPlayer()->HasEntityInCarryableInventory(this));
+	}
 
 	// remove the highlight shell
 	if ( itemShellHandle != -1 ) {
@@ -132,18 +132,31 @@ idItem::Save
 ================
 */
 void idItem::Save( idSaveGame *savefile ) const {
+	savefile->WriteObject( lastThrower ); // idEntityPtr<idEntity> lastThrower
 
-	savefile->WriteVec3( orgOrigin );
-	savefile->WriteBool( spin );
-	savefile->WriteBool( pulse );
-	savefile->WriteBool( canPickUp );
+	savefile->WriteBool( canPickUp ); //  bool canPickUp
+	savefile->WriteBool( pulse ); //  bool pulse
+	savefile->WriteBool( carryable ); //  bool carryable
+	savefile->WriteInt( dropTimer ); //  int dropTimer
+	savefile->WriteBool( justDropped ); //  bool justDropped
 
-	savefile->WriteMaterial( shellMaterial );
+	savefile->WriteBool( dropInvincibleActive ); //  bool dropInvincibleActive
+	savefile->WriteInt( dropInvincibleTimer ); //  int dropInvincibleTimer
 
-	savefile->WriteBool( inView );
-	savefile->WriteInt( inViewTime );
-	savefile->WriteInt( lastCycle );
-	savefile->WriteInt( lastRenderViewTime );
+	savefile->WriteVec3( orgOrigin ); //  idVec3 orgOrigin
+	savefile->WriteBool( spin ); //  bool spin
+	savefile->WriteBool( showRimLight ); //  bool showRimLight
+	savefile->WriteInt( -1 ); // savefile->WriteInt( rimLightShellHandle ); //  int rimLightShellHandle
+
+	// const  idMaterial* rimLightMaterial 	// setup in SetupRimlightMaterial();
+	// idImage* rimLightImage 	// setup in SetupRimlightMaterial();
+
+	savefile->WriteInt( itemShellHandle ); //  int itemShellHandle // blendo eric: regen in code
+	savefile->WriteMaterial( shellMaterial ); // const  idMaterial * shellMaterial
+	savefile->WriteBool( inView ); // mutable  bool inView
+	savefile->WriteInt( inViewTime ); // mutable  int inViewTime
+	savefile->WriteInt( lastCycle ); // mutable  int lastCycle
+	savefile->WriteInt( lastRenderViewTime ); // mutable  int lastRenderViewTime
 }
 
 /*
@@ -152,20 +165,32 @@ idItem::Restore
 ================
 */
 void idItem::Restore( idRestoreGame *savefile ) {
+	savefile->ReadObject( lastThrower ); // idEntityPtr<idEntity> lastThrower
 
-	savefile->ReadVec3( orgOrigin );
-	savefile->ReadBool( spin );
-	savefile->ReadBool( pulse );
-	savefile->ReadBool( canPickUp );
+	savefile->ReadBool( canPickUp ); //  bool canPickUp
+	savefile->ReadBool( pulse ); //  bool pulse
+	savefile->ReadBool( carryable ); //  bool carryable
+	savefile->ReadInt( dropTimer ); //  int dropTimer
+	savefile->ReadBool( justDropped ); //  bool justDropped
 
-	savefile->ReadMaterial( shellMaterial );
+	savefile->ReadBool( dropInvincibleActive ); //  bool dropInvincibleActive
+	savefile->ReadInt( dropInvincibleTimer ); //  int dropInvincibleTimer
 
-	savefile->ReadBool( inView );
-	savefile->ReadInt( inViewTime );
-	savefile->ReadInt( lastCycle );
-	savefile->ReadInt( lastRenderViewTime );
+	savefile->ReadVec3( orgOrigin ); //  idVec3 orgOrigin
+	savefile->ReadBool( spin ); //  bool spin
+	savefile->ReadBool( showRimLight ); //  bool showRimLight
+	savefile->ReadInt( rimLightShellHandle ); //  int rimLightShellHandle
 
-	itemShellHandle = -1;
+	// const  idMaterial* rimLightMaterial 	// setup in SetupRimlightMaterial();
+	//  idImage* rimLightImage 	// setup in SetupRimlightMaterial();
+	SetupRimlightMaterial();
+
+	savefile->ReadInt( itemShellHandle ); //  int itemShellHandle // blendo eric: regen in code
+	savefile->ReadMaterial( shellMaterial ); // const  idMaterial * shellMaterial
+	savefile->ReadBool( inView ); // mutable  bool inView
+	savefile->ReadInt( inViewTime ); // mutable  int inViewTime
+	savefile->ReadInt( lastCycle ); // mutable  int lastCycle
+	savefile->ReadInt( lastRenderViewTime ); // mutable  int lastRenderViewTime
 }
 
 /*
@@ -403,17 +428,33 @@ void idItem::Spawn( void ) {
 	showRimLight = spawnArgs.GetBool("rimLight", "0");
 	rimLightShellHandle = -1;
 
+	SetupRimlightMaterial();
+	
+
+	//BC
+	isFrobbable = spawnArgs.GetBool("frobbable", "0");
+	pulse = (isFrobbable && spawnArgs.GetBool("frobhighlight", "0"));
+	lastThrower = NULL;
+	dropTimer = gameLocal.time;
+	justDropped = false;
+	dropInvincibleActive = false;
+	dropInvincibleTimer = 0;
+}
+
+void idItem::SetupRimlightMaterial() {
+	rimLightMaterial = nullptr;
+	rimLightImage = nullptr;
+
 	if (showRimLight)
 	{
 		rimLightMaterial = declManager->FindMaterial("rimLightShader");
-		rimLightImage = NULL;
 
 #if 0 // use skin image first
 		idImage* rimLightImageFallback = NULL;
 
 		// Try to find a diffuse map to use for our rim light shader
 		idRenderModel* renderModel = this->renderEntity.hModel;
-		
+
 		for (int i = 0; i < renderModel->NumSurfaces(); i++)
 		{
 			const idMaterial* shader = renderModel->Surface(i)->shader;
@@ -427,7 +468,7 @@ void idItem::Spawn( void ) {
 					{
 						rimLightImageFallback = curImage;
 					}
-					if (curImage && curImage->imgName.Find("skin",false) >= 0)
+					if (curImage && curImage->imgName.Find("skin", false) >= 0)
 					{
 						rimLightImage = curImage;
 						break;
@@ -442,7 +483,7 @@ void idItem::Spawn( void ) {
 		}
 
 #else // default standard white or other texture
-		
+
 		// rimLightImage is redundant here, but keeping it just in case we want to go back to customSkin image version
 		for (int j = 0; j < rimLightMaterial->GetNumStages(); j++)
 		{
@@ -452,31 +493,14 @@ void idItem::Spawn( void ) {
 			}
 		}
 #endif
-		
-		if(!rimLightImage)
+
+		if (!rimLightImage)
 		{
 
 			gameLocal.Warning("idItem '%s' could not find a suitable diffuse map for use with rim light shell.", GetName());
 			rimLightImage = NULL;
 		}
-		
 	}
-	else
-	{
-		rimLightImage = NULL;
-		rimLightMaterial = NULL;
-	}
-	
-	
-
-	//BC
-	isFrobbable = spawnArgs.GetBool("frobbable", "0");
-	pulse = (isFrobbable && spawnArgs.GetBool("frobhighlight", "0"));
-	lastThrower = NULL;
-	dropTimer = gameLocal.time;
-	justDropped = false;
-	dropInvincibleActive = false;
-	dropInvincibleTimer = 0;
 }
 
 /*
@@ -546,7 +570,10 @@ bool idItem::Pickup( idPlayer *player )
 	idVec3 fxPos;
 	idMat3 fxMat;
 
-	//BC handle the weapon having a round in its chamber. We only want to do this if the player does not currently own the weapon.
+	// SW 27th March 2025:
+	// This code was previously used for stuffing a round into the chamber. It didn't work because the weapon didn't have a hotbar slot at this point,
+	// and in any case, we don't want to just infinitely chamber a round every time the player picks up the weapon.
+	// I'm repurposing it here for telling the inventory system whether it needs to load the weapon we picked up
 	if (spawnArgs.GetBool("isweapon"))
 	{
 		const idKeyValue * keyval = this->spawnArgs.MatchPrefix("inv_weapon");
@@ -557,19 +584,12 @@ bool idItem::Pickup( idPlayer *player )
 
 			if (weaponIndex >= 0)
 			{
-				if (gameLocal.GetLocalPlayer()->inventory.GetHotbarslotViaWeaponIndex(weaponIndex) >= 0)
+				if (gameLocal.GetLocalPlayer()->inventory.GetHotbarslotViaWeaponIndex(weaponIndex) < 0)
 				{
-					const idKeyValue * ammokey = this->spawnArgs.MatchPrefix("inv_ammo_");
-
-					if (ammokey)
-					{
-						idStr keyName = ammokey->GetKey();
-						idStr inchamberKey = ammokey->GetKey();
-						inchamberKey.Insert("inchamber_", 4);
-
-						//we want to put one round in the chamber of the spawned weapon.
-						this->spawnArgs.SetInt(inchamberKey, 1);
-					}
+					// SW 27th March 2025:
+					// Player doesn't already have this weapon. So when we supply the new weapon to the inventory, we need the inventory to load it instead of just hoovering up the ammo
+					// We pass on this instruction to the inventory via the keyvalue below
+					this->spawnArgs.SetBool("loadnewweapon", true);
 				}
 			}
 		}
@@ -904,8 +924,8 @@ idItemPowerup::Save
 ================
 */
 void idItemPowerup::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( time );
-	savefile->WriteInt( type );
+	savefile->WriteInt( time ); // int time
+	savefile->WriteInt( type ); // int type
 }
 
 /*
@@ -914,8 +934,8 @@ idItemPowerup::Restore
 ================
 */
 void idItemPowerup::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( time );
-	savefile->ReadInt( type );
+	savefile->ReadInt( time ); // int time
+	savefile->ReadInt( type ); // int type
 }
 
 /*
@@ -1674,7 +1694,7 @@ idObjective::Save
 ================
 */
 void idObjective::Save( idSaveGame *savefile ) const {
-	savefile->WriteVec3( playerPos );
+	savefile->WriteVec3( playerPos ); // idVec3 playerPos
 }
 
 /*
@@ -1683,7 +1703,7 @@ idObjective::Restore
 ================
 */
 void idObjective::Restore( idRestoreGame *savefile ) {
-	savefile->ReadVec3( playerPos );
+	savefile->ReadVec3( playerPos ); // idVec3 playerPos
 }
 
 /*
@@ -1916,33 +1936,53 @@ idMoveableItem::idMoveableItem
 ================
 */
 idMoveableItem::idMoveableItem() {
-	trigger = NULL;
-	smoke = NULL;
+	// blendo eric: script gen
+	canDealEntDamage = false;
+
+	trigger = nullptr;
+	smoke = nullptr;
 	smokeTime = 0;
-#ifdef _D3XP
+	smokeParticleAngleLock = false;
+
 	nextSoundTime = 0;
-#endif
-#ifdef CTF
 	repeatSmoke = false;
-#endif
+
+	fireTrigger = nullptr;
+	fireTimer = 0;
+	fireDamageIntervalTimer = 0;
+
+	maxSmackCount = 0;
+	smackCount = 0;
+
+	interestSingleBounceDone = false;
+
+	collideFrobTimer = 0;
+
+	showItemLine = false;
+
+	moveToPlayerTimer = 0;
+
+	sparkTimer = 0;
+	isSparking = false;
+	sparkEmitter = nullptr;
+
+	outerspaceUpdateTimer = 0;
+	outerspaceDeleteCounter = 0;
+
+	canBeLostInSpace = false;
+
+	nextSmackTime = 0;
 
 	//BC
 	isOnFire = false;    
 	nextDischargeTime = 0;
 	nextParticleBounceTime = 0;
 
-	// SW: Trigger a gravity check
-	PostEventMS(&EV_PostSpawn, 0);
-
 	// SW: We need to track this so that we can remove ownership of the item once it's been in the world for X milliseconds
 	spawnTime = gameLocal.time;
 
 	itemLineHandle = -1;
-	showItemLine = false;
 	itemLineColor = idVec3(1, 1, 1);
-	canDealEntDamage = false;
-
-	nextSmackTime = 0;
 }
 
 /*
@@ -1970,15 +2010,63 @@ idMoveableItem::Save
 ================
 */
 void idMoveableItem::Save( idSaveGame *savefile ) const {
-	savefile->WriteStaticObject( physicsObj );
 
-	savefile->WriteClipModel( trigger );
+	savefile->WriteBool( isOnFire ); //  bool isOnFire
 
-	savefile->WriteParticle( smoke );
-	savefile->WriteInt( smokeTime );
-#ifdef _D3XP
-	savefile->WriteInt( nextSoundTime );
-#endif
+	savefile->WriteBool( canDealEntDamage ); //  bool canDealEntDamage
+
+	savefile->WriteStaticObject( idMoveableItem::physicsObj ); //  idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteClipModel( trigger ); //  idClipModel * trigger
+	savefile->WriteParticle( smoke ); // const  idDeclParticle * smoke
+	savefile->WriteInt( smokeTime ); //  int smokeTime
+	savefile->WriteBool( smokeParticleAngleLock ); //  bool smokeParticleAngleLock
+
+	savefile->WriteInt( nextSoundTime ); //  int nextSoundTime
+
+	savefile->WriteBool( repeatSmoke ); //  bool repeatSmoke
+
+
+	//savefile->WriteClipModel( fireTrigger ); //  idClipModel * fireTrigger // regened
+
+	savefile->WriteInt( fireTimer ); //  int fireTimer
+	savefile->WriteInt( fireDamageIntervalTimer ); //  int fireDamageIntervalTimer
+	fxFire.Save( savefile ); //  idEntityPtr<idEntityFx> fxFire
+
+	savefile->WriteInt( maxSmackCount ); //  int maxSmackCount
+	savefile->WriteInt( smackCount ); //  int smackCount
+
+	savefile->WriteInt( nextDischargeTime ); //  int nextDischargeTime
+
+	savefile->WriteInt( nextParticleBounceTime ); //  int nextParticleBounceTime
+
+	savefile->WriteBool( interestSingleBounceDone ); //  bool interestSingleBounceDone
+
+	savefile->WriteInt( collideFrobTimer ); //  int collideFrobTimer
+
+
+	savefile->WriteInt( spawnTime ); //  int spawnTime
+	savefile->WriteBool( showItemLine ); //  bool showItemLine
+	savefile->WriteInt( itemLineHandle ); //  int itemLineHandle
+	savefile->WriteVec3( itemLineColor ); //  idVec3 itemLineColor
+
+	savefile->WriteInt( moveToPlayerTimer ); //  int moveToPlayerTimer
+
+	savefile->WriteInt( sparkTimer ); //  int sparkTimer
+	savefile->WriteBool( isSparking ); //  bool isSparking
+	savefile->WriteObject( sparkEmitter ); // idFuncEmitter* sparkEmitter
+
+	savefile->WriteInt( outerspaceUpdateTimer ); //  int outerspaceUpdateTimer
+	savefile->WriteInt( outerspaceDeleteCounter ); //  int outerspaceDeleteCounter
+
+	savefile->WriteBool( canBeLostInSpace ); //  bool canBeLostInSpace
+
+	savefile->WriteInt( nextSmackTime ); //  int nextSmackTime
+
+	savefile->WriteString( smackMaterial ); //  idString smackMaterial
+
 }
 
 /*
@@ -1987,16 +2075,70 @@ idMoveableItem::Restore
 ================
 */
 void idMoveableItem::Restore( idRestoreGame *savefile ) {
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
 
-	savefile->ReadClipModel( trigger );
+	savefile->ReadBool( isOnFire ); //  bool isOnFire
 
-	savefile->ReadParticle( smoke );
-	savefile->ReadInt( smokeTime );
-#ifdef _D3XP
-	savefile->ReadInt( nextSoundTime );
-#endif
+	savefile->ReadBool( canDealEntDamage ); //  bool canDealEntDamage
+
+	savefile->ReadStaticObject( physicsObj ); //  idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadClipModel( trigger ); //  idClipModel * trigger
+	savefile->ReadParticle( smoke ); // const  idDeclParticle * smoke
+	savefile->ReadInt( smokeTime ); //  int smokeTime
+	savefile->ReadBool( smokeParticleAngleLock ); //  bool smokeParticleAngleLock
+
+	savefile->ReadInt( nextSoundTime ); //  int nextSoundTime
+
+	savefile->ReadBool( repeatSmoke ); //  bool repeatSmoke
+
+
+	//savefile->ReadClipModel( fireTrigger ); //  idClipModel * fireTrigger
+	fireTrigger = new idClipModel(idTraceModel(idBounds(vec3_origin).Expand(24)));
+	fireTrigger->Link(gameLocal.clip, this, 0, GetPhysics()->GetOrigin(), GetPhysics()->GetAxis());
+	fireTrigger->SetContents(CONTENTS_TRIGGER);
+	fireTrigger->SetOwner(this);
+
+	savefile->ReadInt( fireTimer ); //  int fireTimer
+	savefile->ReadInt( fireDamageIntervalTimer ); //  int fireDamageIntervalTimer
+	fxFire.Restore( savefile ); //  idEntityPtr<idEntityFx> fxFire
+
+	savefile->ReadInt( maxSmackCount ); //  int maxSmackCount
+	savefile->ReadInt( smackCount ); //  int smackCount
+
+	savefile->ReadInt( nextDischargeTime ); //  int nextDischargeTime
+
+	savefile->ReadInt( nextParticleBounceTime ); //  int nextParticleBounceTime
+
+	savefile->ReadBool( interestSingleBounceDone ); //  bool interestSingleBounceDone
+
+	savefile->ReadInt( collideFrobTimer ); //  int collideFrobTimer
+
+
+	savefile->ReadLong( spawnTime ); //  int spawnTime
+	savefile->ReadBool( showItemLine ); //  bool showItemLine
+	savefile->ReadInt( itemLineHandle ); //  int itemLineHandle
+	savefile->ReadVec3( itemLineColor ); //  idVec3 itemLineColor
+
+	savefile->ReadInt( moveToPlayerTimer ); //  int moveToPlayerTimer
+
+	savefile->ReadInt( sparkTimer ); //  int sparkTimer
+	savefile->ReadBool( isSparking ); //  bool isSparking
+	savefile->ReadObject( reinterpret_cast<idClass*&>(sparkEmitter) ); // idFuncEmitter* sparkEmitter
+
+	savefile->ReadInt( outerspaceUpdateTimer ); //  int outerspaceUpdateTimer
+	savefile->ReadInt( outerspaceDeleteCounter ); //  int outerspaceDeleteCounter
+
+	savefile->ReadBool( canBeLostInSpace ); //  bool canBeLostInSpace
+
+	savefile->ReadInt( nextSmackTime ); //  int nextSmackTime
+
+	savefile->ReadString( smackMaterial ); //  idString smackMaterial
 }
 
 /*
@@ -2012,6 +2154,9 @@ void idMoveableItem::Spawn( void ) {
 #ifdef _D3XP
 	SetTimeState ts( timeGroup );
 #endif
+
+	// SW: Trigger a gravity check // blendo eric: moved this from init, hopefully still fine here
+	PostEventMS(&EV_PostSpawn, 0);
 
 	// create a trigger for item pickup
 	/*
@@ -2174,35 +2319,45 @@ void idMoveableItem::Spawn( void ) {
 
 
     //BC Ok, for weapons we want to jam loose ammo into the magazine. We don't want the magazine to just be empty.
-    if (this->spawnArgs.GetBool("isweapon", "0") && this->spawnArgs.GetInt("clipSize", "0") > 0)
+	// SW 27th March 2025: note that this will be immediately overridden if the weapon in question is dropped or thrown by the player,
+	// so it's effectively just "initial spawn" behaviour
+    if (this->spawnArgs.GetBool("isweapon", "0"))
     {
         const idKeyValue * keyval = this->spawnArgs.MatchPrefix("inv_ammo_");
 		
-		//handle magazine.
         if (keyval)
         {
             idStr keyName = keyval->GetKey();
             idStr inclipKey = keyval->GetKey();
+			idStr inChamberKey = keyval->GetKey();
             inclipKey.Insert("inclip_", 4);
+			inChamberKey.Insert("inchamber_", 4);
 
-            int amount = atoi(keyval->GetValue());
-
-			//BC
-			if (spawnArgs.GetBool("mag_randomize"))
+			// SW 31st March 2025: Shuffling some logic around so that weapons without a clip will still get their initial round in the chamber
+			if (this->spawnArgs.GetInt("clipSize", "0") > 0)
 			{
-				int randomMin = spawnArgs.GetInt("mag_randmin");
-				int randomMax = spawnArgs.GetInt("mag_randmax");
-				amount = gameLocal.random.RandomInt(randomMin, randomMax);
+				int amount = atoi(keyval->GetValue());
+
+				//BC
+				if (spawnArgs.GetBool("mag_randomize"))
+				{
+					int randomMin = spawnArgs.GetInt("mag_randmin");
+					int randomMax = spawnArgs.GetInt("mag_randmax");
+					amount = gameLocal.random.RandomInt(randomMin, randomMax);
+				}
+
+				if (amount)
+				{
+					//Stuff ammo into mag.
+					this->spawnArgs.SetInt(inclipKey, amount);
+
+					//and also REMOVE the loose ammo amount.
+					this->spawnArgs.SetInt(keyName, 0);
+				}
 			}
 
-            if (amount)
-            {
-                //Stuff ammo into mag.
-                this->spawnArgs.SetInt(inclipKey, amount);
-
-                //and also REMOVE the loose ammo amount.
-                this->spawnArgs.SetInt(keyName, 0);
-            }
+			// SW 27th March 2025: add a round to the chamber for initial spawn
+			this->spawnArgs.SetInt(inChamberKey, 1);
         }
     }
 
@@ -2240,11 +2395,52 @@ void idMoveableItem::Spawn( void ) {
 
 	smackMaterial = spawnArgs.GetString("mtr_smack");
 
+	if (!g_bloodEffects.GetBool() && spawnArgs.FindKey("mtr_smack_noblood") != NULL)
+	{
+		smackMaterial = spawnArgs.GetString("mtr_smack_noblood");
+	}
 
 	idStr soundName = spawnArgs.GetString("snd_ambient");
 	if (soundName.Length() > 1)
 	{
 		StartSound("snd_ambient", SND_CHANNEL_BODY);
+	}
+}
+
+// SW 18th Feb 2025
+// Adding bespoke show/hide functions to idMoveableItem so that spark trails are correctly hidden
+// if the item is stowed away in the inventory
+void idMoveableItem::Show(void)
+{
+	idItem::Show();
+
+	if (sparkEmitter != NULL)
+	{
+		sparkEmitter->Show();
+
+		// Unmute sparks if they're sparking
+		// SND_CHANNEL_WEAPON is used for the spark sound here
+		if (refSound.referenceSound != NULL)
+		{
+			refSound.referenceSound->FadeSound(SND_CHANNEL_WEAPON, 0, 0);
+		}
+	}
+}
+
+void idMoveableItem::Hide(void)
+{
+	idItem::Hide();
+
+	if (sparkEmitter != NULL)
+	{
+		sparkEmitter->Hide();
+
+		// Mute so the hidden item doesn't continue to emit the sparking sound
+		// SND_CHANNEL_WEAPON is used for the spark sound here
+		if (refSound.referenceSound != NULL)
+		{
+			refSound.referenceSound->FadeSound(SND_CHANNEL_WEAPON, -60, 0);
+		}
 	}
 }
 
@@ -2335,7 +2531,7 @@ void idMoveableItem::Think( void ) {
 	// SW: Dropped items like magazines and tele-pucks will initially have their owner set to the player, to avoid collision issues.
 	// However, leaving them in this state causes havoc with frob traces, so we need to remove the owner once we've been in the world for a bit
 	idClipModel* cm = this->GetPhysics()->GetClipModel();
-	if (cm->GetOwner() && cm->GetOwner() == gameLocal.GetLocalPlayer() && gameLocal.time - spawnTime > MOVEABLE_PLAYEROWNERSHIP_LIFETIME && gameLocal.GetLocalPlayer()->GetCarryable() != this)
+	if (cm->GetOwner() && cm->GetOwner() == gameLocal.GetLocalPlayer() && gameLocal.time - spawnTime > MOVEABLE_PLAYEROWNERSHIP_LIFETIME && gameLocal.GetLocalPlayer()->GetCarryable() != this && !justDropped)
 		cm->SetOwner(NULL);
 	
 	UpdateMoveToPlayer();
@@ -2455,6 +2651,13 @@ void idMoveableItem::SetLostInSpace()
 
 	if (IsType(idSkullsaver::Type))
 	{
+		//BC 2-13-2025: play VO if skull is lost in space & player has LOS to it happening.
+		if (DoesPlayerHaveLOStoMe_Simple())
+		{
+			gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay("snd_vo_throw_skull_space"); //BC 3-3-2025: fixed bug where skull vo was being called without cooldown.
+		}
+
+
 		static_cast<idSkullsaver*>(this)->StoreSkull();
 	}
 	else
@@ -2724,10 +2927,45 @@ void idMoveableItem::ThrownFrob(idEntity * ent)
 	
 
 	if (ent->DoFrob(0, this))
-	{		
-		gameLocal.AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_frobbed"),
-			common->GetLanguageDict()->GetString(displayName.c_str()),  
-			common->GetLanguageDict()->GetString(ent->displayName.c_str())), ent->GetPhysics()->GetOrigin());
+	{
+		//BC 2-27-2025: fix bug where the thing being interacted with sometimes has no frob name (such as frobcube).
+		//Try to find a suitable name.
+		idStr interacteeName = ent->displayName;
+		if (interacteeName.Length() <= 0)
+		{
+			//name is empty.
+			//see if it has an owner or is bound to something.
+			if (ent->GetBindMaster() != nullptr)
+			{
+				//get the bindmaster's name.
+				interacteeName = ent->GetBindMaster()->displayName;
+			}
+		}
+		
+		//Try again, but with owner.
+		if (interacteeName.Length() <= 0)
+		{
+			if (ent->GetPhysics()->GetClipModel()->GetOwner() != nullptr)
+			{
+				interacteeName = ent->GetPhysics()->GetClipModel()->GetOwner()->displayName;
+			}
+		}
+
+		//Still fail, so just exit out here.
+		if (interacteeName.Length() <= 0)
+		{
+			gameLocal.Warning("Failed to find interactee name for str_def_gameplay_frobbed: %s interact with %s\n",
+				common->GetLanguageDict()->GetString(displayName.c_str()),
+				ent->GetName());
+		}
+		else
+		{
+			gameLocal.AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_frobbed"),
+				common->GetLanguageDict()->GetString(displayName.c_str()),
+				common->GetLanguageDict()->GetString(interacteeName.c_str())),
+				ent->GetPhysics()->GetOrigin());
+		}
+
 		idEntityFx::StartFx("fx/frob_lines", &ent->GetPhysics()->GetOrigin(), &mat3_identity, NULL, false);
 	}
 
@@ -2750,7 +2988,8 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 	if ( ent && ent->IsType( idSkullsaver::Type ) )
 	{
 		idSkullsaver* skullsaver = static_cast< idSkullsaver* >( ent );
-		if ( skullsaver->IsConveying() )
+		// SW 27th Feb 2025: Check for respawn state too
+		if ( skullsaver->IsConveying() || skullsaver->IsRespawning() )
 		{
 			skullsaver->ResetConveyTime();
 		}
@@ -2762,6 +3001,10 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 	{
 		const char *fxBounce;
 		fxBounce = spawnArgs.GetString("fx_bounce");
+		if (!g_bloodEffects.GetBool() && spawnArgs.FindKey("fx_bounce_noblood"))
+		{
+			fxBounce = spawnArgs.GetString("fx_bounce_noblood");
+		}
 		if (*fxBounce != '\0')
 		{
 			idAngles particleAngle = collision.c.normal.ToAngles();
@@ -2945,12 +3188,17 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 				//it hit the ground.
 
 				//Check ammo.
-				const idKeyValue * keyval = spawnArgs.MatchPrefix("inv_inclip_");
-				if (keyval && spawnArgs.GetBool("canMisfire", "1"))
+				// SW 1st April 2025: use chamber to determine if it should misfire, not clip
+				// (so weapons without a round chambered won't misfire)
+				const idKeyValue * inchamber = spawnArgs.MatchPrefix("inv_inchamber_");
+				const idKeyValue * inclip = spawnArgs.MatchPrefix("inv_inclip_");
+				if (inchamber && spawnArgs.GetBool("canMisfire", "0")) //BC 4-3-2025 make this default to canMisfare 0, to prevent crash with non-misfireable entities
 				{
-					int amountRoundsRemaining = atoi(keyval->GetValue());
+					// There should only ever be 1 or 0 in the chamber, but we express it as an integer, oops
+					int roundsInChamber = atoi(inchamber->GetValue());
+					int roundsInClip = atoi(inclip->GetValue());
 
-					if (amountRoundsRemaining > 0)
+					if (roundsInChamber > 0)
 					{
 						//Still have at least one round remaining. Fire the weapon.
 
@@ -3023,18 +3271,34 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 										propelSpeed = spawnArgs.GetFloat("propelspeed", "384");
 										this->ApplyImpulse(NULL, 0, this->GetPhysics()->GetOrigin(), (propelAngles.ToForward() * -propelSpeed) * this->GetPhysics()->GetMass());
 
-										if (!spawnArgs.GetBool("silent_fire"))
-										{
-											gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), "interest_weaponfire");
-
-											//add text to infofeed.
-											gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_misfire"), displayName.c_str()), GetPhysics()->GetOrigin());
-										}
-
-										//Expend one round. TODO? Expend more than one round if necessary, depending on weapon type.
-										spawnArgs.SetInt(keyval->GetKey(), amountRoundsRemaining - 1);
+										
 									}
 								}
+
+								//BC 4-3-2025: Moved this out of the for loop so that it didn't create a bajillion misfire events.
+								if (!spawnArgs.GetBool("silent_fire"))
+								{
+									gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), "interest_weaponfire");
+
+									//add text to infofeed. "hit ground and misfired"
+									gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_misfire"), displayName.c_str()), GetPhysics()->GetOrigin());
+								}
+
+								//Expend one round. If there are no rounds left in the clip/magazine, empty the chamber
+								if (roundsInClip > 0)
+								{
+									// subtract one from the clip and move it to the chamber
+									spawnArgs.SetInt(inchamber->GetKey(), 1);
+									spawnArgs.SetInt(inclip->GetKey(), roundsInClip - 1);
+								}
+								else
+								{
+									// empty out the chamber (this was the last round
+									spawnArgs.SetInt(inchamber->GetKey(), 0);
+									spawnArgs.SetInt(inclip->GetKey(), 0);
+									StartSound("snd_lastshot", SND_CHANNEL_BODY, 0, false, NULL);
+								}
+								
 							}							
 						}
 					}
@@ -3172,7 +3436,8 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 						}
 					}
 				}
-				else if (v >= COLLISION_DESTROY_THRESHOLD && ent->IsType(idAFEntity_Base::Type) && this->spawnArgs.GetBool("remove_on_actor", "1") && ent != gameLocal.GetLocalPlayer() && !objectAppliedDamage)
+				// SW 24th March 2025: changing type comparison here because otherwise it produces odd results when colliding with animated non-actors
+				else if (v >= COLLISION_DESTROY_THRESHOLD && ent->IsType(idActor::Type) && this->spawnArgs.GetBool("remove_on_actor", "1") && ent != gameLocal.GetLocalPlayer() && !objectAppliedDamage)
 				{
 					//so -- item hit an actor, but the item didn't apply any damage. So, we give
 					//a little impulse to push the object away from the actor. This is to prevent
@@ -3181,7 +3446,12 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 					idVec3 velocityNormal = velocity;
 					velocityNormal.Normalize();
 
-					GetPhysics()->SetOrigin(GetPhysics()->GetOrigin() + velocityNormal * 32);
+					// SW 24th March 2025: Do some trace safety checks here to make sure the item doesn't just teleport into the void
+					trace_t results;
+					idVec3 start = GetPhysics()->GetOrigin();
+					idVec3 end = start + velocityNormal * 32;
+					gameLocal.clip.TraceBounds(results, start, end, GetPhysics()->GetBounds(), CONTENTS_SOLID, ent);
+					GetPhysics()->SetOrigin(results.endpos);
 						
 					idVec3 pushawayImpulse = velocityNormal * 64 * GetPhysics()->GetMass();
 					GetPhysics()->ApplyImpulse(0, GetPhysics()->GetOrigin(), pushawayImpulse);
@@ -3704,7 +3974,7 @@ void idMoveableItem::Killed(idEntity *inflictor, idEntity *attacker, int damage,
 	
 	if (spawnArgs.GetBool("event_deathmsg", "1"))
 	{
-		gameLocal.AddEventlogDeath(this, damage, inflictor, attacker, "");
+		gameLocal.AddEventlogDeath(this, damage, inflictor, attacker, "", EL_DESTROYED);
 	}
 
     Hide();
@@ -3713,6 +3983,13 @@ void idMoveableItem::Killed(idEntity *inflictor, idEntity *attacker, int damage,
 
 void idMoveableItem::JustThrown()
 {
+	// SW 14th April 2025: When throwing a weapon, the weapon moveable exists in a "just spawned" state, which means its dropTimer is at the current game time.
+	// While this sometimes helps as an anti-chaos measure, it prevents the weapon from frobbing things or generating interestpoints the way you'd expect it to when thrown.
+	// So, to accommodate for this, we cheat the dropTimer somewhat for thrown weapons
+	if (spawnArgs.GetBool("isweapon") && dropTimer == gameLocal.time)
+	{
+		dropTimer = gameLocal.time - max(JUST_SPAWNED_GRACEPERIOD, INTERESTPOINT_DISABLETIME);
+	}
 }
 
 void idMoveableItem::JustPickedUp()
@@ -3851,7 +4128,7 @@ idObjectiveComplete::Save
 ================
 */
 void idObjectiveComplete::Save( idSaveGame *savefile ) const {
-	savefile->WriteVec3( playerPos );
+	savefile->WriteVec3( playerPos ); // idVec3 playerPos
 }
 
 /*
@@ -3860,7 +4137,7 @@ idObjectiveComplete::Restore
 ================
 */
 void idObjectiveComplete::Restore( idRestoreGame *savefile ) {
-	savefile->ReadVec3( playerPos );
+	savefile->ReadVec3( playerPos ); // idVec3 playerPos
 }
 
 /*

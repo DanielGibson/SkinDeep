@@ -47,7 +47,7 @@ public:
 
 	void			Spawn( void );
 
-	void			Save( idRestoreGame *savefile );
+	void			Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void			Restore( idRestoreGame *savefile );
 
 	idHashTable<idStrList> spawnfilterTable;

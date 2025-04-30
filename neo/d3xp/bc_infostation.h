@@ -13,7 +13,7 @@ public:
 							idInfoStation(void);
 	virtual					~idInfoStation(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -44,7 +44,7 @@ private:
 
 	//void					Event_Activate(idEntity *activator);
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = 0;
 
 	idEntityPtr<idEntity>	FTLDrive_ptr;
 
@@ -59,7 +59,7 @@ private:
 	qhandle_t				headlightHandle;
 	void					SetLight(bool value, idVec3 color);
 	
-	idEntity				*hackboxEnt;
+	idEntity				*hackboxEnt = 0;
 	void					UpdateSoulsLocation();
 	int						soulUpdateTimer;
 	//bool					hackboxHacked;
@@ -71,6 +71,8 @@ private:
 	
 	bool					initialLockdoorDisplayDone;
 	int						initialLockdoorDisplayTimer;
+
+	int						lastSaveTime;
 
 	void					UpdateLockedDoorDisplay();
 

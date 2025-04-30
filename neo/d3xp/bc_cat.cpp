@@ -72,10 +72,49 @@ void idCat::Spawn(void)
 
 void idCat::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( catState ); //  int catState
+
+	savefile->WriteVec3( startPosition ); //  idVec3 startPosition
+	savefile->WriteVec3( targetPosition ); //  idVec3 targetPosition
+	savefile->WriteAngles( targetAngle ); //  idAngles targetAngle
+	savefile->WriteVec3( targetMovedir ); //  idVec3 targetMovedir
+	savefile->WriteVec3( targetNormal ); //  idVec3 targetNormal
+
+	savefile->WriteBool( hasPlayedUnstretchAnimation ); //  bool hasPlayedUnstretchAnimation
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteObject( lookEnt ); //  idEntityPtr<idEntity> lookEnt
+	savefile->WriteJoint( headJoint ); //  saveJoint_t headJoint
+
+
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
 }
 
 void idCat::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( catState ); //  int catState
+
+	savefile->ReadVec3( startPosition ); //  idVec3 startPosition
+	savefile->ReadVec3( targetPosition ); //  idVec3 targetPosition
+	savefile->ReadAngles( targetAngle ); //  idAngles targetAngle
+	savefile->ReadVec3( targetMovedir ); //  idVec3 targetMovedir
+	savefile->ReadVec3( targetNormal ); //  idVec3 targetNormal
+
+	savefile->ReadBool( hasPlayedUnstretchAnimation ); //  bool hasPlayedUnstretchAnimation
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadObject( lookEnt ); //  idEntityPtr<idEntity> lookEnt
+	savefile->ReadJoint( headJoint ); //  saveJoint_t headJoint
+
+
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
 }
 
 void idCat::Think(void)

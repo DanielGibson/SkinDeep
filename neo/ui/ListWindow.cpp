@@ -68,6 +68,174 @@ idListWindow::idListWindow(idUserInterfaceLocal *g) : idWindow(g) {
 	CommonInit();
 }
 
+idListWindow::~idListWindow() {
+}
+
+void idTabRect::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	savefile->WriteInt( x ); // int x
+	savefile->WriteInt( w ); // int w
+	savefile->WriteInt( align ); // int align
+	savefile->WriteInt( valign ); // int valign
+	savefile->WriteInt( type ); // int type
+	savefile->WriteVec2( iconSize ); // idVec2 iconSize
+	savefile->WriteFloat( iconVOffset ); // float iconVOffset
+}
+void idTabRect::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	savefile->ReadInt( x ); // int x
+	savefile->ReadInt( w ); // int w
+	savefile->ReadInt( align ); // int align
+	savefile->ReadInt( valign ); // int valign
+	savefile->ReadInt( type ); // int type
+	savefile->ReadVec2( iconSize ); // idVec2 iconSize
+	savefile->ReadFloat( iconVOffset ); // float iconVOffset
+}
+
+void idListWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame(savefile);
+
+	savefile->WriteInt( tabInfo.Num() ); // idList<idTabRect> tabInfo
+	for (int idx = 0; idx < tabInfo.Num(); idx++ )
+	{
+		tabInfo[idx].WriteToSaveGame( savefile );
+	}
+
+	savefile->WriteInt( top ); // int top
+	savefile->WriteFloat( sizeBias ); // float sizeBias
+	savefile->WriteBool( horizontal ); // bool horizontal
+	savefile->WriteString( tabStopStr ); // idString tabStopStr
+	savefile->WriteString( tabAlignStr ); // idString tabAlignStr
+	savefile->WriteString( tabVAlignStr ); // idString tabVAlignStr
+	savefile->WriteString( tabTypeStr ); // idString tabTypeStr
+	savefile->WriteString( tabIconSizeStr ); // idString tabIconSizeStr
+	savefile->WriteString( tabIconVOffsetStr ); // idString tabIconVOffsetStr
+
+	savefile->WriteInt( iconMaterials.Num() ); // idHashTable<const idMaterial*> iconMaterials
+	for (int idx = 0; idx < iconMaterials.Num(); idx++)
+	{
+		idStr outKey;
+		const idMaterial* outVal;
+		iconMaterials.GetIndex( idx, &outKey, &outVal);
+
+		savefile->WriteString( outKey );
+		savefile->WriteString( outVal->GetName() );
+	}
+
+	savefile->WriteBool( multipleSel ); // bool multipleSel
+
+	savefile->WriteInt( listItems.Num() ); // idStrList listItems
+	for (int idx = 0; idx < listItems.Num(); idx++ )
+	{
+		savefile->WriteString( listItems[idx] );
+	}
+
+	// blendo eric: newed by init, and written out as child
+	//bool scrollIsChild = GetChildIndex((idWindow*)scroller) >= 0;
+	//savefile->WriteBool( scrollIsChild );
+	//if (scrollIsChild) {
+	//	savefile->WriteSGPtr( scroller ); // idSliderWindow* scroller
+	//} else {
+	//	scroller->WriteToSaveGame(savefile); // idSliderWindow* scroller
+	//}
+
+	savefile->WriteInt( currentSel.Num() ); // idList<int> currentSel
+	for (int idx = 0; idx < currentSel.Num(); idx++ )
+	{
+		savefile->WriteInt( currentSel[idx] );
+	}
+
+	savefile->WriteString( listName ); // idString listName
+
+	savefile->WriteInt( clickTime ); // int clickTime
+
+	savefile->WriteInt( typedTime ); // int typedTime
+	savefile->WriteString( typed ); // idString typed
+
+	savefile->WriteCheckSizeMarker();
+}
+
+void idListWindow::ReadFromSaveGame(idRestoreGame* savefile)
+{
+	idWindow::ReadFromSaveGame(savefile);
+
+	int num;
+	savefile->ReadInt(num); // idList<idTabRect> tabInfo
+	tabInfo.SetNum(num);
+	for (int idx = 0; idx < tabInfo.Num(); idx++)
+	{
+		tabInfo[idx].ReadFromSaveGame(savefile);
+	}
+
+	savefile->ReadInt(top); // int top
+	savefile->ReadFloat(sizeBias); // float sizeBias
+	savefile->ReadBool(horizontal); // bool horizontal
+	savefile->ReadString(tabStopStr); // idString tabStopStr
+	savefile->ReadString(tabAlignStr); // idString tabAlignStr
+	savefile->ReadString(tabVAlignStr); // idString tabVAlignStr
+	savefile->ReadString(tabTypeStr); // idString tabTypeStr
+	savefile->ReadString(tabIconSizeStr); // idString tabIconSizeStr
+	savefile->ReadString(tabIconVOffsetStr); // idString tabIconVOffsetStr
+
+	savefile->ReadInt(num); // idHashTable<const idMaterial*> iconMaterials
+	for (int idx = 0; idx < num; idx++)
+	{
+		idStr outKey;
+		idStr outVal;
+		savefile->ReadString(outKey);
+		savefile->ReadString(outVal);
+
+		const idMaterial* mat = declManager->FindMaterial(outVal);
+		assert(mat);
+		mat->SetImageClassifications(1);	// just for resource tracking
+		if (mat && !mat->TestMaterialFlag(MF_DEFAULTED)) {
+			mat->SetSort(SS_GUI);
+		}
+
+		iconMaterials.Set(outKey, mat);
+	}
+
+	savefile->ReadBool(multipleSel); // bool multipleSel
+
+	savefile->ReadInt(num); // idStrList listItems
+	listItems.SetNum(num);
+	for (int idx = 0; idx < listItems.Num(); idx++)
+	{
+		savefile->ReadString(listItems[idx]);
+	}
+
+	// blendo eric: newed by init, and written out as child
+	//bool scrollIsChild;
+	//savefile->ReadBool(scrollIsChild);
+	//if( scrollIsChild ) {
+	//	savefile->ReadSGPtr( (idSaveGamePtr**)&scroller ); // idSliderWindow* scroller
+	//} else {
+	//	scroller->ReadFromSaveGame(savefile); // idSliderWindow* scroller
+	//	if (GetChildIndex(scroller) < 0) {
+	//		InsertChild(scroller, NULL);
+	//	}
+	//}
+
+	scroller->SetBuddy(this);
+
+	savefile->ReadInt( num ); // idList<int> currentSel
+	currentSel.SetNum( num );
+	for (int idx = 0; idx < currentSel.Num(); idx++ )
+	{
+		savefile->ReadInt( currentSel[idx] );
+	}
+
+	savefile->ReadString( listName ); // idString listName
+
+	savefile->ReadInt( clickTime ); // int clickTime
+
+	savefile->ReadInt( typedTime ); // int typedTime
+	savefile->ReadString( typed ); // idString typed
+
+	savefile->ReadCheckSizeMarker();
+}
+
 void idListWindow::SetCurrentSel( int sel ) {
 	currentSel.Clear();
 	currentSel.Append( sel );
@@ -456,7 +624,10 @@ void idListWindow::InitScroller( bool horizontal )
 	}
 
 	scroller->InitWithDefaults(scrollerName, scrollRect, foreColor, matColor, mat->GetName(), thumbImage, !horizontal, true, true);
-	InsertChild(scroller, NULL);
+	if (GetChildIndex(scroller) < 0)
+	{
+		InsertChild(scroller, NULL);
+	}
 	scroller->SetBuddy(this);
 }
 

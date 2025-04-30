@@ -2,6 +2,7 @@
 #include "gamesys/SysCvar.h"
 #include "Entity.h"
 #include "Player.h"
+#include "idlib/LangDict.h"
 
 
 #include "bc_key.h"
@@ -24,12 +25,26 @@ END_CLASS
 idDoorBarricade::idDoorBarricade(void)
 {
 	particleDone = false;
+	beamOrigin = nullptr;
+	beamTarget = nullptr;
+
+	//BC 4-12-2025: locboxes
+	for (int i = 0; i < 2; i++)
+	{
+		locboxes[i] = nullptr;
+	}
 }
 
 idDoorBarricade::~idDoorBarricade(void)
 {
 	delete beamOrigin;
 	delete beamTarget;
+
+	//BC 4-12-2025: locboxes
+	for (int i = 0; i < 2; i++)
+	{
+		delete locboxes[i];
+	}
 }
 
 void idDoorBarricade::Spawn(void)
@@ -68,14 +83,74 @@ void idDoorBarricade::Spawn(void)
 	beamOrigin->Hide();
 
 	BecomeActive(TH_THINK);
+
+	//BC 4-12-2025: locboxes spawn	
+	#define LOCBOXRADIUS 4
+	idStr requiredKey = spawnArgs.GetString("requires"); //get key required by barricade
+	bool requiresBlueKey = requiredKey.Find("blue") >= 0; //determine if it needs blue key or not
+	idStr keyText = requiresBlueKey ? "#str_def_gameplay_requiresbluekey" : "#str_def_gameplay_requiresyellowkey"; //set the locbox text
+
+	idVec3 forward, right;
+	GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, &right, NULL);
+	int locboxOffsetForward = spawnArgs.GetInt("locbox_fwd");
+	int locboxOffsetRight = spawnArgs.GetInt("locbox_right");
+
+	for (int i = 0; i < 2; i++)
+	{
+		idVec3 locboxPos = GetPhysics()->GetOrigin();
+
+		//Set position of the locbox on the barricade.
+		if (i <= 0)
+			locboxPos += (forward * locboxOffsetForward) + (right * locboxOffsetRight);
+		else
+			locboxPos += (forward * -locboxOffsetForward) + (right * -locboxOffsetRight);
+
+		args.Clear();
+		args.Set("text", common->GetLanguageDict()->GetString(keyText.c_str()) );
+		args.SetVector("origin", locboxPos);
+		args.SetBool("playerlook_trigger", true);
+		args.SetFloat("locboxDistScale", 3.0f);
+		args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+		args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+		locboxes[i] = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+		locboxes[i]->Bind(this, false);
+	}
 }
 
 void idDoorBarricade::Save(idSaveGame *savefile) const
 {
+	owningDoor.Save( savefile ); //  idEntityPtr<idDoor> owningDoor
+
+	savefile->WriteInt( keyrequirementTimer ); //  int keyrequirementTimer
+	savefile->WriteBool( keyrequirementLightActive ); //  bool keyrequirementLightActive
+	savefile->WriteInt( proximityTimer ); //  int proximityTimer
+	savefile->WriteBool( proximityActive ); //  bool proximityActive
+
+	savefile->WriteObject( beamOrigin ); //  idBeam* beamOrigin
+	savefile->WriteObject( beamTarget ); //  idBeam* beamTarget
+
+	savefile->WriteBool( particleDone ); //  bool particleDone
+
+	//BC 4-12-2025: locboxes
+	SaveFileWriteArray(locboxes, 2, WriteObject);
 }
 
 void idDoorBarricade::Restore(idRestoreGame *savefile)
 {
+	owningDoor.Restore( savefile ); //  idEntityPtr<idDoor> owningDoor
+
+	savefile->ReadInt( keyrequirementTimer ); //  int keyrequirementTimer
+	savefile->ReadBool( keyrequirementLightActive ); //  bool keyrequirementLightActive
+	savefile->ReadInt( proximityTimer ); //  int proximityTimer
+	savefile->ReadBool( proximityActive ); //  bool proximityActive
+
+	savefile->ReadObject( CastClassPtrRef(beamOrigin) ); //  idBeam* beamOrigin
+	savefile->ReadObject( CastClassPtrRef(beamTarget) ); //  idBeam* beamTarget
+
+	savefile->ReadBool( particleDone ); //  bool particleDone
+
+	//BC 4-12-2025: locboxes
+	SaveFileReadArrayCast(locboxes, ReadObject, idClass*&);
 }
 
 void idDoorBarricade::Think(void)

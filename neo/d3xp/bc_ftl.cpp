@@ -48,7 +48,8 @@ const int FTL_DISPATCH_DELAYTIME = 1100;
 
 const int OUTSIDE_DAMAGE_INTERVAL = 70; //when player is outside during FTL, inflict damage every XX msec
 
-const idVec4 RODLIGHT_DEFAULTCOLOR = idVec4(0, .2f, .2f, 1);
+//const idVec4 RODLIGHT_DEFAULTCOLOR = idVec4(0, .2f, .2f, 1);
+const idStr RODLIGHT_DEFAULTCOLOR_STR = idStr("0 .2 .2");
 const idVec4 RODLIGHT_DAMAGECOLOR = idVec4(.4f, 0, 0, 1);
 
 const idEventDef EV_ftl_activate("ftl_activate");
@@ -65,6 +66,28 @@ END_CLASS
 
 idFTL::idFTL(void)
 {
+	bafflerNode.SetOwner(this);
+	bafflerNode.AddToEnd(gameLocal.bafflerEntities);
+
+	sheatheEnt = nullptr;
+	rodLight = nullptr;
+
+	ftlTimer = {};
+	ftlState = {};
+
+	ftlPauseTime = {};
+
+	// smokeEmitters = {};
+	seamEmitter = nullptr;
+
+	initializedHealth = false;
+	lastHealth = {};
+	voiceoverIndex = {};
+	pipepauseTimer = {};
+	openAnimationStarted = {};
+	outsideDamageTimer = {};
+	additionalCountdownTime = {};
+	defaultJumpTime = {};
 }
 
 idFTL::~idFTL(void)
@@ -78,11 +101,6 @@ void idFTL::Spawn(void)
 	idDict args;
 	idVec3 sheathePos;
 	idVec3 forwardDir, rightDir;	
-
-	bafflerNode.SetOwner(this);
-	bafflerNode.AddToEnd(gameLocal.bafflerEntities);
-
-	
 
 	BecomeActive(TH_THINK);
 	GetPhysics()->SetContents(CONTENTS_SOLID);
@@ -115,7 +133,7 @@ void idFTL::Spawn(void)
 	args.SetInt("start_off", 1);	
 	rodLight = (idLight *)gameLocal.SpawnEntityType(idLight::Type, &args);
 	rodLight->SetRadius(512);
-	rodLight->SetColor(RODLIGHT_DEFAULTCOLOR);
+	rodLight->SetColor(spawnArgs.GetVector("color_ftl", RODLIGHT_DEFAULTCOLOR_STR));
 	rodLight->Off();
 	rodLight->Bind(this, false);
 
@@ -341,10 +359,60 @@ int idFTL::GetPublicPauseTimer()
 
 void idFTL::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( normalizedHealth ); // int normalizedHealth
+
+	savefile->WriteObject( sheatheEnt ); // idAnimated* sheatheEnt
+	savefile->WriteObject( rodLight ); // idLight * rodLight
+
+	savefile->WriteInt( ftlTimer ); // int ftlTimer
+	savefile->WriteInt( ftlState ); // int ftlState
+
+	savefile->WriteInt( ftlPauseTime ); // int ftlPauseTime
+
+	SaveFileWriteArray(smokeEmitters, 3, WriteObject); // idFuncEmitter *smokeEmitters[3]
+
+	savefile->WriteObject( seamEmitter ); // idFuncEmitter * seamEmitter
+
+	savefile->WriteBool( initializedHealth ); // bool initializedHealth
+	savefile->WriteInt( lastHealth ); // int lastHealth
+
+	savefile->WriteObject( healthGUI ); // idEntityPtr<idEntity> healthGUI
+
+	savefile->WriteInt( voiceoverIndex ); // int voiceoverIndex
+	savefile->WriteInt( pipepauseTimer ); // int pipepauseTimer
+	savefile->WriteBool( openAnimationStarted ); // bool openAnimationStarted
+	savefile->WriteInt( outsideDamageTimer ); // int outsideDamageTimer
+	savefile->WriteInt( additionalCountdownTime ); // int additionalCountdownTime
+	savefile->WriteInt( defaultJumpTime ); // int defaultJumpTime
 }
 
 void idFTL::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( normalizedHealth ); // int normalizedHealth
+
+	savefile->ReadObject( CastClassPtrRef(sheatheEnt) ); // idAnimated* sheatheEnt
+	savefile->ReadObject( CastClassPtrRef(rodLight) ); // idLight * rodLight
+
+	savefile->ReadInt( ftlTimer ); // int ftlTimer
+	savefile->ReadInt( ftlState ); // int ftlState
+
+	savefile->ReadInt( ftlPauseTime ); // int ftlPauseTime
+
+	SaveFileReadArrayCast( smokeEmitters, ReadObject, idClass*& ); // idFuncEmitter *smokeEmitters[3]
+
+	savefile->ReadObject( CastClassPtrRef(seamEmitter) ); // idFuncEmitter * seamEmitter
+
+	savefile->ReadBool( initializedHealth ); // bool initializedHealth
+	savefile->ReadInt( lastHealth ); // int lastHealth
+
+	savefile->ReadObject( healthGUI ); // idEntityPtr<idEntity> healthGUI
+
+	savefile->ReadInt( voiceoverIndex ); // int voiceoverIndex
+	savefile->ReadInt( pipepauseTimer ); // int pipepauseTimer
+	savefile->ReadBool( openAnimationStarted ); // bool openAnimationStarted
+	savefile->ReadInt( outsideDamageTimer ); // int outsideDamageTimer
+	savefile->ReadInt( additionalCountdownTime ); // int additionalCountdownTime
+	savefile->ReadInt( defaultJumpTime ); // int defaultJumpTime
 }
 
 void idFTL::Think(void)
@@ -771,7 +839,7 @@ void idFTL::DoRepairTick(int amount)
 
 		DoCloseSequence();
 
-		rodLight->SetColor(RODLIGHT_DEFAULTCOLOR); //Reset the rod light color.
+		rodLight->SetColor(spawnArgs.GetVector("color_ftl", RODLIGHT_DEFAULTCOLOR_STR)); //Reset the rod light color.
 	}
 }
 

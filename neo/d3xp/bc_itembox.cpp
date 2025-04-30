@@ -40,10 +40,18 @@ void idItembox::Spawn(void)
 
 void idItembox::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteString( itemSpawnType ); // idString itemSpawnType
 }
 
 void idItembox::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadString( itemSpawnType ); // idString itemSpawnType
 }
 
 

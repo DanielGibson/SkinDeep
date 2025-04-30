@@ -22,6 +22,9 @@ END_CLASS
 
 idSecurityStation::idSecurityStation(void)
 {
+	//make it repairable.
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idSecurityStation::~idSecurityStation(void)
@@ -39,10 +42,6 @@ void idSecurityStation::Spawn(void)
 	thinkTimer = 0;	
     unlocked = false;
 
-    //make it repairable.
-    repairNode.SetOwner(this);
-    repairNode.AddToEnd(gameLocal.repairEntities);
-
     this->GetRenderEntity()->gui[0] = uiManager->FindGui(spawnArgs.GetString("gui"), true, true); //Create a UNIQUE gui so that it doesn't auto sync with other guis.
 
 	BecomeActive(TH_THINK);
@@ -52,10 +51,18 @@ void idSecurityStation::Spawn(void)
 
 void idSecurityStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( securityState ); // int securityState
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+	savefile->WriteBool( unlocked ); // bool unlocked
 }
 
 void idSecurityStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( securityState ); // int securityState
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+	savefile->ReadBool( unlocked ); // bool unlocked
 }
 
 void idSecurityStation::Think(void)

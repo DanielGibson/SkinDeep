@@ -181,10 +181,41 @@ void idAirlockAccumulator::Event_PostSpawn(void) //We need to do this post-spawn
 
 void idAirlockAccumulator::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( airlockEnt ); //  idEntityPtr<idEntity> airlockEnt
+
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteObject( emergencyButton ); //  idEntity * emergencyButton
+
+	savefile->WriteBool( hasUpdatedAccumStatus ); //  bool hasUpdatedAccumStatus
+	savefile->WriteInt( accumStatusTimer ); //  int accumStatusTimer
+
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
+	savefile->WriteObject( cableEnt ); //  idEntityPtr<idEntity> cableEnt
 }
 
 void idAirlockAccumulator::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( airlockEnt ); //  idEntityPtr<idEntity> airlockEnt
+
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadObject( emergencyButton ); //  idEntity * emergencyButton
+
+	savefile->ReadBool( hasUpdatedAccumStatus ); //  bool hasUpdatedAccumStatus
+	savefile->ReadInt( accumStatusTimer ); //  int accumStatusTimer
+
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadObject( cableEnt ); //  idEntityPtr<idEntity> cableEnt
 }
 
 void idAirlockAccumulator::Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType )
@@ -221,6 +252,7 @@ void idAirlockAccumulator::SetDeflate()
 	//Delete the button.
 	emergencyButton->Hide();
 	emergencyButton->PostEventMS(&EV_Remove, 0);
+	emergencyButton = nullptr;
 
 	//Pop off a physics button.
 	idEntity *physicsValve;

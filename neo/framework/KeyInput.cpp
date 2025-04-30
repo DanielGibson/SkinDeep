@@ -97,17 +97,17 @@ static const keyname_t keynames[] =
 	{"HOME",			K_HOME,				"#str_07052"},
 	{"END",				K_END,				"#str_07053"},
 
-	{"MOUSE1",			K_MOUSE1,			"#str_07054"},
-	{"MOUSE2",			K_MOUSE2,			"#str_07055"},
-	{"MOUSE3",			K_MOUSE3,			"#str_07056"},
+	{"MOUSE1",			K_MOUSE1,			"MOUSE1"},
+	{"MOUSE2",			K_MOUSE2,			"MOUSE2"},
+	{"MOUSE3",			K_MOUSE3,			"MOUSE3"},
 	{"MOUSE4",			K_MOUSE4,			"#str_07057"},
 	{"MOUSE5",			K_MOUSE5,			"#str_07058"},
 	{"MOUSE6",			K_MOUSE6,			"#str_07059"},
 	{"MOUSE7",			K_MOUSE7,			"#str_07060"},
 	{"MOUSE8",			K_MOUSE8,			"#str_07061"},
 
-	{"MWHEELUP",		K_MWHEELUP,			"#str_07131"},
-	{"MWHEELDOWN",		K_MWHEELDOWN,		"#str_07132"},
+	{"MWHEELUP",		K_MWHEELUP,			"MWHEELUP"},
+	{"MWHEELDOWN",		K_MWHEELDOWN,		"MWHEELDOWN"},
 
 	//QC
 	{ "JOY1", 			K_JOY1, 			"JOY1" },

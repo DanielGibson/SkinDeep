@@ -13,7 +13,7 @@ public:
 							idFTL(void);
 	virtual					~idFTL(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -48,8 +48,8 @@ private:
 
 	void					DoCloseSequence();
 
-	idAnimated*				sheatheEnt;
-	idLight *				rodLight;
+	idAnimated*				sheatheEnt = nullptr;
+	idLight *				rodLight = nullptr;
 
 	int						ftlTimer;
 	int						ftlState;
@@ -60,9 +60,9 @@ private:
 	
 	
 
-	idFuncEmitter			*smokeEmitters[3];
+	idFuncEmitter			*smokeEmitters[3] = {};
 
-    idFuncEmitter			*seamEmitter;
+    idFuncEmitter			*seamEmitter = nullptr;
 
 	void					UpdateHealthGUI();
 

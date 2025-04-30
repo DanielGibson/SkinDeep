@@ -407,11 +407,20 @@ void idFeedAlertWindow::DisplayAlert(const char * displayText, const char * aler
 		return;
 	}
 
-	alert_t* prevAlert = GetActiveAlert(0);
-	if( !allowDupes && prevAlert && prevAlert->displayText == displayText )
+	// SW 19th March 2025: dupe check now checks all active events, not just the most recent one
+	// (this prevents alternating events slipping through when we're spamming a load of interestpoint reactions)
+	if (!allowDupes)
 	{
-		return;
+		for (int i = 0; i < activeAlerts.Num(); i++)
+		{
+			alert_t* prevAlert = GetActiveAlert(i);
+			if (prevAlert && prevAlert->displayText == displayText)
+			{
+				return;
+			}
+		}
 	}
+
 
 	// recycle alert from queue
 	alert_t& newAlert = ActivateNewAlert();
@@ -456,6 +465,168 @@ void idFeedAlertWindow::DisplayAlert(const char * displayText, const char * aler
 	}
 
 }
+
+
+void idFeedAlertWindow::WriteToSaveGame(idSaveGame* savefile) const
+{
+	// SM: Intentionally don't save/load this, so it resets on load
+
+	//idWindow::WriteToSaveGame(savefile);
+
+	//savefile->WriteInt(alertQueueIterator); // int alertQueueIterator; // blendo eric: internal index to the newest item in queue
+	//
+	//// idList<alert_t>	 alertQueue; // queue items, both displayed and waiting
+	//savefile->WriteInt(alertQueue.Num());
+	//for (int i = 0; i < alertQueue.Num(); i++) {
+	//	WriteSaveGameAlert(alertQueue[i], savefile);
+	//}
+
+	//// idList<alert_t*> activeAlerts; // alerts currently alive
+	//savefile->WriteInt(activeAlerts.Num());
+	//for (int i = 0; i < activeAlerts.Num(); i++) {
+	//	// Calculate the index into alertQueue this is pointing to
+	//	int index = ((char*)activeAlerts[i] - (char*)&alertQueue[0]) / sizeof(alert_t);
+	//	savefile->WriteInt(index);
+	//}
+
+	//// idList<idWindow*> alertWindows; // display windows for queue items, size = displayCount + 1
+	//// idList<idWindow*> alertWindowsAvailable; // display windows available for waiting alerts
+
+	//// specific feed window parsed vars
+	//savefile->WriteInt(alertQueueSize); // int		alertQueueSize; // maximum alerts allowed in queue, both displayed and waiting
+	//savefile->WriteBool(pushUpwards); // bool	pushUpwards; // untested for downwards
+	//savefile->WriteBool(alwaysTransition); // bool	alwaysTransition; // transition new alerts even when no other alerts are present
+	//savefile->WriteInt(textBGMargin); // int		textBGMargin; // amount bg width should extend past text
+	//savefile->WriteInt(displayTime); // int		displayTime; // total time to display window
+	//savefile->WriteInt(fadeOutTime); // int		fadeOutTime; // fade time at end
+	//savefile->WriteInt(fadeInTime); // int		fadeInTime; // transition time into starting position
+	//savefile->WriteInt(turnOverTime); // int		turnOverTime; // when at display capacity, how long oldest window waits before expiring
+	//savefile->WriteFloat(popLerpDistance); // float	popLerpDistance; // distance to pop in poplerp
+	//savefile->WriteFloat(fadeEdgeY); // float	fadeEdgeY; // edge pos where alerts will always fade when crossing
+	//savefile->WriteRect(fadeInRect); // idRectangle fadeInRect; // the fade in transition rect for new alerts
+
+	//// extracted vars from gui window
+	//savefile->WriteRect(startAlertRect); // idRectangle startAlertRect; // the start rect for after transitioned alerts
+	//savefile->WriteRect(startTextRect); // idRectangle startTextRect; // the start text rect for after transitioned alerts
+	//savefile->WriteRect(startBGRect); // idRectangle startBGRect; // the start bg rect for after transitioned alerts
+	//savefile->WriteRect(startIconRect); // idRectangle startIconRect; // the start bg rect for after transitioned alerts
+	//savefile->WriteVec4(defaultBGColor); // idVec4 defaultBGColor;
+	//savefile->WriteVec4(defaultTextColor); // idVec4 defaultTextColor;
+	//savefile->WriteVec4(defaultIconColor); // idVec4 defaultIconColor;
+	//savefile->WriteString(defaultIcon); // idStr  defaultIcon;
+	//savefile->WriteFloat(defaultTextScale); // float defaultTextScale;
+	//savefile->WriteFloat(defaultTextSpacing); // float defaultTextSpacing;
+
+	//savefile->WriteFloat(smoothSpeedUpScale); // float smoothSpeedUpScale;
+
+	//savefile->WriteInt(disposedState); // int disposedState;
+	//savefile->WriteInt(debugAlertTotalCount); // int debugAlertTotalCount;
+}
+
+
+void idFeedAlertWindow::ReadFromSaveGame(idRestoreGame* savefile)
+{
+	// SM: Intentionally don't save/load this, so it resets on load
+
+	//idWindow::ReadFromSaveGame(savefile);
+
+	//savefile->ReadInt(alertQueueIterator); // int alertQueueIterator; // blendo eric: internal index to the newest item in queue
+
+	//// idList<alert_t>	 alertQueue; // queue items, both displayed and waiting
+	//int num = 0;
+	//savefile->ReadInt(num);
+	//alertQueue.SetNum(num);
+	//for (int i = 0; i < alertQueue.Num(); i++) {
+	//	ReadSaveGameAlert(alertQueue[i], savefile);
+	//}
+
+	//// idList<alert_t*> activeAlerts; // alerts currently alive
+	//savefile->ReadInt(num);
+	//activeAlerts.SetNum(num);
+	//int index = 0;
+	//for (int i = 0; i < activeAlerts.Num(); i++) {
+	//	// Calculate the index into alertQueue this is pointing to
+	//	savefile->ReadInt(index);
+	//	activeAlerts[i] = &alertQueue[index];
+	//}
+
+	//// idList<idWindow*> alertWindows; // display windows for queue items, size = displayCount + 1
+	//// idList<idWindow*> alertWindowsAvailable; // display windows available for waiting alerts
+
+	//// specific feed window parsed vars
+	//savefile->ReadInt(alertQueueSize); // int		alertQueueSize; // maximum alerts allowed in queue, both displayed and waiting
+	//savefile->ReadBool(pushUpwards); // bool	pushUpwards; // untested for downwards
+	//savefile->ReadBool(alwaysTransition); // bool	alwaysTransition; // transition new alerts even when no other alerts are present
+	//savefile->ReadInt(textBGMargin); // int		textBGMargin; // amount bg width should extend past text
+	//savefile->ReadInt(displayTime); // int		displayTime; // total time to display window
+	//savefile->ReadInt(fadeOutTime); // int		fadeOutTime; // fade time at end
+	//savefile->ReadInt(fadeInTime); // int		fadeInTime; // transition time into starting position
+	//savefile->ReadInt(turnOverTime); // int		turnOverTime; // when at display capacity, how long oldest window waits before expiring
+	//savefile->ReadFloat(popLerpDistance); // float	popLerpDistance; // distance to pop in poplerp
+	//savefile->ReadFloat(fadeEdgeY); // float	fadeEdgeY; // edge pos where alerts will always fade when crossing
+	//savefile->ReadRect(fadeInRect); // idRectangle fadeInRect; // the fade in transition rect for new alerts
+
+	//// extracted vars from gui window
+	//savefile->ReadRect(startAlertRect); // idRectangle startAlertRect; // the start rect for after transitioned alerts
+	//savefile->ReadRect(startTextRect); // idRectangle startTextRect; // the start text rect for after transitioned alerts
+	//savefile->ReadRect(startBGRect); // idRectangle startBGRect; // the start bg rect for after transitioned alerts
+	//savefile->ReadRect(startIconRect); // idRectangle startIconRect; // the start bg rect for after transitioned alerts
+	//savefile->ReadVec4(defaultBGColor); // idVec4 defaultBGColor;
+	//savefile->ReadVec4(defaultTextColor); // idVec4 defaultTextColor;
+	//savefile->ReadVec4(defaultIconColor); // idVec4 defaultIconColor;
+	//savefile->ReadString(defaultIcon); // idStr  defaultIcon;
+	//savefile->ReadFloat(defaultTextScale); // float defaultTextScale;
+	//savefile->ReadFloat(defaultTextSpacing); // float defaultTextSpacing;
+
+	//savefile->ReadFloat(smoothSpeedUpScale); // float smoothSpeedUpScale;
+
+	//savefile->ReadInt(disposedState); // int disposedState;
+	//savefile->ReadInt(debugAlertTotalCount); // int debugAlertTotalCount;
+}
+
+//void idFeedAlertWindow::WriteSaveGameAlert(const alert_t& alert, idSaveGame* savefile) const
+//{
+//	savefile->WriteInt(alert.debugID); // int		debugID;
+//	savefile->WriteBool(alert.transitioned); // bool	transitioned; // true after fade in
+//	savefile->WriteBool(alert.ended); // bool	ended; // true when reset, and no longer valid
+//	savefile->WriteString(alert.icon); // idStr	icon; // asset str
+//	savefile->WriteString(alert.displayText); // idStr	displayText;
+//	savefile->WriteVec4(alert.textColor); // idVec4	textColor;
+//	savefile->WriteVec4(alert.bgColor); // idVec4	bgColor;
+//	savefile->WriteVec4(alert.iconColor); // idVec4	iconColor;
+//	savefile->WriteInt(alert.startTime); // int		startTime; // ms time of alert creation (start of transition/fade in)
+//	savefile->WriteInt(alert.fadeInTime); // int		fadeInTime; // ms
+//	savefile->WriteInt(alert.fadeOutTime); // int		fadeOutTime; // ms
+//	savefile->WriteInt(alert.endTime); // int		endTime; // ms time when the alert should no longer exist
+//	savefile->WriteInt(alert.displayTime); // int		displayTime; // ms unaltered total time to display
+//	savefile->WriteFloat(alert.fade); // float	fade;
+//	savefile->WriteFloat(alert.heightScale); // float	heightScale; // alters the default rect, currently for double lines
+//	savefile->WriteInt(alertWindows.FindIndex(alert.window)); // idWindow* window;	// draw window assigned when window begins transition
+//}
+//
+//
+//void idFeedAlertWindow::ReadSaveGameAlert(alert_t& alert, idRestoreGame* savefile)
+//{
+//	savefile->ReadInt(alert.debugID); // int		debugID;
+//	savefile->ReadBool(alert.transitioned); // bool	transitioned; // true after fade in
+//	savefile->ReadBool(alert.ended); // bool	ended; // true when reset, and no longer valid
+//	savefile->ReadString(alert.icon); // idStr	icon; // asset str
+//	savefile->ReadString(alert.displayText); // idStr	displayText;
+//	savefile->ReadVec4(alert.textColor); // idVec4	textColor;
+//	savefile->ReadVec4(alert.bgColor); // idVec4	bgColor;
+//	savefile->ReadVec4(alert.iconColor); // idVec4	iconColor;
+//	savefile->ReadInt(alert.startTime); // int		startTime; // ms time of alert creation (start of transition/fade in)
+//	savefile->ReadInt(alert.fadeInTime); // int		fadeInTime; // ms
+//	savefile->ReadInt(alert.fadeOutTime); // int		fadeOutTime; // ms
+//	savefile->ReadInt(alert.endTime); // int		endTime; // ms time when the alert should no longer exist
+//	savefile->ReadInt(alert.displayTime); // int		displayTime; // ms unaltered total time to display
+//	savefile->ReadFloat(alert.fade); // float	fade;
+//	savefile->ReadFloat(alert.heightScale); // float	heightScale; // alters the default rect, currently for double lines
+//	
+//	int windowIndex = 0;
+//	savefile->ReadInt(windowIndex); // idWindow* window;	// draw window assigned when window begins transition
+//	alert.window = windowIndex != -1 ? alertWindows[windowIndex] : nullptr;
+//}
 
 /*
 ====================

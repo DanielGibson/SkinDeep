@@ -114,6 +114,8 @@ short	BigShort( short l );
 short	LittleShort( short l );
 int		BigInt( int l );
 int		LittleInt( int l );
+long	BigLong( long l );
+long	LittleLong( long l );
 float	BigFloat( float l );
 float	LittleFloat( float l );
 void	BigRevBytes( void *bp, int elsize, int elcount );
@@ -133,6 +135,12 @@ void AssertFailed( const char *file, int line, const char *expression );
 #undef assert
 #define assert( X )		if ( X ) { } else AssertFailed( __FILE__, __LINE__, #X )
 void ForceDebuggerBreak(); // blendo eric: debugger break straight from game
+#endif
+
+#if defined(_DEBUG)
+#define assert_debugonly( X )	if ( X ) { } else AssertFailed( __FILE__, __LINE__, #X )
+#else
+#define assert_debugonly( X )
 #endif
 
 class idException {

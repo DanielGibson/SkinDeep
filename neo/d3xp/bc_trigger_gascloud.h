@@ -7,6 +7,8 @@ public:
 
 	idTrigger_gascloud();
 	void				Spawn();
+	void				Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void				Restore(idRestoreGame *savefile);
 
 	virtual void		Think(void);
 
@@ -14,7 +16,7 @@ private:
 	void				Event_Touch(idEntity* other, trace_t* trace);
 	int					lastUpdatetime;	
 
-	idFuncEmitter		*particleEmitter;
+	idFuncEmitter		*particleEmitter = nullptr;
 
 	int					maxlifetime;
 

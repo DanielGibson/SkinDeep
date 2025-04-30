@@ -10,7 +10,7 @@ public:
 							idLighter(void);
 	virtual					~idLighter(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -31,7 +31,7 @@ private:
     renderLight_t			headlight;
     qhandle_t				headlightHandle;
 
-    const idDeclParticle *	trailParticles;
+    const idDeclParticle *	trailParticles = nullptr;
     int						trailParticlesFlyTime;
 
 	int						thinkTimer;
@@ -41,7 +41,7 @@ private:
 
     void                    KillLight();
 
-    idAnimatedEntity*       animatedEnt;
+    idAnimatedEntity*       animatedEnt = nullptr;
     void                    SetLightState(bool activate);
     idVec3                  lastPosition;
 

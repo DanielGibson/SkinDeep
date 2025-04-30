@@ -51,6 +51,7 @@ idPlayerIcon::idPlayerIcon
 idPlayerIcon::idPlayerIcon() {
 	iconHandle	= -1;
 	iconType	= ICON_NONE;
+	memset(&renderEnt, 0, sizeof(renderEntity_s));
 }
 
 /*

@@ -20,6 +20,7 @@ idEmailflag::idEmailflag(void)
 	state = UNDEPLOYED;
 	checkTimer = gameLocal.time + 400;
 	idleTimer = 0;
+	locbox = nullptr;
 }
 
 idEmailflag::~idEmailflag(void)
@@ -42,14 +43,47 @@ void idEmailflag::Spawn(void)
 	BecomeActive(TH_THINK);
 
 	idleTimer = gameLocal.time + 2000;
+
+	//BC 3-22-2025: locbox for emailflag.
+	idVec3 forward, up;
+	GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, &up);
+	idVec3 locboxPos = GetPhysics()->GetOrigin() + (forward * 10) + (up * -2);
+	gameRenderWorld->DebugArrowSimple(locboxPos, 9000000);
+
+	#define LOCBOXRADIUS 2.5f
+	idDict args;
+	args.Clear();
+	args.Set("text", spawnArgs.GetString("displayname"));
+	args.SetVector("origin", locboxPos);
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	locbox = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+	locbox->Hide();
 }
 
 void idEmailflag::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteInt( checkTimer ); //  int checkTimer
+	savefile->WriteInt( flagType ); //  int flagType
+
+	savefile->WriteInt( idleTimer ); //  int idleTimer
+
+	savefile->WriteObject( locbox ); // idEntity* locbox 
 }
 
 void idEmailflag::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadInt( checkTimer ); //  int checkTimer
+	savefile->ReadInt( flagType ); //  int flagType
+
+	savefile->ReadInt( idleTimer ); //  int idleTimer
+
+	savefile->ReadObject( locbox ); // idEntity* locbox 
 }
 
 void idEmailflag::Think(void)
@@ -83,6 +117,15 @@ void idEmailflag::Think(void)
 		{
 			state = desiredState;
 			Event_PlayAnim((state == DEPLOYED) ? "deploy" : "undeploy", 1, false);
+
+			if (desiredState == DEPLOYED)
+			{
+				locbox->Show();
+			}
+			else
+			{
+				locbox->Hide();
+			}
 		}		
 	}
 
@@ -90,7 +133,7 @@ void idEmailflag::Think(void)
 	{
 		idleTimer = gameLocal.time + gameLocal.random.RandomInt(3000, 7000);
 
-		Event_PlayAnim("deployed_idle", 1);
+		Event_PlayAnim("deployed_idle", 1); //Do a little idle wiggle.
 	}
 
 	idAnimatedEntity::Think();

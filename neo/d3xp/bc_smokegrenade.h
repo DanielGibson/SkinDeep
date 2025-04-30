@@ -9,7 +9,7 @@ class idSmokegrenade : public idMoveableItem
 public:
 	CLASS_PROTOTYPE(idSmokegrenade);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -21,7 +21,7 @@ public:
 private:
 
 	
-    idFuncEmitter			*nozzleParticle;
+    idFuncEmitter			*nozzleParticle = nullptr;
     int                     spewtimer;
 
     int                     state;

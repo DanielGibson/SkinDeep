@@ -407,9 +407,9 @@ idTarget_FadeEntity::Save
 ================
 */
 void idTarget_FadeEntity::Save( idSaveGame *savefile ) const {
-	savefile->WriteVec4( fadeFrom );
-	savefile->WriteInt( fadeStart );
-	savefile->WriteInt( fadeEnd );
+	savefile->WriteVec4( fadeFrom ); // idVec4 fadeFrom
+	savefile->WriteInt( fadeStart ); // int fadeStart
+	savefile->WriteInt( fadeEnd ); // int fadeEnd
 }
 
 /*
@@ -418,9 +418,9 @@ idTarget_FadeEntity::Restore
 ================
 */
 void idTarget_FadeEntity::Restore( idRestoreGame *savefile ) {
-	savefile->ReadVec4( fadeFrom );
-	savefile->ReadInt( fadeStart );
-	savefile->ReadInt( fadeEnd );
+	savefile->ReadVec4( fadeFrom ); // idVec4 fadeFrom
+	savefile->ReadInt( fadeStart ); // int fadeStart
+	savefile->ReadInt( fadeEnd ); // int fadeEnd
 }
 
 /*
@@ -749,54 +749,36 @@ idTarget_SetInfluence::Save
 ================
 */
 void idTarget_SetInfluence::Save( idSaveGame *savefile ) const {
-	int i;
+	bool gather = lightList.Num() > 0 || guiList.Num() > 0 || soundList.Num() > 0 || genericList.Num() > 0;
+	savefile->WriteBool( gather );
 
-	savefile->WriteInt( lightList.Num() );
-	for( i = 0; i < lightList.Num(); i++ ) {
-		savefile->WriteInt( lightList[ i ] );
-	}
+	//SaveFileWriteArray( lightList, lightList.Num(), WriteInt); // idList<int> lightList
+	//SaveFileWriteArray( guiList, guiList.Num(), WriteInt); // idList<int> guiList
+	//SaveFileWriteArray( soundList, soundList.Num(), WriteInt); // idList<int> soundList
+	//SaveFileWriteArray( genericList, genericList.Num(), WriteInt); // idList<int> genericList
 
-	savefile->WriteInt( guiList.Num() );
-	for( i = 0; i < guiList.Num(); i++ ) {
-		savefile->WriteInt( guiList[ i ] );
-	}
+	savefile->WriteFloat( flashIn ); // float flashIn
+	savefile->WriteFloat( flashOut ); // float flashOut
+	savefile->WriteFloat( delay ); // float delay
+	savefile->WriteString( flashInSound ); // idString flashInSound
+	savefile->WriteString( flashOutSound ); // idString flashOutSound
+	savefile->WriteObject( switchToCamera ); // idEntity * switchToCamera
 
-	savefile->WriteInt( soundList.Num() );
-	for( i = 0; i < soundList.Num(); i++ ) {
-		savefile->WriteInt( soundList[ i ] );
-	}
-
-	savefile->WriteInt( genericList.Num() );
-	for( i = 0; i < genericList.Num(); i++ ) {
-		savefile->WriteInt( genericList[ i ] );
-	}
-
-	savefile->WriteFloat( flashIn );
-	savefile->WriteFloat( flashOut );
-
-	savefile->WriteFloat( delay );
-
-	savefile->WriteString( flashInSound );
-	savefile->WriteString( flashOutSound );
-
-	savefile->WriteObject( switchToCamera );
-
-	savefile->WriteFloat( fovSetting.GetStartTime() );
+	savefile->WriteFloat( fovSetting.GetStartTime() );// idInterpolate<float> fovSetting
 	savefile->WriteFloat( fovSetting.GetDuration() );
 	savefile->WriteFloat( fovSetting.GetStartValue() );
 	savefile->WriteFloat( fovSetting.GetEndValue() );
 
-	savefile->WriteBool( soundFaded );
-	savefile->WriteBool( restoreOnTrigger );
+	savefile->WriteBool( soundFaded ); // bool soundFaded
+	savefile->WriteBool( restoreOnTrigger ); // bool restoreOnTrigger
 
-#ifdef _D3XP
-	savefile->WriteInt( savedGuiList.Num() );
-	for( i = 0; i < savedGuiList.Num(); i++ ) {
-		for(int j = 0; j < MAX_RENDERENTITY_GUI; j++) {
-			savefile->WriteUserInterface(savedGuiList[i].gui[j], savedGuiList[i].gui[j] ? savedGuiList[i].gui[j]->IsUniqued() : false);
-		}
-	}
-#endif
+	//savefile->WriteInt( savedGuiList.Num() );// idList<SavedGui_t> savedGuiList
+	//for( int i = 0; i < savedGuiList.Num(); i++ ) {
+	//	for(int j = 0; j < MAX_RENDERENTITY_GUI; j++) {
+	//		// blendo eric: guis saved on renderentity, so just use ptr write
+	//		savefile->WriteSGPtr( savedGuiList[i].gui[j] );
+	//	}
+	//}
 }
 
 /*
@@ -805,66 +787,43 @@ idTarget_SetInfluence::Restore
 ================
 */
 void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {
-	int i, num;
-	int itemNum;
-	float set;
+	bool gather;
+	savefile->ReadBool( gather );
+	Event_GatherEntities();
+	//SaveFileReadList( lightList, ReadInt); // idList<int> lightList
+	//SaveFileReadList( guiList, ReadInt); // idList<int> guiList
+	//SaveFileReadList( soundList, ReadInt); // idList<int> soundList
+	//SaveFileReadList( genericList, ReadInt); // idList<int> genericList
 
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		lightList.Append( itemNum );
-	}
+	savefile->ReadFloat( flashIn ); // float flashIn
+	savefile->ReadFloat( flashOut ); // float flashOut
+	savefile->ReadFloat( delay ); // float delay
+	savefile->ReadString( flashInSound ); // idString flashInSound
+	savefile->ReadString( flashOutSound ); // idString flashOutSound
+	savefile->ReadObject( switchToCamera ); // idEntity * switchToCamera
 
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		guiList.Append( itemNum );
-	}
+	float fVal;
+	savefile->ReadFloat( fVal );// idInterpolate<float> fovSetting
+	fovSetting.SetStartTime( fVal );
+	savefile->ReadFloat( fVal );
+	fovSetting.SetDuration( fVal );
+	savefile->ReadFloat( fVal );
+	fovSetting.SetStartValue( fVal );
+	savefile->ReadFloat( fVal );
+	fovSetting.SetEndValue( fVal );
 
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		soundList.Append( itemNum );
-	}
+	savefile->ReadBool( soundFaded ); // bool soundFaded
+	savefile->ReadBool( restoreOnTrigger ); // bool restoreOnTrigger
 
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		genericList.Append( itemNum );
-	}
-
-	savefile->ReadFloat( flashIn );
-	savefile->ReadFloat( flashOut );
-
-	savefile->ReadFloat( delay );
-
-	savefile->ReadString( flashInSound );
-	savefile->ReadString( flashOutSound );
-
-	savefile->ReadObject( reinterpret_cast<idClass *&>( switchToCamera ) );
-
-	savefile->ReadFloat( set );
-	fovSetting.SetStartTime( set );
-	savefile->ReadFloat( set );
-	fovSetting.SetDuration( set );
-	savefile->ReadFloat( set );
-	fovSetting.SetStartValue( set );
-	savefile->ReadFloat( set );
-	fovSetting.SetEndValue( set );
-
-	savefile->ReadBool( soundFaded );
-	savefile->ReadBool( restoreOnTrigger );
-
-#ifdef _D3XP
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		SavedGui_t temp;
-		for(int j = 0; j < MAX_RENDERENTITY_GUI; j++) {
-			savefile->ReadUserInterface(temp.gui[j]);
-		}
-		savedGuiList.Append( temp );
-	}
-#endif
+	//int num;
+	//savefile->ReadInt( num ); // idList<SavedGui_t> savedGuiList
+	//for( int i = 0; i < num; i++ ) {
+	//	SavedGui_t temp;
+	//	for(int j = 0; j < MAX_RENDERENTITY_GUI; j++) {
+	//		savefile->ReadUserInterface(temp.gui[j]);
+	//	}
+	//	savedGuiList.Append( temp );
+	//}
 }
 
 /*
@@ -922,7 +881,8 @@ idTarget_SetInfluence::Event_GatherEntities
 */
 void idTarget_SetInfluence::Event_GatherEntities() {
 	int i, listedEntities;
-	idEntity *entityList[ MAX_GENTITIES ];
+	static idEntity *entityList[ MAX_GENTITIES ];
+	memset( entityList, 0, sizeof(idEntity *)*MAX_GENTITIES );
 
 	bool lights = spawnArgs.GetBool( "effect_lights" );
 	bool sounds = spawnArgs.GetBool( "effect_sounds" );
@@ -1330,7 +1290,7 @@ idTarget_SetFov::Save
 */
 void idTarget_SetFov::Save( idSaveGame *savefile ) const {
 
-	savefile->WriteFloat( fovSetting.GetStartTime() );
+	savefile->WriteFloat( fovSetting.GetStartTime() ); // idInterpolate<int> fovSetting
 	savefile->WriteFloat( fovSetting.GetDuration() );
 	savefile->WriteFloat( fovSetting.GetStartValue() );
 	savefile->WriteFloat( fovSetting.GetEndValue() );
@@ -1344,7 +1304,7 @@ idTarget_SetFov::Restore
 void idTarget_SetFov::Restore( idRestoreGame *savefile ) {
 	float setting;
 
-	savefile->ReadFloat( setting );
+	savefile->ReadFloat( setting ); // idInterpolate<int> fovSetting
 	fovSetting.SetStartTime( setting );
 	savefile->ReadFloat( setting );
 	fovSetting.SetDuration( setting );
@@ -1578,7 +1538,7 @@ idTarget_Tip::Save
 ================
 */
 void idTarget_Tip::Save( idSaveGame *savefile ) const {
-	savefile->WriteVec3( playerPos );
+	savefile->WriteVec3( playerPos ); // idVec3 playerPos
 }
 
 /*
@@ -1587,7 +1547,7 @@ idTarget_Tip::Restore
 ================
 */
 void idTarget_Tip::Restore( idRestoreGame *savefile ) {
-	savefile->ReadVec3( playerPos );
+	savefile->ReadVec3( playerPos ); // idVec3 playerPos
 }
 
 /*

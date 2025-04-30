@@ -68,18 +68,17 @@ idPhysics_Actor::Save
 ================
 */
 void idPhysics_Actor::Save( idSaveGame *savefile ) const {
+	savefile->WriteClipModel( clipModel ); //  idClipModel * clipModel
+	savefile->WriteMat3( clipModelAxis ); //  idMat3 clipModelAxis
 
-	savefile->WriteClipModel( clipModel );
-	savefile->WriteMat3( clipModelAxis );
+	savefile->WriteFloat( mass ); //  float mass
+	savefile->WriteFloat( invMass ); //  float invMass
 
-	savefile->WriteFloat( mass );
-	savefile->WriteFloat( invMass );
+	savefile->WriteObject( masterEntity ); //  idEntity * masterEntity
+	savefile->WriteFloat( masterYaw ); //  float masterYaw
+	savefile->WriteFloat( masterDeltaYaw ); //  float masterDeltaYaw
 
-	savefile->WriteObject( masterEntity );
-	savefile->WriteFloat( masterYaw );
-	savefile->WriteFloat( masterDeltaYaw );
-
-	groundEntityPtr.Save( savefile );
+	savefile->WriteObject( groundEntityPtr ); //  idEntityPtr<idEntity> groundEntityPtr
 }
 
 /*
@@ -89,17 +88,17 @@ idPhysics_Actor::Restore
 */
 void idPhysics_Actor::Restore( idRestoreGame *savefile ) {
 
-	savefile->ReadClipModel( clipModel );
-	savefile->ReadMat3( clipModelAxis );
+	savefile->ReadClipModel( clipModel ); //  idClipModel * clipModel
+	savefile->ReadMat3( clipModelAxis ); //  idMat3 clipModelAxis
 
-	savefile->ReadFloat( mass );
-	savefile->ReadFloat( invMass );
+	savefile->ReadFloat( mass ); //  float mass
+	savefile->ReadFloat( invMass ); //  float invMass
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( masterEntity ) );
-	savefile->ReadFloat( masterYaw );
-	savefile->ReadFloat( masterDeltaYaw );
+	savefile->ReadObject( masterEntity ); //  idEntity * masterEntity
+	savefile->ReadFloat( masterYaw ); //  float masterYaw
+	savefile->ReadFloat( masterDeltaYaw ); //  float masterDeltaYaw
 
-	groundEntityPtr.Restore( savefile );
+	savefile->ReadObject( groundEntityPtr ); //  idEntityPtr<idEntity> groundEntityPtr
 }
 
 /*

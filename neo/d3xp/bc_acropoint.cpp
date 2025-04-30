@@ -13,10 +13,14 @@ END_CLASS
 
 void idAcroPoint::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt(state);  //  int state
+	savefile->WriteFloat(baseAngle); //  float baseAngle
 }
 
 void idAcroPoint::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt(state);  // int state
+	savefile->ReadFloat(baseAngle); //  float baseAngle
 }
 
 

@@ -29,10 +29,14 @@ void idNutrientTube::Spawn(void)
 
 void idNutrientTube::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
 }
 
 void idNutrientTube::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
 }
 
 void idNutrientTube::Think(void)

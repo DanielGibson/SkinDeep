@@ -13,7 +13,7 @@ public:
 							idCryointerior(void);
 	virtual					~idCryointerior(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -31,20 +31,20 @@ private:
 	int						state;
 	int						stateTimer;
 
-	idLight *				ceilingLight;
-	idAnimated*				doorProp;
+	idLight *				ceilingLight = nullptr;
+	idAnimated*				doorProp = nullptr;
 
-	idEntity*				frobBar;
+	idEntity*				frobBar = nullptr;
 
 	idEntityPtr<idEntity>	cryospawn;
 	
-	idEntity				*ventpeekEnt;
+	idEntity				*ventpeekEnt = nullptr;
 
 	int						iceMeltTimer;
 	enum					{ ICEMELT_INITIALDELAY, ICEMELT_MELTING, ICEMELT_LIGHTFADE, ICEMELT_DONE };
 	int						iceMeltState;
 
-	idFuncEmitter			*dripEmitter;
+	idFuncEmitter			*dripEmitter = nullptr;
 
 	void					SetCryoFrobbable(int value);
 

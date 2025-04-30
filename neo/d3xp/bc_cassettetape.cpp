@@ -32,10 +32,12 @@ void idCassetteTape::Spawn(void)
 
 void idCassetteTape::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( tapeIndex ); //  int tapeIndex
 }
 
 void idCassetteTape::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( tapeIndex ); //  int tapeIndex
 }
 
 void idCassetteTape::Think(void)
@@ -67,6 +69,9 @@ bool idCassetteTape::DoFrob(int index, idEntity * frobber)
 	gameLocal.GetLocalPlayer()->PickupTape(tapeIndex);
 
 	gameLocal.AddEventLog("#str_def_gameplay_foundcassette", GetPhysics()->GetOrigin());
+
+	//BC 3-6-2025: added pickup effect.
+	idEntityFx::StartFx(spawnArgs.GetString("fx_pickup"), GetPhysics()->GetOrigin(), mat3_identity);	
 
 	Hide();
 	PostEventMS(&EV_Remove, 0);

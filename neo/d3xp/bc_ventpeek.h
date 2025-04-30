@@ -13,7 +13,7 @@ public:
 							idVentpeek(void);
 	virtual					~idVentpeek(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -85,6 +85,9 @@ class idVentpeekTelescope : public idVentpeek
 
 	public:
 		CLASS_PROTOTYPE(idVentpeekTelescope);
+
+		void Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+		void Restore(idRestoreGame *savefile);
 
 		void Event_PostSpawn(void);
 		bool HasNextTarget(void);
@@ -192,7 +195,7 @@ class idVentpeekTelescope : public idVentpeek
 		enum { ZOOM_NONE, ZOOMIN_BLURIN, ZOOMIN_BLUROUT, ZOOMOUT_BLURIN, ZOOMOUT_BLUROUT };
 
 		idList<idLookTarget> lookTargets;
-		idLookTarget* currentFocusTarget;
+		idLookTarget* currentFocusTarget = nullptr;
 		int focusTime;
 
 		enum { FOCUS_STYLE_SIMPLE, FOCUS_STYLE_LOOSE, FOCUS_STYLE_PRECISE };

@@ -5,12 +5,16 @@
 
 #define CLEANUP_RADIUS 32 //when glass is stepped on, remove all other glass pieces in XX radius.
 
+const int GLASS_PIECES_ACTIVE_MAX = 64;
+const int GLASS_PIECES_SAMPLE_SIZE = 10; // should be big enough sample to compare pieces, but smaller than max
+
 class idGlassPiece : public idMoveableItem
 {
 public:
 	CLASS_PROTOTYPE(idGlassPiece);
 
-	void					Save(idSaveGame *savefile) const;
+	virtual					~idGlassPiece();
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -25,9 +29,11 @@ public:
 	virtual void			Think(void);
 	virtual bool			DoFrob(int index = 0, idEntity * frobber = NULL);
 
-	void					ShatterAndRemove();
+	void					ShatterAndRemove(bool fastCleanUpOnly = false);
 
 	bool					IsDoingInitialSpawnFall();
+
+	static void				LimitActiveGlassPieces();
 
 private:
 
@@ -44,7 +50,10 @@ private:
 
 	int						initialSpawnFallTimer;
 	bool					spawnfallDone;
-	
+
+	float					modelRadius;
+
+	static idList<idGlassPiece*> glassList;
 
 };
 //#pragma once

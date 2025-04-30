@@ -22,10 +22,14 @@ END_CLASS
 
 idManifestStation::idManifestStation(void)
 {
+	//make it repairable.
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idManifestStation::~idManifestStation(void)
 {
+	repairNode.Remove();
 }
 
 void idManifestStation::Spawn(void)
@@ -38,10 +42,6 @@ void idManifestStation::Spawn(void)
 	idleSmoke = NULL;
 	thinkTimer = 0;	
     unlocked = false;
-
-    //make it repairable.
-    repairNode.SetOwner(this);
-    repairNode.AddToEnd(gameLocal.repairEntities);
 
     this->GetRenderEntity()->gui[0] = uiManager->FindGui(spawnArgs.GetString("gui"), true, true); //Create a UNIQUE gui so that it doesn't auto sync with other guis.
 
@@ -92,10 +92,18 @@ void idManifestStation::UpdateInfos()
 
 void idManifestStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+	savefile->WriteBool( unlocked ); // bool unlocked
 }
 
 void idManifestStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+	savefile->ReadBool( unlocked ); // bool unlocked
 }
 
 void idManifestStation::Think(void)

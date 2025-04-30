@@ -57,10 +57,34 @@ void idHazardPipe::Event_PostSpawn(void)
 
 void idHazardPipe::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( pipetype ); // int pipetype
+
+	savefile->WriteObject( controlBox ); // idEntityPtr<idEntity> controlBox
+
+	savefile->WriteBool( pipeActive ); // bool pipeActive
+
+	savefile->WriteBool( sabotageEnabled ); // bool sabotageEnabled
+
+	savefile->WriteInt( cooldownState ); // int cooldownState
+	savefile->WriteInt( cooldownTimer ); // int cooldownTimer
+
 }
 
 void idHazardPipe::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( pipetype ); // int pipetype
+
+	savefile->ReadObject( controlBox ); // idEntityPtr<idEntity> controlBox
+
+	savefile->ReadBool( pipeActive ); // bool pipeActive
+
+
+	savefile->ReadBool( sabotageEnabled ); // bool sabotageEnabled
+
+
+	savefile->ReadInt( cooldownState ); // int cooldownState
+	savefile->ReadInt( cooldownTimer ); // int cooldownTimer
+
 }
 
 void idHazardPipe::Think()

@@ -100,10 +100,24 @@ void idElevatorcable::Think(void)
 
 void idElevatorcable::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( hasInitialized ); //  bool hasInitialized
+
+	savefile->WriteObject( topEnt ); //  idEntity * topEnt
+	savefile->WriteObject( bottomEnt ); //  idEntity * bottomEnt
+
+	savefile->WriteInt( animTimer ); //  int animTimer
+	savefile->WriteInt( animState ); //  int animState
 }
 
 void idElevatorcable::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( hasInitialized ); //  bool hasInitialized
+
+	savefile->ReadObject( topEnt ); //  idEntity * topEnt
+	savefile->ReadObject( bottomEnt ); //  idEntity * bottomEnt
+
+	savefile->ReadInt( animTimer ); //  int animTimer
+	savefile->ReadInt( animState ); //  int animState
 }
 
 bool idElevatorcable::DoFrob(int index, idEntity * frobber)

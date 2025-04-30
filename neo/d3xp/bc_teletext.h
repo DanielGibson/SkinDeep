@@ -15,7 +15,7 @@ public:
 							idTeletext(void);
 	virtual					~idTeletext(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -29,13 +29,13 @@ private:
 	int						state;
 	int						stateTimer;
 	
-	idLight*				spotlights[2];
-	idMover*				mover;
+	idLight*				spotlights[2] = {};
+	idMover*				mover = nullptr;
 
 
 	void					SetTeletextActive(int value);
 	void					SetTeletextMaterial(const char* materialName);
 	void					StartSlideShow();
 
-	idEntity*				arrowProp;
+	idEntity*				arrowProp = nullptr;
 };

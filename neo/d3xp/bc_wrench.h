@@ -9,7 +9,7 @@ class idWrench : public idMoveableItem
 public:
 	CLASS_PROTOTYPE(idWrench);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -22,7 +22,8 @@ public:
 
 private:
 
-	bool					DoRepairOnEnt(idEntity *ent);
+	bool					DoRepairHitLogic(trace_t tr, bool isBash);
+	bool					DoRepairOnEnt(idEntity *ent, bool isBash);
 	idEntity *				FindBashTarget();
 	idVec3					lastBashPos;
 

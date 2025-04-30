@@ -257,7 +257,7 @@ public:
 	virtual void			RemoveFlaggedAutoCompletion( int flags ) = 0;
 
 							// Writes variables with one of the given flags set to the given file.
-	virtual void			WriteFlaggedVariables( int flags, const char *setCmd, idFile *f ) const = 0;
+	virtual void			WriteFlaggedVariables( int flags, const char *setCmd, idFile *f, int excludeFlags = 0 ) const = 0;
 
 							// Moves CVars to and from dictionaries.
 	virtual const idDict *	MoveCVarsToDict( int flags ) const = 0;

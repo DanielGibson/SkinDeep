@@ -10,7 +10,7 @@ public:
 							idTrashchute(void);
 	virtual					~idTrashchute(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -28,7 +28,7 @@ private:
 
 	virtual void			Event_PostSpawn(void);
 
-	idMover *				platform;
+	idMover *				platform = nullptr;
 
 	int						detectionTimer;
 
@@ -43,7 +43,7 @@ private:
 	qhandle_t				headlightHandle;
 
 	
-	idEntity				*gateModel;
+	idEntity				*gateModel = nullptr;
 	enum					{ SHT_IDLE, SHT_SHUTTERING, SHT_SHUTTERED };
 	int						shutterState;
 	int						shutterTimer;

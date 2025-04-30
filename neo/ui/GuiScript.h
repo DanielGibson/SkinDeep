@@ -65,8 +65,8 @@ public:
 		return sz;
 	}
 
-	void WriteToSaveGame( idFile *savefile );
-	void ReadFromSaveGame( idFile *savefile );
+	void WriteToSaveGame( idSaveGame *savefile ) const;
+	void ReadFromSaveGame( idRestoreGame *savefile );
 
 protected:
 	int conditionReg;
@@ -98,8 +98,8 @@ public:
 	void ReadFromDemoFile( class idDemoFile *f ) {};
 	void WriteToDemoFile( class idDemoFile *f ) {};
 
-	void WriteToSaveGame( idFile *savefile );
-	void ReadFromSaveGame( idFile *savefile );
+	void WriteToSaveGame( idSaveGame *savefile ) const;
+	void ReadFromSaveGame( idRestoreGame *savefile );
 };
 
 #endif // __GUISCRIPT_H

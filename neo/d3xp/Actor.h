@@ -94,7 +94,7 @@ public:
 							idAnimState();
 							~idAnimState();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Init( idActor *owner, idAnimator *_animator, int animchannel );
@@ -113,9 +113,9 @@ public:
 	animFlags_t				GetAnimFlags( void ) const;
 
 private:
-	idActor *				self;
-	idAnimator *			animator;
-	idThread *				thread;
+	idActor *				self = nullptr;
+	idAnimator *			animator = nullptr;
+	idThread *				thread = nullptr;
 	int						channel;
 	bool					disabled;
 };
@@ -150,7 +150,7 @@ public:
 	void					Spawn( void );
 	virtual void			Restart( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Hide( void );
@@ -300,8 +300,8 @@ protected:
 	idList<copyJoints_t>		copyJoints;			// copied from the body animation to the head model
 
 	// state variables
-	const function_t		*state;
-	const function_t		*idealState;
+	const function_t		*state = nullptr;
+	const function_t		*idealState = nullptr;
 
 	// joint handles
 	jointHandle_t			leftEyeJoint;
@@ -322,7 +322,7 @@ protected:
 	int						blink_max;
 
 	// script variables
-	idThread *				scriptThread;
+	idThread *				scriptThread = nullptr;
 	idStr					waitState;
 	idAnimState				headAnim;
 	idAnimState				torsoAnim;
@@ -351,14 +351,14 @@ protected:
 	//BC protected.
 	jointHandle_t			leftFootJoint;
 	jointHandle_t			rightFootJoint;
-	idTrigger *				visionBox;
+	idTrigger *				visionBox = nullptr;
 	jointHandle_t			eyeJoint;
 
 	
 	int						energyShieldTimer;
 	int						energyShieldState;
 	enum					{ ENERGYSHIELDSTATE_STOWED, ENERGYSHIELDSTATE_IDLE, ENERGYSHIELDSTATE_REGENDELAY, ENERGYSHIELDSTATE_REGENERATING, ENERGYSHIELDSTATE_DESTROYED };
-	idEntity *				energyShieldModel;
+	idEntity *				energyShieldModel = nullptr;
 
 
 	virtual void			OnShieldHit();
@@ -376,7 +376,7 @@ protected:
 
 	//Helmet
 	void					SetHelmet(bool value);
-	idEntity *				helmetModel;
+	idEntity *				helmetModel = nullptr;
 	
 
 	void					DetachPointdefense();

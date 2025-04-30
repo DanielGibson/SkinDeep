@@ -14,6 +14,8 @@ public:
 	virtual					~idAI_Spearbot(void);
 
 	void					Spawn(void);
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
 	virtual void			Think(void);
 	virtual void			Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType = SURFTYPE_NONE);
 	virtual void			Killed(idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location);
@@ -45,8 +47,8 @@ private:
 	idVec3					GetTargetPosition(idEntity *targetEnt);
 	idVec3					ramDirection;
 
-	idBeam*					beamOrigin[SCANBEAMS];
-	idBeam*					beamTarget[SCANBEAMS];
+	idBeam*					beamOrigin[SCANBEAMS] = {};
+	idBeam*					beamTarget[SCANBEAMS] = {};
 
 	idVec3					beamOffsets[SCANBEAMS];
 	idVec3					beamRandomAngles[SCANBEAMS];
@@ -54,10 +56,10 @@ private:
 	renderLight_t			headlight;
 	qhandle_t				headlightHandle;
 
-	idFuncEmitter			*scanchargeParticles;
+	idFuncEmitter			*scanchargeParticles = nullptr;
 
-	idBeam*					targetinglineStart;
-	idBeam*					targetinglineEnd;
+	idBeam*					targetinglineStart = nullptr;
+	idBeam*					targetinglineEnd = nullptr;
 
 	void					Launch();
 

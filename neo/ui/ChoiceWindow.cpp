@@ -85,6 +85,94 @@ idChoiceWindow::~idChoiceWindow() {
 
 }
 
+void idChoiceWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	savefile->WriteInt( currentChoice ); // int currentChoice
+	savefile->WriteInt( choiceType ); // int choiceType
+	savefile->WriteString( latchedChoices ); // idString latchedChoices
+	choicesStr.WriteToSaveGame( savefile ); // idWinStr choicesStr
+	savefile->WriteString( latchedVals ); // idString latchedVals
+	choiceVals.WriteToSaveGame( savefile ); // idWinStr choiceVals
+
+	savefile->WriteInt( choices.Num() ); // idStrList choices
+	for (int idx = 0; idx < choices.Num(); idx++)
+	{
+		savefile->WriteString(choices[idx]);
+	}
+	savefile->WriteInt( values.Num() ); // idStrList values
+	for (int idx = 0; idx < values.Num(); idx++)
+	{
+		savefile->WriteString(values[idx]);
+	}
+
+	guiStr.WriteToSaveGame( savefile ); // idWinStr guiStr
+	cvarStr.WriteToSaveGame( savefile ); // idWinStr cvarStr
+	// cvar = cvarSystem->Find( cvarStr ); // idCVar * cvar
+
+	idMultiWinVar updateStr; // idMultiWinVar updateStr
+
+	savefile->WriteInt( values.Num() ); // idStrList values
+	for (int idx = 0; idx < values.Num(); idx++)
+	{
+		savefile->WriteString(values[idx]);
+	}
+
+	liveUpdate.WriteToSaveGame( savefile ); // idWinBool liveUpdate
+	updateGroup.WriteToSaveGame( savefile ); // idWinStr updateGroup
+
+	savefile->WriteCheckSizeMarker();
+}
+
+void idChoiceWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	savefile->ReadInt( currentChoice ); // int currentChoice
+	savefile->ReadInt( choiceType ); // int choiceType
+	savefile->ReadString( latchedChoices ); // idString latchedChoices
+	choicesStr.ReadFromSaveGame( savefile ); // idWinStr choicesStr
+	savefile->ReadString( latchedVals ); // idString latchedVals
+	choiceVals.ReadFromSaveGame( savefile ); // idWinStr choiceVals
+
+	int num;
+	savefile->ReadInt( num ); // idStrList choices
+	choices.SetNum( num );
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadString(choices[idx]);
+	}
+
+	savefile->ReadInt( num ); // idStrList values
+	choices.SetNum( num );
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadString(values[idx]);
+	}
+
+	guiStr.ReadFromSaveGame( savefile ); // idWinStr guiStr
+	cvarStr.ReadFromSaveGame( savefile ); // idWinStr cvarStr
+	cvar = cvarSystem->Find( cvarStr ); // idCVar * cvar
+
+	idMultiWinVar updateStr; // idMultiWinVar updateStr
+
+	savefile->ReadInt( num ); // idStrList values
+	values.SetNum( num );
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadString(values[idx]);
+	}
+
+	liveUpdate.ReadFromSaveGame( savefile ); // idWinBool liveUpdate
+	updateGroup.ReadFromSaveGame( savefile ); // idWinStr updateGroup
+
+	savefile->ReadCheckSizeMarker();
+}
+
+idStr R_GetVidModeListString();
+idStr R_GetVidModeValsString();
+
 void idChoiceWindow::RunNamedEvent( const char* eventName ) {
 	idStr event, group;
 
@@ -100,6 +188,10 @@ void idChoiceWindow::RunNamedEvent( const char* eventName ) {
 		if ( !group.Cmp( updateGroup ) ) {
 			UpdateVars( false, true );
 		}
+	} else if (cvar && !idStr::Icmp(cvar->GetName(), "r_mode") &&
+			!idStr::Icmp(eventName, "resolution refresh")) {
+		choicesStr.Set(R_GetVidModeListString());
+		choiceVals.Set(R_GetVidModeValsString());
 	}
 }
 
@@ -352,8 +444,6 @@ void idChoiceWindow::UpdateChoicesAndVals( void ) {
 	}
 }
 
-idStr R_GetVidModeListString();
-idStr R_GetVidModeValsString();
 bool isValidResolution(int width, int height);
 
 void idChoiceWindow::PostParse() {

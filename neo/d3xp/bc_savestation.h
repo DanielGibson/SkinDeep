@@ -13,7 +13,7 @@ public:
 							idSaveStation(void);
 	virtual					~idSaveStation(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -34,7 +34,7 @@ private:
 	enum					{ SV_READY, SV_LOCKDOWN, SV_BROKEN };
 	int						state;
 	int						stateTimer;
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	bool					savebuttonDelayActive;
 

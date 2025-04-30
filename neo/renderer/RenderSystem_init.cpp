@@ -44,6 +44,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifdef _WIN32
 #include "sys/win32/win_local.h"
 #endif
+#include "SDL2/SDL.h"
 
 // blendo eric: png support
 #define BLENDO_PNG_SCREENSHOT
@@ -62,11 +63,13 @@ const char *r_rendererArgs[] = { "best", "glsl", NULL };
 idCVar r_inhibitFragmentProgram( "r_inhibitFragmentProgram", "0", CVAR_RENDERER | CVAR_BOOL, "ignore the fragment program extension" );
 idCVar r_useLightPortalFlow( "r_useLightPortalFlow", "1", CVAR_RENDERER | CVAR_BOOL, "use a more precise area reference determination" );
 idCVar r_multiSamples( "r_multiSamples", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of antialiasing samples. 0 = off. Options: 2,4,8", 0, 8 );//BC anti-aliasing
-idCVar r_mode( "r_mode", "5", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_INTEGER, "video mode number" ); //Refer to r_vidModes[] for the resolution list.
+idCVar r_mode( "r_mode", "0", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_INTEGER, "(DEPRECATED) video mode number. [use r_resolution instead]" ); //Refer to r_vidModes[] for the resolution list.
 idCVar r_displayRefresh( "r_displayRefresh", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NOCHEAT, "optional display refresh rate option for vid mode", 0.0f, 200.0f );
 idCVar r_fullscreen("r_fullscreen", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "0 = windowed, 1 = full screen, 2 = borderless");
-idCVar r_customWidth( "r_customWidth", "1440", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "custom screen width. set r_mode to -1 to activate" );
-idCVar r_customHeight( "r_customHeight", "800", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "custom screen height. set r_mode to -1 to activate" );
+idCVar r_customWidth( "r_customWidth", "1440", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "(DEPRECATED) custom screen width. set r_mode to -1 to activate [use r_resolution instead]" );
+idCVar r_customHeight( "r_customHeight", "800", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "(DEPRECATED) custom screen height. set r_mode to -1 to activate [use r_resolution instead]" );
+// SM: Instead of using r_mode, r_customWidth, and r_customHeight, use these different resolution cvar now
+idCVar r_resolution("r_resolution", "", CVAR_RENDERER | CVAR_ARCHIVE, "Game resolution. Usage: r_resolution WIDTHxHEIGHT\nExample: r_resolution 1600x900\nTo apply changes: quit and restart game.");
 idCVar r_singleTriangle( "r_singleTriangle", "0", CVAR_RENDERER | CVAR_BOOL, "only draw a single triangle per primitive" );
 idCVar r_checkBounds( "r_checkBounds", "0", CVAR_RENDERER | CVAR_BOOL, "compare all surface bounds with precalculated ones" );
 
@@ -215,7 +218,7 @@ idCVar r_showOverDraw( "r_showOverDraw", "0", CVAR_RENDERER | CVAR_INTEGER, "1 =
 idCVar r_lockSurfaces( "r_lockSurfaces", "0", CVAR_RENDERER | CVAR_BOOL, "allow moving the view point without changing the composition of the scene, including culling" );
 idCVar r_useEntityCallbacks( "r_useEntityCallbacks", "1", CVAR_RENDERER | CVAR_BOOL, "if 0, issue the callback immediately at update time, rather than defering" );
 
-idCVar r_showSkel( "r_showSkel", "0", CVAR_RENDERER | CVAR_INTEGER, "draw the skeleton when model animates, 1 = draw model with skeleton, 2 = draw skeleton only", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar r_showSkel( "r_showSkel", "0", CVAR_RENDERER | CVAR_INTEGER, "draw the skeleton when model animates, 1 = draw model with skeleton, 2 = draw skeleton only, 3 = origin/body only, 4 = transform data", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
 idCVar r_jointNameScale( "r_jointNameScale", "0.05", CVAR_RENDERER | CVAR_FLOAT, "size of joint names when r_showskel is set to 1" );
 idCVar r_jointNameOffset( "r_jointNameOffset", "0.05", CVAR_RENDERER | CVAR_FLOAT, "offset of joint names when r_showskel is set to 1" );
 
@@ -234,6 +237,9 @@ idCVar r_blendoAmbienceScale("r_blendoAmbienceScale", "0.15", CVAR_RENDERER | CV
 
 idCVar r_blendoTriangleCount("r_blendoTriangleCount", "-1", CVAR_RENDERER | CVAR_INTEGER, "only draw a x triangle per primitive, -1 off"); // blendo eric: perf testing
 idCVar r_stencilReverse("r_stencilReverse", "1", CVAR_RENDERER | CVAR_BOOL, "use carmack's reverse"); // blendo eric: re-add carmack's reverse
+
+// DG: let users disable the "scale menus to 4:3" hack
+idCVar r_scaleMenusTo169( "r_scaleMenusTo169", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Scale menus, fullscreen videos and PDA to 16:9 aspect ratio even when widescreen" );
 
 // define qgl functions
 #define QGLPROC(name, rettype, args) rettype (APIENTRYP q##name) args;
@@ -350,6 +356,10 @@ static void APIENTRY
 DebugCallback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
               const GLchar *message, const void *userParam )
 {
+	// DG: skindeep added the following lines, but for now show also warnings etc
+	//if (type != GL_DEBUG_TYPE_ERROR)
+	//	return;
+	
 	const char* sourceStr = "Source: Unknown";
 	const char* typeStr = "Type: Unknown";
 	const char* severityStr = "Severity: Unknown";
@@ -623,6 +633,32 @@ static void R_CheckPortableExtensions( void ) {
 	qglBindBufferBase = ( PFNGLBINDBUFFERBASEPROC )GLimp_ExtensionPointer("glBindBufferBase");
 
 	glConfig.GLSLAvailable = qglCreateProgram != nullptr;
+	idStr gpuStr = glConfig.renderer_string;
+	
+	// SM: Rendering with GL_COLOR_LOGIC_OP enabled on (~2013-2015) R7 and R9 series cards
+	// completely breaks alpha. Pretty sure this is a driver bug, but we have no
+	// real way to fix this. Disabling the logic op means that some overlapping
+	// outlines of different types may artifact, but that's better than a black screen.
+	glConfig.isBrokenAMDR7200 = gpuStr.Find("R7 ") != -1 || gpuStr.Find("R9 ") != -1;
+
+	if (!R_CheckExtension("GL_ARB_texture_float") || !glConfig.GLSLAvailable || !R_CheckExtension("GL_ARB_shading_language_420pack"))
+	{
+		idStr errorMessage = "Skin Deep requires a graphics card that supports DirectX 11_0 feature level or higher.\n";
+		errorMessage += idStr::Format("Your video card is: %s\n\n", glConfig.renderer_string);
+
+		if (!R_CheckExtension("GL_ARB_texture_float"))
+			errorMessage += "- Your video card doesn't support GL_ARB_texture_float\n";
+
+		if (!glConfig.GLSLAvailable)
+			errorMessage += "- Your video card doesn't support GLSL\n";
+
+		if (!R_CheckExtension("GL_ARB_shading_language_420pack"))
+			errorMessage += "- Your video card doesn't support GL_ARB_shading_language_420pack\n";
+
+		errorMessage += "\nExiting now.";
+
+		common->Error(errorMessage.c_str());
+	}
 }
 
 
@@ -636,175 +672,275 @@ the values from r_customWidth, and r_customHeight
 will be used instead.
 ====================
 */
-typedef struct vidmode_s {
-	const char *description;
-	int         width, height;
-} vidmode_t;
-
-vidmode_t r_vidModes[] = {
-	{ "Mode  0: 320x240",		320,	240 },
-	{ "Mode  1: 400x300",		400,	300 },
-	{ "Mode  2: 512x384",		512,	384 },
-	{ "Mode  3: 640x480",		640,	480 },
-	{ "Mode  4: 800x600",		800,	600 },
-	{ "Mode  5: 1024x768",		1024,	768 },
-	{ "Mode  6: 1152x864",		1152,	864 },
-	{ "Mode  7: 1280x1024",		1280,	1024 },
-	{ "Mode  8: 1600x1200",		1600,	1200 },
-	// DG: from here on: modes I added.
-	{ "Mode  9: 1280x720",		1280,	720 },
-	{ "Mode 10: 1366x768",		1366,	768 },
-	{ "Mode 11: 1440x900",		1440,	900 },
-	{ "Mode 12: 1400x1050",		1400,	1050 },
-	{ "Mode 13: 1600x900",		1600,	900 },
-	{ "Mode 14: 1680x1050",		1680,	1050 },
-	{ "Mode 15: 1920x1080",		1920,	1080 },
-	{ "Mode 16: 1920x1200",		1920,	1200 },
-	{ "Mode 17: 2048x1152",		2048,	1152 },
-	{ "Mode 18: 2560x1600",		2560,	1600 },
-	{ "Mode 19: 3200x2400",		3200,	2400 },
-	{ "Mode 20: 3840x2160",		3840,   2160 },
-	{ "Mode 21: 4096x2304",		4096,   2304 },
-	{ "Mode 22: 2880x1800",		2880,   1800 },
-	{ "Mode 23: 2560x1440",		2560,   1440 },
-	// blendo eric 21:9
-	{ "Mode 24: 1920x800",		1920,   800  },
-	{ "Mode 25: 2520x1080",		2520,   1080  },
-	{ "Mode 26: 2880x1200",		2880,   1200  },
-	{ "Mode 27: 3840x1600",		3840,	1600  },
-	{ "Mode 28: 4320x1800",		4320,   1800  },
-};
-// DG: made this an enum so even stupid compilers accept it as array length below
-enum {	s_numVidModes = sizeof( r_vidModes ) / sizeof( r_vidModes[0] ) };
-
-static bool R_GetModeInfo( int *width, int *height, int mode ) {
-	vidmode_t	*vm;
-
-	if ( mode < -1 ) {
-		return false;
-	}
-	if ( mode >= s_numVidModes ) {
-		return false;
-	}
-
-	//If using the -1 custom resolution r_mode:
-	if ( mode == -1 )
-	{
-		*width = r_customWidth.GetInteger();
-		*height = r_customHeight.GetInteger();
-		return true;
-	}
-
-	vm = &r_vidModes[mode];
-
-	if ( width ) {
-		*width  = vm->width;
-	}
-	if ( height ) {
-		*height = vm->height;
-	}
-
-	return true;
-}
-
-// DG: I added all this vidModeInfoPtr stuff, so I can have a second list of vidmodes
-//     that are sorted (by width, height), instead of just r_mode index.
-//     That way I can add modes without breaking r_mode, but still display them
-//     sorted in the menu.
-
-struct vidModePtr {
-	vidmode_t* vidMode;
-	int modeIndex;
-};
-
-static vidModePtr sortedVidModes[s_numVidModes];
-
-static int vidModeCmp(const void* vm1, const void* vm2)
-{
-	const vidModePtr* v1 = static_cast<const vidModePtr*>(vm1);
-	const vidModePtr* v2 = static_cast<const vidModePtr*>(vm2);
-
-	// sort primarily by width, secondarily by height
-	int wdiff = v1->vidMode->width - v2->vidMode->width;
-	return (wdiff != 0) ? wdiff : (v1->vidMode->height - v2->vidMode->height);
-}
-
-static void initSortedVidModes()
-{
-	if(sortedVidModes[0].vidMode != NULL)
-	{
-		// already initialized
-		return;
-	}
-
-	for(int i=0; i<s_numVidModes; ++i)
-	{
-		sortedVidModes[i].modeIndex = i;
-		sortedVidModes[i].vidMode = &r_vidModes[i];
-	}
-
-	qsort(sortedVidModes, s_numVidModes, sizeof(vidModePtr), vidModeCmp);
-}
-
-bool isValidResolution(int width, int height)
-{
-	//BC Don't allow some older resolutions. Have a minimum allowed resolution, because the game becomes awkward at mega ancient monitor resolutions
-	#define VIDEOMODE_MINIMALWIDTH 1024
-	#define VIDEOMODE_MINIMALHEIGHT 768
-
-	if (width < VIDEOMODE_MINIMALWIDTH || height < VIDEOMODE_MINIMALHEIGHT
-		|| width > glConfig.displayWidth  // blendo eric: don't allow past screen res
-		|| height > glConfig.displayHeight) {
-		return false;
-	}
-
-	return true;
-}
+// typedef struct vidmode_s {
+// 	const char *description;
+// 	int         width, height;
+// } vidmode_t;
+// 
+// vidmode_t r_vidModes[] = {
+// 	{ "Mode  0: 320x240",		320,	240 },
+// 	{ "Mode  1: 400x300",		400,	300 },
+// 	{ "Mode  2: 512x384",		512,	384 },
+// 	{ "Mode  3: 640x480",		640,	480 },
+// 	{ "Mode  4: 800x600",		800,	600 },
+// 	{ "Mode  5: 1024x768",		1024,	768 },
+// 	{ "Mode  6: 1152x864",		1152,	864 },
+// 	{ "Mode  7: 1280x1024",		1280,	1024 },
+// 	{ "Mode  8: 1600x1200",		1600,	1200 },
+// 	// DG: from here on: modes I added.
+// 	{ "Mode  9: 1280x720",		1280,	720 },
+// 	{ "Mode 10: 1366x768",		1366,	768 },
+// 	{ "Mode 11: 1440x900",		1440,	900 },
+// 	{ "Mode 12: 1400x1050",		1400,	1050 },
+// 	{ "Mode 13: 1600x900",		1600,	900 },
+// 	{ "Mode 14: 1680x1050",		1680,	1050 },
+// 	{ "Mode 15: 1920x1080",		1920,	1080 },
+// 	{ "Mode 16: 1920x1200",		1920,	1200 },
+// 	{ "Mode 17: 2048x1152",		2048,	1152 },
+// 	{ "Mode 18: 2560x1600",		2560,	1600 },
+// 	{ "Mode 19: 3200x2400",		3200,	2400 },
+// 	{ "Mode 20: 3840x2160",		3840,   2160 },
+// 	{ "Mode 21: 4096x2304",		4096,   2304 },
+// 	{ "Mode 22: 2880x1800",		2880,   1800 },
+// 	{ "Mode 23: 2560x1440",		2560,   1440 },
+// 	// blendo eric 21:9
+// 	{ "Mode 24: 1920x800",		1920,   800  },
+// 	{ "Mode 25: 2520x1080",		2520,   1080  },
+// 	{ "Mode 26: 2880x1200",		2880,   1200  },
+// 	{ "Mode 27: 3840x1600",		3840,	1600  },
+// 	{ "Mode 28: 4320x1800",		4320,   1800  },
+// };
+// // DG: made this an enum so even stupid compilers accept it as array length below
+// enum {	s_numVidModes = sizeof( r_vidModes ) / sizeof( r_vidModes[0] ) };
+// 
+// static bool R_GetModeInfo( int *width, int *height, int mode ) {
+// 	vidmode_t	*vm;
+// 
+// 	if ( mode < -1 ) {
+// 		return false;
+// 	}
+// 	if ( mode >= s_numVidModes ) {
+// 		return false;
+// 	}
+// 
+// 	//If using the -1 custom resolution r_mode:
+// 	if ( mode == -1 )
+// 	{
+// 		*width = r_customWidth.GetInteger();
+// 		*height = r_customHeight.GetInteger();
+// 		return true;
+// 	}
+// 
+// 	vm = &r_vidModes[mode];
+// 
+// 	if ( width ) {
+// 		*width  = vm->width;
+// 	}
+// 	if ( height ) {
+// 		*height = vm->height;
+// 	}
+// 
+// 	return true;
+// }
+// 
+// // DG: I added all this vidModeInfoPtr stuff, so I can have a second list of vidmodes
+// //     that are sorted (by width, height), instead of just r_mode index.
+// //     That way I can add modes without breaking r_mode, but still display them
+// //     sorted in the menu.
+// 
+// struct vidModePtr {
+// 	vidmode_t* vidMode;
+// 	int modeIndex;
+// };
+// 
+// static vidModePtr sortedVidModes[s_numVidModes];
+// 
+// static int vidModeCmp(const void* vm1, const void* vm2)
+// {
+// 	const vidModePtr* v1 = static_cast<const vidModePtr*>(vm1);
+// 	const vidModePtr* v2 = static_cast<const vidModePtr*>(vm2);
+// 
+// 	// sort primarily by width, secondarily by height
+// 	int wdiff = v1->vidMode->width - v2->vidMode->width;
+// 	return (wdiff != 0) ? wdiff : (v1->vidMode->height - v2->vidMode->height);
+// }
+// 
+// static void initSortedVidModes()
+// {
+// 	if(sortedVidModes[0].vidMode != NULL)
+// 	{
+// 		// already initialized
+// 		return;
+// 	}
+// 
+// 	for(int i=0; i<s_numVidModes; ++i)
+// 	{
+// 		sortedVidModes[i].modeIndex = i;
+// 		sortedVidModes[i].vidMode = &r_vidModes[i];
+// 	}
+// 
+// 	qsort(sortedVidModes, s_numVidModes, sizeof(vidModePtr), vidModeCmp);
+// }
+// 
+// bool isValidResolution(int width, int height)
+// {
+// 	//BC Don't allow some older resolutions. Have a minimum allowed resolution, because the game becomes awkward at mega ancient monitor resolutions
+// 	#define VIDEOMODE_MINIMALWIDTH 1024
+// 	#define VIDEOMODE_MINIMALHEIGHT 720
+// 
+// 	if (width < VIDEOMODE_MINIMALWIDTH || height < VIDEOMODE_MINIMALHEIGHT
+// 		|| width > glConfig.displayWidth  // blendo eric: don't allow past screen res
+// 		|| height > glConfig.displayHeight) {
+// 		return false;
+// 	}
+// 
+// 	return true;
+// }
 
 // DG: the following two functions are part of a horrible hack in ChoiceWindow.cpp
 //     to overwrite the default resolution list in the system options menu
 
 // "r_custom*;640x480;800x600;1024x768;..."
+idStrList displayVidModes;
+idStrList vidModesToShow;
+
 idStr R_GetVidModeListString()
 {
-	idStr ret = "Custom";
+	vidModesToShow = displayVidModes;
+	// The current resolution should always also be in the list
+	vidModesToShow.AddUnique(r_resolution.GetString());
 
-	for(int i=0; i<s_numVidModes; ++i)
+	vidModesToShow.Sort();
+
+	idStr ret;
+	for (int i = 0; i < vidModesToShow.Num(); i++)
 	{
-		//common->Printf("vid %d: %d %d\n", i, sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height);
-
-		if(sortedVidModes[i].vidMode != NULL)
+		ret += vidModesToShow[i];
+		if (vidModesToShow[i] == r_resolution.GetString())
 		{
-			if (!isValidResolution(sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height))
-				continue;
-
-			idStr modeStr;
-			sprintf(modeStr, ";%dx %d", sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height);
-			ret += modeStr;
+			r_mode.SetInteger(i);
+		}
+		if (i != vidModesToShow.Num() - 1)
+		{
+			ret += ';';
 		}
 	}
+// 	idStr ret = "Custom";
+// 
+// 	for(int i=0; i<s_numVidModes; ++i)
+// 	{
+// 		//common->Printf("vid %d: %d %d\n", i, sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height);
+// 
+// 		if(sortedVidModes[i].vidMode != NULL)
+// 		{
+// 			if (!isValidResolution(sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height))
+// 				continue;
+// 
+// 			idStr modeStr;
+// 			sprintf(modeStr, ";%dx %d", sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height);
+// 			ret += modeStr;
+// 		}
+// 	}
 	return ret;
 }
 
 // r_mode values for resolutions from R_GetVidModeListString(): "-1;3;4;5;..."
 idStr R_GetVidModeValsString()
 {
-	idStr ret =  "-1"; // for custom resolutions using r_customWidth/r_customHeight
-	for(int i=0; i<s_numVidModes; ++i)
+	idStr ret;
+	for (int i = 0; i < vidModesToShow.Num(); i++)
 	{
-		if(sortedVidModes[i].vidMode != NULL)
+		ret += idStr::Format("%d", i);
+		if (i != vidModesToShow.Num() - 1)
 		{
-			if (!isValidResolution(sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height))
-				continue;
-
-			ret += ";";
-			ret += sortedVidModes[i].modeIndex;
+			ret += ';';
 		}
 	}
+// 	idStr ret =  "-1"; // for custom resolutions using r_customWidth/r_customHeight
+// 	for(int i=0; i<s_numVidModes; ++i)
+// 	{
+// 		if(sortedVidModes[i].vidMode != NULL)
+// 		{
+// 			if (!isValidResolution(sortedVidModes[i].vidMode->width, sortedVidModes[i].vidMode->height))
+// 				continue;
+// 
+// 			ret += ";";
+// 			ret += sortedVidModes[i].modeIndex;
+// 		}
+// 	}
 	return ret;
 }
 // DG end
 
+void R_ValidateResolutionString(int displayIndex)
+{
+	idStr requestedResolution = r_resolution.GetString();
+	idStrList resSplits = requestedResolution.Split('x', true);
+
+	SDL_DisplayMode current;
+	SDL_GetCurrentDisplayMode(displayIndex, &current);
+	idStr resString = idStr::Format("%dx%d", current.w, current.h);
+
+	if (resSplits.Num() == 2)
+	{
+		glConfig.vidWidth = atoi(resSplits[0]);
+		glConfig.vidHeight = atoi(resSplits[1]);
+	}
+	else
+	{
+		r_resolution.SetString(resString);
+		glConfig.vidWidth = current.w;
+		glConfig.vidHeight = current.h;
+		r_fullscreen.SetInteger(2);
+	}
+
+	// Confirm this is a valid resolution, there's different logic depending on what we're in
+
+	// For borderless, only the current screen resolution is allowed
+	if (r_fullscreen.GetInteger() == 2 && (glConfig.vidWidth != current.w || glConfig.vidHeight != current.h))
+	{
+		r_resolution.SetString(resString);
+		glConfig.vidWidth = current.w;
+		glConfig.vidHeight = current.h;
+	}
+
+	// If we're full screen exclusive and this is not a supported resolution
+	// go back to borderless default
+	if (r_fullscreen.GetInteger() == 1)
+	{
+		bool supported = false;
+
+		int numDisplayModes = SDL_GetNumDisplayModes(0);
+		for (int i = 0; i < numDisplayModes; i++)
+		{
+			SDL_DisplayMode mode;
+			SDL_GetDisplayMode(0, i, &mode);
+			if (mode.w == glConfig.vidWidth && mode.h == glConfig.vidHeight)
+			{
+				supported = true;
+				break;
+			}
+		}
+
+		if (!supported)
+		{
+			r_resolution.SetString(resString);
+			glConfig.vidWidth = current.w;
+			glConfig.vidHeight = current.h;
+			r_fullscreen.SetInteger(2);
+		}
+	}
+
+	// If we're windowed, make sure the size is <= current resolution, otherwise go back
+	// to borderless default
+	if (r_fullscreen.GetInteger() == 0 && (glConfig.vidWidth > current.w || glConfig.vidHeight > current.h))
+	{
+		r_resolution.SetString(resString);
+		glConfig.vidWidth = current.w;
+		glConfig.vidHeight = current.h;
+		r_fullscreen.SetInteger(2);
+	}
+}
 
 /*
 ==================
@@ -837,14 +973,16 @@ void R_InitOpenGL( void ) {
 	tr.viewportOffset[0] = 0;
 	tr.viewportOffset[1] = 0;
 
-	initSortedVidModes();
+	//initSortedVidModes();
 
 	//
 	// initialize OS specific portions of the renderSystem
 	//
 	for ( i = 0 ; i < 2 ; i++ ) {
+		R_ValidateResolutionString(0);
+
 		// set the parameters we are trying
-		R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, r_mode.GetInteger() );
+		//R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, r_mode.GetInteger() );
 
 		parms.width = glConfig.vidWidth;
 		parms.height = glConfig.vidHeight;
@@ -866,6 +1004,7 @@ void R_InitOpenGL( void ) {
 		// if we failed, set everything back to "safe mode"
 		// and try again
 		r_mode.SetInteger( 3 );
+		r_resolution.SetString("1280x720");
 		r_fullscreen.SetInteger( 0 );
 		r_displayRefresh.SetInteger( 0 );
 		r_multiSamples.SetInteger( 0 );
@@ -1050,8 +1189,8 @@ static void R_ListModes_f( const idCmdArgs &args ) {
 	int i;
 
 	common->Printf( "\n" );
-	for ( i = 0; i < s_numVidModes; i++ ) {
-		common->Printf( "%s\n", r_vidModes[i].description );
+	for ( i = 0; i < vidModesToShow.Num(); i++ ) {
+		common->Printf( "%s\n", vidModesToShow[i].c_str() );
 	}
 	common->Printf( "\n" );
 }
@@ -2149,7 +2288,12 @@ void R_VidRestart_f( const idCmdArgs &args ) {
 		globalImages->ReloadAllImages();
 	} else {
 		glimpParms_t	parms;
-		R_GetModeInfo(&glConfig.vidWidth, &glConfig.vidHeight, r_mode.GetInteger());
+		if (r_mode.GetInteger() >= 0 && r_mode.GetInteger() < vidModesToShow.Num())
+		{
+			r_resolution.SetString(vidModesToShow[r_mode.GetInteger()]);
+		}
+		R_ValidateResolutionString(0);
+		//R_GetModeInfo(&glConfig.vidWidth, &glConfig.vidHeight, r_mode.GetInteger());
 		parms.width = glConfig.vidWidth;
 		parms.height = glConfig.vidHeight;
 		parms.fullScreen = (forceWindow) ? false : r_fullscreen.GetInteger() == 1;
@@ -2158,6 +2302,12 @@ void R_VidRestart_f( const idCmdArgs &args ) {
 		parms.multiSamples = r_multiSamples.GetInteger();
 		parms.stereo = false;
 		GLimp_SetScreenParms( parms );
+
+		// SM: Need to recreate current render image when changing resolution
+		globalImages->currentRenderImage->PurgeImage();
+		globalImages->currentRenderImage->Reload(true, true);
+		renderSystem->UpdateScreenWidth();
+		renderSystem->CaptureRenderToImage("_currentRender");
 	}
 
 	// make sure the regeneration doesn't use anything no longer valid

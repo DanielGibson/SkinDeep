@@ -24,10 +24,81 @@ END_CLASS
 
 void idDamageJet::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( lifetimer ); //  int lifetimer
+	savefile->WriteInt( lifetimeMax ); //  int lifetimeMax
+	savefile->WriteBool( noLifetime ); //  bool noLifetime
+
+	savefile->WriteInt( damageTimer ); //  int damageTimer
+	savefile->WriteInt( damageTimerMax ); //  int damageTimerMax
+
+	savefile->WriteFloat( range ); //  float range
+	savefile->WriteFloat( enemyRange ); //  float enemyRange
+
+	savefile->WriteString( damageDefname ); // idStr damageDefname
+
+	savefile->WriteVec3( direction ); //  idVec3 direction
+	savefile->WriteBool( allowLerpRotate ); //  bool allowLerpRotate
+
+	savefile->WriteInt( ownerIndex ); //  int ownerIndex
+
+	savefile->WriteObject( emitterParticles ); //  idFuncEmitter * emitterParticles
+
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
+	savefile->WriteInt( jetLerpstate ); //  int jetLerpstate
+	savefile->WriteInt( jetLerpTimer ); //  int jetLerpTimer
+	savefile->WriteVec3( jetInitialTarget ); //  idVec3 jetInitialTarget
+	savefile->WriteVec3( jetDestinationTarget ); //  idVec3 jetDestinationTarget
+
+	savefile->WriteAngles( jetCurrentAngle ); //  idAngles jetCurrentAngle
+
+
+	savefile->WriteBool( hasCloud ); //  bool hasCloud
+	savefile->WriteBool( hasSpark ); //  bool hasSpark
+	savefile->WriteEntityDef( cloudDef ); // const  idDeclEntityDef * cloudDef
+	savefile->WriteInt( cloudTimer ); //  int cloudTimer
 }
 
 void idDamageJet::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( lifetimer ); //  int lifetimer
+	savefile->ReadInt( lifetimeMax ); //  int lifetimeMax
+	savefile->ReadBool( noLifetime ); //  bool noLifetime
+
+	savefile->ReadInt( damageTimer ); //  int damageTimer
+	savefile->ReadInt( damageTimerMax ); //  int damageTimerMax
+
+	savefile->ReadFloat( range ); //  float range
+	savefile->ReadFloat( enemyRange ); //  float enemyRange
+
+	savefile->ReadString( damageDefname ); // idStr damageDefname
+
+	savefile->ReadVec3( direction ); //  idVec3 direction
+	savefile->ReadBool( allowLerpRotate ); //  bool allowLerpRotate
+
+	savefile->ReadInt( ownerIndex ); //  int ownerIndex
+
+	savefile->ReadObject( CastClassPtrRef(emitterParticles) ); //  idFuncEmitter * emitterParticles
+
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadInt( jetLerpstate ); //  int jetLerpstate
+	savefile->ReadInt( jetLerpTimer ); //  int jetLerpTimer
+	savefile->ReadVec3( jetInitialTarget ); //  idVec3 jetInitialTarget
+	savefile->ReadVec3( jetDestinationTarget ); //  idVec3 jetDestinationTarget
+
+	savefile->ReadAngles( jetCurrentAngle ); //  idAngles jetCurrentAngle
+
+
+	savefile->ReadBool( hasCloud ); //  bool hasCloud
+	savefile->ReadBool( hasSpark ); //  bool hasSpark
+	savefile->ReadEntityDef( cloudDef ); // const  idDeclEntityDef * cloudDef
+	savefile->ReadInt( cloudTimer ); //  int cloudTimer
 }
 
 

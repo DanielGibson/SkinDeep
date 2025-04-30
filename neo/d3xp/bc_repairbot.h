@@ -12,6 +12,8 @@ public:
 	virtual					~idAI_Repairbot(void);
 
 	void					Spawn(void);
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
 	virtual void			Think(void);
 
 	bool					SetRepairTask(idEntity * thingToRepair);
@@ -46,8 +48,8 @@ private:
 
 	virtual void			Killed(idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location);
 
-	idLight *				headLight;
-	idFuncEmitter			*repairParticles;
+	idLight *				headLight = nullptr;
+	idFuncEmitter			*repairParticles = nullptr;
 
 	int						patrolCooldownTimer;
 
@@ -59,7 +61,7 @@ private:
 	idEntityPtr<idEntity>	despawnHatch;
 	int						despawnProximityTimer;
 
-	idFuncEmitter			*talkParticles;
+	idFuncEmitter			*talkParticles = nullptr;
 
 	idVec3					AttemptGoToRepairPoint(idEntity *ent);
 

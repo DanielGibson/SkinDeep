@@ -55,10 +55,20 @@ void idSaveStation::Spawn(void)
 
 void idSaveStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+
+	savefile->WriteBool( savebuttonDelayActive ); // bool savebuttonDelayActive
 }
 
 void idSaveStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+
+	savefile->ReadBool( savebuttonDelayActive ); // bool savebuttonDelayActive
 }
 
 void idSaveStation::Think(void)

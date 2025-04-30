@@ -7,6 +7,8 @@ public:
 
 	idTrigger_sneeze();
 	void				Spawn();
+	void				Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void				Restore(idRestoreGame *savefile);
 
 	virtual void		Think(void);
 
@@ -15,7 +17,7 @@ private:
 	int					lastUpdatetime;
 	float				multiplier;
 
-	idFuncEmitter		*particleEmitter;
+	idFuncEmitter		*particleEmitter = nullptr;
 
 	int					maxlifetime;
 

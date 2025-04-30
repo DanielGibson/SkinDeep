@@ -1339,8 +1339,8 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 		oldFloatTime = tr.viewDef->floatTime;
 		oldTime = tr.viewDef->renderView.time;
 
-		tr.viewDef->floatTime = game->GetTimeGroupTime( 1 ) * 0.001;
-		tr.viewDef->renderView.time = game->GetTimeGroupTime( 1 );
+		tr.viewDef->floatTime = game->GetTimeGroupTime( 0 ) * 0.001;
+		tr.viewDef->renderView.time = game->GetTimeGroupTime( 0 );
 
 		idBounds ndcBounds;
 

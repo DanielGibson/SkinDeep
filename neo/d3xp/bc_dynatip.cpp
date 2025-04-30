@@ -116,10 +116,46 @@ void idDynaTip::Event_PostSpawn(void)
 
 void idDynaTip::Save(idSaveGame *savefile) const
 {
+	savefile->WriteString( displayText ); //  idString displayText
+	savefile->WriteObject( targetEnt ); //  idEntityPtr<idEntity> targetEnt
+	savefile->WriteMaterial( iconMaterial ); // const  idMaterial *		 iconMaterial
+	savefile->WriteMaterial( arrowMaterial ); // const  idMaterial *		 arrowMaterial
+	savefile->WriteVec2( offscreenDrawPos ); //  idVec2 offscreenDrawPos
+	savefile->WriteVec2( actualscreenDrawPos ); //  idVec2 actualscreenDrawPos
+
+	savefile->WriteVec3( drawOffset ); //  idVec3 drawOffset
+
+	savefile->WriteFloat( dotAng ); //  float dotAng
+
+	savefile->WriteInt( tipState ); //  int tipState
+	savefile->WriteInt( lerpTimer ); //  int lerpTimer
+
+	savefile->WriteBool( hasGainedInitialLOS ); //  bool hasGainedInitialLOS
+	savefile->WriteInt( losTimer ); //  int losTimer
+
+	savefile->WriteBool( initialized ); //  bool initialized
 }
 
 void idDynaTip::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadString( displayText ); //  idString displayText
+	savefile->ReadObject( targetEnt ); //  idEntityPtr<idEntity> targetEnt
+	savefile->ReadMaterial( iconMaterial ); // const  idMaterial *		 iconMaterial
+	savefile->ReadMaterial( arrowMaterial ); // const  idMaterial *		 arrowMaterial
+	savefile->ReadVec2( offscreenDrawPos ); //  idVec2 offscreenDrawPos
+	savefile->ReadVec2( actualscreenDrawPos ); //  idVec2 actualscreenDrawPos
+
+	savefile->ReadVec3( drawOffset ); //  idVec3 drawOffset
+
+	savefile->ReadFloat( dotAng ); //  float dotAng
+
+	savefile->ReadInt( tipState ); //  int tipState
+	savefile->ReadInt( lerpTimer ); //  int lerpTimer
+
+	savefile->ReadBool( hasGainedInitialLOS ); //  bool hasGainedInitialLOS
+	savefile->ReadInt( losTimer ); //  int losTimer
+
+	savefile->ReadBool( initialized ); //  bool initialized
 }
 
 void idDynaTip::SetDynatipComplete()

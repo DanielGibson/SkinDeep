@@ -54,7 +54,8 @@ void idEnviroSpawner::Spawn(void)
 
 	// Default asteroid
 	idAsteroidParms parms;
-	parms.asteroidSpawnArgs = gameLocal.FindEntityDefDict(spawnArgs.GetString("def_asteroid"), false);
+	parms.asteroidArgsName = spawnArgs.GetString("def_asteroid");
+	parms.asteroidSpawnArgs = gameLocal.FindEntityDefDict(parms.asteroidArgsName, false);
 	float size = parms.asteroidSpawnArgs->GetFloat("bbox_size", "128");
 	parms.asteroidBox = idBounds(idVec3(-size / 2, -size / 2, -size / 2), idVec3(size / 2, size / 2, size / 2));
 	parms.chanceOfSpawning = 1;
@@ -66,6 +67,7 @@ void idEnviroSpawner::Spawn(void)
 		idStr defName;
 		if (spawnArgs.GetString(va("def_asteroid%d", i), "", defName))
 		{
+			parms.asteroidArgsName = defName;
 			parms.asteroidSpawnArgs = gameLocal.FindEntityDefDict(defName, false);
 			float size = parms.asteroidSpawnArgs->GetFloat("bbox_size", "128");
 			parms.asteroidBox = idBounds(idVec3(-size / 2, -size / 2, -size / 2), idVec3(size / 2, size / 2, size / 2));
@@ -121,10 +123,50 @@ idEnviroSpawner::~idEnviroSpawner(void)
 
 void idEnviroSpawner::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBounds( spawnBox ); //  idBounds spawnBox
+	SaveFileWriteArray( occluderBoxes, occluderBoxes.Num(), WriteBounds ); //  idList<idBounds> occluderBoxes
+
+	savefile->WriteInt( asteroidEntries.Num() ); //  idList<idAsteroidParms> asteroidEntries
+	for (int idx = 0; idx < asteroidEntries.Num(); idx++)
+	{
+		savefile->WriteString( asteroidEntries[idx].asteroidArgsName ); // const  idDict*	 asteroidSpawnArgs
+		// const  idDict*	 asteroidSpawnArgs // regen
+		savefile->WriteBounds( asteroidEntries[idx].asteroidBox ); //  idBounds asteroidBox
+		savefile->WriteFloat( asteroidEntries[idx].chanceOfSpawning ); //  float chanceOfSpawning
+	}
+
+	savefile->WriteInt( timer ); //  int timer
+	savefile->WriteInt( spawnRate ); //  int spawnRate
+	savefile->WriteInt( despawnThreshold ); //  int despawnThreshold
+
+	savefile->WriteVec3( lastSpawnPos ); //  idVec3 lastSpawnPos
+
+	savefile->WriteBool( state ); //  bool state
 }
 
 void idEnviroSpawner::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBounds( spawnBox ); //  idBounds spawnBox
+	SaveFileReadList( occluderBoxes, ReadBounds ); //  idList<idBounds> occluderBoxes
+
+	int num;
+	savefile->ReadInt( num ); //  idList<idAsteroidParms> asteroidEntries
+	asteroidEntries.SetNum(num);
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadString( asteroidEntries[idx].asteroidArgsName ); // const  idDict*	 asteroidSpawnArgs
+		asteroidEntries[idx].asteroidSpawnArgs = gameLocal.FindEntityDefDict(asteroidEntries[idx].asteroidArgsName, false); // const  idDict*	 asteroidSpawnArgs
+		savefile->ReadBounds( asteroidEntries[idx].asteroidBox ); //  idBounds asteroidBox
+		savefile->ReadFloat( asteroidEntries[idx].chanceOfSpawning ); //  float chanceOfSpawning
+	}
+
+	savefile->ReadInt( timer ); //  int timer
+	savefile->ReadInt( spawnRate ); //  int spawnRate
+	savefile->ReadInt( despawnThreshold ); //  int despawnThreshold
+
+	savefile->ReadVec3( lastSpawnPos ); //  idVec3 lastSpawnPos
+
+	savefile->ReadBool( state ); //  bool state
 }
 
 

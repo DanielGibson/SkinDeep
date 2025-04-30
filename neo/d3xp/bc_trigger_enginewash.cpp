@@ -36,6 +36,20 @@ void idTrigger_enginewash::Spawn()
 	BecomeActive(TH_THINK);
 }
 
+
+void idTrigger_enginewash::Save(idSaveGame* savefile) const
+{
+	savefile->WriteFloat( baseAngle ); // float baseAngle
+	savefile->WriteInt( timer ); // int timer
+	savefile->WriteInt( state ); // int state
+}
+void idTrigger_enginewash::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadFloat( baseAngle ); // float baseAngle
+	savefile->ReadInt( timer ); // int timer
+	savefile->ReadInt( state ); // int state
+}
+
 void idTrigger_enginewash::Think(void)
 {
 	if (state == EW_NONE)

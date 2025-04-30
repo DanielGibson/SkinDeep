@@ -64,8 +64,8 @@ public:
 							BOEntity(idGameBustOutWindow* _game);
 	virtual					~BOEntity();
 
-	virtual void			WriteToSaveGame( idFile *savefile );
-	virtual void			ReadFromSaveGame( idFile *savefile, idGameBustOutWindow* _game );
+	virtual void			WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void			ReadFromSaveGame( idRestoreGame *savefile, idGameBustOutWindow* _game );
 
 	void					SetMaterial(const char* name);
 	void					SetSize( float _width, float _height );
@@ -103,8 +103,8 @@ public:
 					BOBrick( BOEntity *_ent, float _x, float _y, float _width, float _height );
 	virtual			~BOBrick();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile, idGameBustOutWindow *game );
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile, idGameBustOutWindow *game );
 
 	void			SetColor( idVec4 bcolor );
 	collideDir_t	checkCollision( idVec2 pos, idVec2 vel );
@@ -120,10 +120,11 @@ public:
 	idGameBustOutWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	~idGameBustOutWindow();
 
-	virtual void		WriteToSaveGame( idFile *savefile );
-	virtual void		ReadFromSaveGame( idFile *savefile );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile );
 
 	virtual const char*	HandleEvent(const sysEvent_t *event, bool *updateVisuals);
+	virtual void		RunNamedEvent(const char* namedEvent);
 	virtual void		PostParse();
 	virtual void		Draw(int time, float x, float y);
 	virtual idWinVar *	GetWinVarByName	(const char *_name, bool winLookup = false, drawWin_t** owner = NULL);

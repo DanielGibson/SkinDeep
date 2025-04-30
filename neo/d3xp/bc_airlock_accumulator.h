@@ -31,7 +31,7 @@ private:
 
 	void					SetDeflate();
 
-	idEntity *				emergencyButton;
+	idEntity *				emergencyButton = nullptr;
 
 
 	bool					hasUpdatedAccumStatus;

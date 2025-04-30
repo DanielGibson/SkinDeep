@@ -134,6 +134,8 @@ idMultiplayerGame::idMultiplayerGame() {
 
 	player_blue_flag = -1;
 	player_red_flag = -1;
+
+	memset( gameTypeVoteMap, 0, sizeof(gameTypeVoteMap) );
 #endif
 
 	Clear();

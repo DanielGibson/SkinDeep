@@ -71,12 +71,87 @@ idLifeboat::~idLifeboat(void)
 
 void idLifeboat::Save( idSaveGame *savefile ) const
 {
-	//savefile->WriteInt(state);
+	savefile->WriteInt( state ); // lifeboat_state_t state
+
+	savefile->WriteVec3( targetDirection ); // idVec3 targetDirection
+	savefile->WriteVec3( despawnPosition ); // idVec3 despawnPosition
+
+	savefile->WriteInt( thrustTimer ); // int thrustTimer
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( lastSecondDisplay ); // int lastSecondDisplay
+
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+
+	savefile->WriteObject( animatedThrusters ); // idAnimated* animatedThrusters
+
+	savefile->WriteBool( damageSmokeDone ); // bool damageSmokeDone
+
+	savefile->WriteInt( damageTimer ); // int damageTimer
+
+	savefile->WriteRenderLight( boatlight ); // renderLight_t boatlight
+	savefile->WriteInt( boatlightHandle ); // int boatlightHandle
+
+	savefile->WriteInt( storingCount ); // int storingCount
+
+	savefile->WriteInt( bodypullTimer ); // int bodypullTimer
+
+	savefile->WriteObject( tractorbeam ); // idBeam* tractorbeam
+	savefile->WriteObject( tractorbeamTarget ); // idBeam* tractorbeamTarget
+	savefile->WriteObject( tractorPtr ); // idEntityPtr<idEntity> tractorPtr
+
+	savefile->WriteMat3( displayAngle ); // idMat3 displayAngle
+
+	savefile->WriteBool( hasTractorBeam ); // bool hasTractorBeam
+
+	savefile->WriteObject( shopMonitor ); // idEntity * shopMonitor
+	savefile->WriteInt( shopState ); // int shopState
+
+	savefile->WriteInt( lifeboatStayTime ); // int lifeboatStayTime
 }
 
 void idLifeboat::Restore( idRestoreGame *savefile )
 {
-	//savefile->ReadInt(state);
+	savefile->ReadInt( (int&)state ); // lifeboat_state_t state
+
+	savefile->ReadVec3( targetDirection ); // idVec3 targetDirection
+	savefile->ReadVec3( despawnPosition ); // idVec3 despawnPosition
+
+	savefile->ReadInt( thrustTimer ); // int thrustTimer
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( lastSecondDisplay ); // int lastSecondDisplay
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+
+	savefile->ReadObject( CastClassPtrRef(animatedThrusters) ); // idAnimated* animatedThrusters
+
+	savefile->ReadBool( damageSmokeDone ); // bool damageSmokeDone
+
+	savefile->ReadInt( damageTimer ); // int damageTimer
+
+	savefile->ReadRenderLight( boatlight ); // renderLight_t boatlight
+	savefile->ReadInt( boatlightHandle ); // int boatlightHandle
+	if ( boatlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( boatlightHandle, &boatlight );
+	}
+
+	savefile->ReadInt( storingCount ); // int storingCount
+
+	savefile->ReadInt( bodypullTimer ); // int bodypullTimer
+
+	savefile->ReadObject( CastClassPtrRef(tractorbeam) ); // idBeam* tractorbeam
+	savefile->ReadObject( CastClassPtrRef(tractorbeamTarget) ); // idBeam* tractorbeamTarget
+	savefile->ReadObject( tractorPtr ); // idEntityPtr<idEntity> tractorPtr
+
+	savefile->ReadMat3( displayAngle ); // idMat3 displayAngle
+
+	savefile->ReadBool( hasTractorBeam ); // bool hasTractorBeam
+
+	savefile->ReadObject( shopMonitor ); // idEntity * shopMonitor
+	savefile->ReadInt( shopState ); // int shopState
+
+	savefile->ReadInt( lifeboatStayTime ); // int lifeboatStayTime
 }
 
 void idLifeboat::Spawn( void )
@@ -172,6 +247,12 @@ void idLifeboat::Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &d
 	//		return;
 	//}
 
+	
+	//BC 3-11-2025: ignore damage if player is inside the pod.
+	if (static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->GetPlayerIsCurrentlyInCatpod())
+		return;
+
+
 	idMoveable::Damage(inflictor, attacker, dir, damageDefName, damageScale, location, materialType);
 
 	//if (gameLocal.time > lastDamageFXTime)
@@ -253,6 +334,7 @@ void idLifeboat::Think( void )
 			if (idleSmoke)
 			{
 				idleSmoke->PostEventMS(&EV_Remove, 0);
+				idleSmoke = nullptr;
 			}
 
 			StartSound("snd_moving", SND_CHANNEL_AMBIENT, 0, false, NULL);
@@ -373,6 +455,7 @@ void idLifeboat::Launch(idVec3 _targetPos)
 
 	displayAngle = GetPhysics()->GetAxis();
 	
+	isFrobbable = true; // SW 10th March 2025
 }
 
 
@@ -665,7 +748,9 @@ void idLifeboat::StartTakeoff()
 
 	tractorbeam->Hide();
 
-	//OnTakeoff();
+	isFrobbable = false; // SW 10th March 2025: don't let the player frob it during takeoff warmup, it's too messy
+
+	OnTakeoff();
 }
 
 //When the gui is interacted with.
@@ -975,10 +1060,39 @@ void idLifeboat::Event_LaunchPod(const idVec3 &originPos, const idVec3 &destinat
 	Launch(destinationPos);
 }
 
+// SW 10th March 2025:
+// The player has to juggle a lot of items inside the cat pod and sometimes they might accidentally exit prematurely
+// (or not be able to carry everything they want)
+// To be kind to the player, we eject items into the vacuum of space here.
+void idLifeboat::EjectItems(idList<idMoveableItem*> items)
+{
+	idVec3 itemPos, ejectVelocity;
+	idVec3 lifeboatCenter = this->GetPhysics()->GetAbsBounds().GetCenter();
+	int count = items.Num();
+	for (int i = 0; i < count; i++)
+	{
+		itemPos = FindGoodieSpawnposition();
+
+		items[i]->Unbind();
+		items[i]->Teleport(itemPos, items[i]->GetPhysics()->GetAxis().ToAngles(), NULL);
+		if (itemPos == vec3_zero)
+		{
+			gameLocal.Warning("idLifeboat::EjectItems: item was ejected at vec3_zero");
+		}
+		else
+		{
+			ejectVelocity = (itemPos - lifeboatCenter).Normalized() * 100;
+			items[i]->GetPhysics()->SetLinearVelocity(ejectVelocity);
+			items[i]->GetPhysics()->SetAngularVelocity(idVec3(gameLocal.random.RandomFloat() * 100, gameLocal.random.RandomFloat() * 100, gameLocal.random.RandomFloat() * 100));
+		}
+		
+	}
+}
+
 void idLifeboat::OnLanded()
 {
 }
 
-//void idLifeboat::OnTakeoff()
-//{
-//}
+void idLifeboat::OnTakeoff()
+{
+}

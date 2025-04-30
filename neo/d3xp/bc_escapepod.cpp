@@ -43,10 +43,22 @@ void idEscapePod::Spawn(void)
 
 void idEscapePod::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteObject( skullPtr ); //  idEntityPtr<idEntity> skullPtr
+	savefile->WriteVec3( skullStartPos ); //  idVec3 skullStartPos
+	savefile->WriteVec3( skullEndPos ); //  idVec3 skullEndPos
 }
 
 void idEscapePod::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadObject( skullPtr ); //  idEntityPtr<idEntity> skullPtr
+	savefile->ReadVec3( skullStartPos ); //  idVec3 skullStartPos
+	savefile->ReadVec3( skullEndPos ); //  idVec3 skullEndPos
 }
 
 

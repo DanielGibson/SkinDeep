@@ -23,15 +23,34 @@ END_CLASS
 
 idLostandfoundMonitor::idLostandfoundMonitor(void)
 {
+
+	securityState = 0;
+
+	idleSmoke = nullptr;
+
+	thinkTimer = 0;
+
+	unlocked = false;
+	itemList = nullptr;
+
 	lostandfoundMachine = NULL;
 
 	proximityAnnouncer.sensor = this;
 	proximityAnnouncer.checkHealth = false;
 	proximityAnnouncer.coolDownPeriod = 10000;
+
+	//make it repairable.
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
+
+	itemList = uiManager->AllocListGUI();
 }
 
 idLostandfoundMonitor::~idLostandfoundMonitor(void)
 {
+	repairNode.Remove();
+
+	uiManager->FreeListGUI(itemList);
 }
 
 void idLostandfoundMonitor::Spawn(void)
@@ -45,14 +64,10 @@ void idLostandfoundMonitor::Spawn(void)
 	thinkTimer = 0;	
     unlocked = false;
 
-    //make it repairable.
-    repairNode.SetOwner(this);
-    repairNode.AddToEnd(gameLocal.repairEntities);
-
-    this->GetRenderEntity()->gui[0] = uiManager->FindGui(spawnArgs.GetString("gui"), true, true); //Create a UNIQUE gui so that it doesn't auto sync with other guis.
+	// blendo eric: savegame this should get restored by idEntity::Restore
+	this->GetRenderEntity()->gui[0] = uiManager->FindGui(spawnArgs.GetString("gui"), true, true); //Create a UNIQUE gui so that it doesn't auto sync with other guis.
 
 	//Create the gui list.
-	itemList = uiManager->AllocListGUI();
 	itemList->Config(renderEntity.gui[0], "itemList");
 	itemList->Clear();
 	//itemList->SetSelection(0);
@@ -104,10 +119,28 @@ void idLostandfoundMonitor::Event_PostSpawn(void)
 
 void idLostandfoundMonitor::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( securityState ); // int securityState
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+	savefile->WriteBool( unlocked ); // bool unlocked
+	savefile->WriteObject( lostandfoundMachine ); // idEntityPtr<idEntity> lostandfoundMachine
+
+	itemList->Save( savefile );// idListGUI * itemList
+
+	proximityAnnouncer.Save( savefile ); // idProximityAnnouncer proximityAnnouncer
 }
 
 void idLostandfoundMonitor::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( securityState ); // int securityState
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+	savefile->ReadBool( unlocked ); // bool unlocked
+	savefile->ReadObject( lostandfoundMachine ); // idEntityPtr<idEntity> lostandfoundMachine
+
+	itemList->Restore( savefile ); // idListGUI * itemList
+
+	proximityAnnouncer.Restore( savefile ); // idProximityAnnouncer proximityAnnouncer
 }
 
 void idLostandfoundMonitor::Think(void)
@@ -118,48 +151,33 @@ void idLostandfoundMonitor::Think(void)
 
 	if (securityState == LFM_ACTIVE)
 	{
-		idList<int> entityDefNums = static_cast<idLostAndFound *>(lostandfoundMachine.GetEntity())->cachedEntityDefNums;
 
 		if (gameLocal.time > thinkTimer)
 		{
 			thinkTimer = gameLocal.time + THINK_INTERVAL;
 
-			//Grab the lost and found list from the lostandfound vending machine.
-			itemList->Clear();
-
-			if (lostandfoundMachine.IsValid())
-			{
-
-				for (int i = 0; i < entityDefNums.Num(); i++)
-				{
-					int defNum = entityDefNums[i];
-					const idDeclEntityDef* def = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_ENTITYDEF, defNum));
-					idStr itemname = def->dict.GetString("displayname", "???");
-					if (itemname[0] == '#')
-					{
-						itemname = common->GetLanguageDict()->GetString(itemname.c_str()); //get localized string.
-					}
-					itemList->Add(defNum, itemname.c_str());
-				}				
-			}
+			RefreshList();
 		}
 
 		bool hasCriticalItem = false;
-
-		for (int i = 0; i < entityDefNums.Num(); i++)
+		if (lostandfoundMachine.IsValid())
 		{
-			int defNum = entityDefNums[i];
-			const idDeclEntityDef* def = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_ENTITYDEF, defNum));
-			
-			bool isCriticalItem = def->dict.GetBool("criticalitem", "0");
-			if (isCriticalItem)
+			idList<int> entityDefNums = static_cast<idLostAndFound*>(lostandfoundMachine.GetEntity())->cachedEntityDefNums;
+			for (int i = 0; i < entityDefNums.Num(); i++)
 			{
-				hasCriticalItem = true;
-				break;
+				int defNum = entityDefNums[i];
+				const idDeclEntityDef* def = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_ENTITYDEF, defNum));
+
+				bool isCriticalItem = def->dict.GetBool("criticalitem", "0");
+				if (isCriticalItem)
+				{
+					hasCriticalItem = true;
+					break;
+				}
 			}
 		}
 
-		if( hasCriticalItem )
+		if( hasCriticalItem && health > 0)
 		{
 			proximityAnnouncer.Update();
 		}
@@ -170,6 +188,23 @@ void idLostandfoundMonitor::Think(void)
 
 void idLostandfoundMonitor::RefreshList()
 {
+	itemList->Clear();
+	if (lostandfoundMachine.IsValid())
+	{
+		//Grab the lost and found list from the lostandfound vending machine.
+		idList<int> entityDefNums = static_cast<idLostAndFound *>(lostandfoundMachine.GetEntity())->cachedEntityDefNums;
+		for (int i = 0; i < entityDefNums.Num(); i++)
+		{
+			int defNum = entityDefNums[i];
+			const idDeclEntityDef* def = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_ENTITYDEF, defNum));
+			idStr itemname = def->dict.GetString("displayname", "#str_loc_unknown_00104");
+			if (itemname[0] == '#')
+			{
+				itemname = common->GetLanguageDict()->GetString(itemname.c_str()); //get localized string.
+			}
+			itemList->Add(defNum, itemname.c_str());
+		}				
+	}
 }
 
 
@@ -178,9 +213,12 @@ void idLostandfoundMonitor::Damage(idEntity *inflictor, idEntity *attacker, cons
 	if (securityState == LFM_DEAD)
 		return;
 
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
+
     idDict args;
 
     Event_GuiNamedEvent(1, "onDamaged");
+	health = 0;
 
 	securityState = LFM_DEAD;
     this->isFrobbable = false;

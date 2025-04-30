@@ -4413,10 +4413,121 @@ ID_INLINE void idAFBody::InverseWorldSpatialInertiaMultiply( idVecX &dst, const 
 
 /*
 ================
+idPhysics_AF_SavePState
+================
+*/
+// blendo eric: might not be required?
+void idPhysics_AF_SaveBodyPState( idSaveGame *savefile, const AFBodyPState_t &state ) {
+	savefile->WriteVec3( state.worldOrigin ); //  idVec3 worldOrigin
+	savefile->WriteMat3( state.worldAxis ); //  idMat3 worldAxis
+	savefile->WriteVec6( state.spatialVelocity ); //  idVec6 spatialVelocity
+	savefile->WriteVec6( state.externalForce ); //  idVec6 externalForce
+}
+
+/*
+================
+idPhysics_AF_RestorePState
+================
+*/
+// blendo eric: might not be required?
+void idPhysics_AF_RestoreBodyPState( idRestoreGame *savefile, AFBodyPState_t &state ) {
+	savefile->ReadVec3( state.worldOrigin ); //  idVec3 worldOrigin
+	savefile->ReadMat3( state.worldAxis ); //  idMat3 worldAxis
+	savefile->ReadVec6( state.spatialVelocity ); //  idVec6 spatialVelocity
+	savefile->ReadVec6( state.externalForce ); //  idVec6 externalForce;
+}
+
+/*
+================
 idAFBody::Save
 ================
 */
-void idAFBody::Save( idSaveGame *saveFile ) {
+void idAFBody::Save( idSaveGame *savefile ) {
+#if 1
+	savefile->WriteString( name ); //  idString name
+
+	//idAFBody *				parent; //  idAFBody * parent
+	idList<idAFBody *>		children; //  idList<idAFBody *> children
+
+
+	savefile->WriteClipModel( clipModel ); //  idClipModel * clipModel
+
+	//idAFConstraint *		primaryConstraint; //  idAFConstraint * primaryConstraint
+	//idList<idAFConstraint *>constraints;
+	//idAFTree *				tree; //  idAFTree * tree
+
+	savefile->WriteFloat( linearFriction ); //  float linearFriction
+	savefile->WriteFloat( angularFriction ); //  float angularFriction
+	savefile->WriteFloat( contactFriction ); //  float contactFriction
+	savefile->WriteFloat( bouncyness ); //  float bouncyness
+	savefile->WriteInt( clipMask ); //  int clipMask
+	savefile->WriteVec3( frictionDir ); //  idVec3 frictionDir
+	savefile->WriteVec3( contactMotorDir ); //  idVec3 contactMotorDir
+	savefile->WriteFloat( contactMotorVelocity ); //  float contactMotorVelocity
+	savefile->WriteFloat( contactMotorForce ); //  float contactMotorForce
+
+	savefile->WriteFloat( mass ); //  float mass
+	savefile->WriteFloat( invMass ); //  float invMass
+	savefile->WriteVec3( centerOfMass ); //  idVec3 centerOfMass
+	savefile->WriteMat3( inertiaTensor ); //  idMat3 inertiaTensor
+	savefile->WriteMat3( inverseInertiaTensor ); //  idMat3 inverseInertiaTensor
+
+
+
+	{
+		idPhysics_AF_SaveBodyPState(savefile, state[0]); 		//  AFBodyPState_t state[2];
+		idPhysics_AF_SaveBodyPState(savefile, state[1]);
+
+		int currentHandle = -1; //  AFBodyPState_t * current
+		if (current == &state[0]) {
+			currentHandle = 0;
+		} else if (current == &state[1]) {
+			currentHandle = 1;
+		} else if (current == &saved) {
+			currentHandle = 2;
+		}
+		savefile->WriteInt( currentHandle );
+
+		int nextHandle = -1; //  AFBodyPState_t * next
+		if (next == &state[0]) {
+			nextHandle = 0;
+		} else if (next == &state[1]) {
+			nextHandle = 1;
+		} else if (next == &saved) {
+			nextHandle = 2;
+		}
+		savefile->WriteInt( nextHandle );
+
+		idPhysics_AF_SaveBodyPState(savefile, saved); //  AFBodyPState_t saved
+	}
+
+
+	savefile->WriteVec3( atRestOrigin ); //  idVec3 atRestOrigin
+	savefile->WriteMat3( atRestAxis ); //  idMat3 atRestAxis
+
+	savefile->WriteMatX( inverseWorldSpatialInertia ); //  idMatX inverseWorldSpatialInertia
+	savefile->WriteMatX( I );
+	savefile->WriteMatX( invI );
+	savefile->WriteMatX( J );
+
+	savefile->WriteVecX( s ); //  idVecX s // num = 6
+	savefile->WriteVecX( totalForce ); //  idVecX totalForce // num = 6
+	savefile->WriteVecX( auxForce ); //  idVecX auxForce // num = 6
+	savefile->WriteVecX( acceleration ); //  idVecX acceleration // num = 6
+
+	// float *					response; //  float * response
+	// int *					responseIndex; //  int * responseIndex
+
+	savefile->WriteInt( numResponses ); //  int numResponses
+	savefile->WriteInt( maxAuxiliaryIndex ); //  int maxAuxiliaryIndex
+	savefile->WriteInt( maxSubTreeAuxiliaryIndex ); //  int maxSubTreeAuxiliaryIndex
+
+	bodyFlags_s flags = fl; // bodyFlags_s fl
+	LittleBitField( &flags, sizeof( flags ) );
+	savefile->Write( &flags, sizeof( flags ) );
+
+#else 
+
 	saveFile->WriteFloat( linearFriction );
 	saveFile->WriteFloat( angularFriction );
 	saveFile->WriteFloat( contactFriction );
@@ -4439,6 +4550,8 @@ void idAFBody::Save( idSaveGame *saveFile ) {
 	saveFile->WriteVec6( current->externalForce );
 	saveFile->WriteVec3( atRestOrigin );
 	saveFile->WriteMat3( atRestAxis );
+
+#endif
 }
 
 /*
@@ -4446,29 +4559,94 @@ void idAFBody::Save( idSaveGame *saveFile ) {
 idAFBody::Restore
 ================
 */
-void idAFBody::Restore( idRestoreGame *saveFile ) {
-	saveFile->ReadFloat( linearFriction );
-	saveFile->ReadFloat( angularFriction );
-	saveFile->ReadFloat( contactFriction );
-	saveFile->ReadFloat( bouncyness );
-	saveFile->ReadInt( clipMask );
-	saveFile->ReadVec3( frictionDir );
-	saveFile->ReadVec3( contactMotorDir );
-	saveFile->ReadFloat( contactMotorVelocity );
-	saveFile->ReadFloat( contactMotorForce );
+void idAFBody::Restore( idRestoreGame *savefile ) {
+	savefile->ReadString( name ); //  idString name
 
-	saveFile->ReadFloat( mass );
-	saveFile->ReadFloat( invMass );
-	saveFile->ReadVec3( centerOfMass );
-	saveFile->ReadMat3( inertiaTensor );
-	saveFile->ReadMat3( inverseInertiaTensor );
+	//idAFBody *				parent; //  idAFBody * parent
+	//idList<idAFBody *>		children; //  idList<idAFBody *> children
 
-	saveFile->ReadVec3( current->worldOrigin );
-	saveFile->ReadMat3( current->worldAxis );
-	saveFile->ReadVec6( current->spatialVelocity );
-	saveFile->ReadVec6( current->externalForce );
-	saveFile->ReadVec3( atRestOrigin );
-	saveFile->ReadMat3( atRestAxis );
+	savefile->ReadClipModel( clipModel ); //  idClipModel * clipModel
+
+	//idAFConstraint *		primaryConstraint; //  idAFConstraint * primaryConstraint
+	//idList<idAFConstraint *>constraints;
+	//idAFTree *				tree; //  idAFTree * tree
+
+	savefile->ReadFloat( linearFriction ); //  float linearFriction
+	savefile->ReadFloat( angularFriction ); //  float angularFriction
+	savefile->ReadFloat( contactFriction ); //  float contactFriction
+	savefile->ReadFloat( bouncyness ); //  float bouncyness
+	savefile->ReadInt( clipMask ); //  int clipMask
+	savefile->ReadVec3( frictionDir ); //  idVec3 frictionDir
+	savefile->ReadVec3( contactMotorDir ); //  idVec3 contactMotorDir
+	savefile->ReadFloat( contactMotorVelocity ); //  float contactMotorVelocity
+	savefile->ReadFloat( contactMotorForce ); //  float contactMotorForce
+
+	savefile->ReadFloat( mass ); //  float mass
+	savefile->ReadFloat( invMass ); //  float invMass
+	savefile->ReadVec3( centerOfMass ); //  idVec3 centerOfMass
+	savefile->ReadMat3( inertiaTensor ); //  idMat3 inertiaTensor
+	savefile->ReadMat3( inverseInertiaTensor ); //  idMat3 inverseInertiaTensor
+
+
+	{
+		idPhysics_AF_RestoreBodyPState(savefile, state[0]); 		//  AFBodyPState_t state[2];
+		idPhysics_AF_RestoreBodyPState(savefile, state[1]);
+
+
+		int currentHandle = 0; //  AFBodyPState_t * current
+		savefile->ReadInt(currentHandle);
+		switch (currentHandle) {
+		case 0:
+			current = &state[0]; break;
+		case 1:
+			current = &state[1]; break;
+		case 2:
+			current = &saved; break;
+		default:
+			current = nullptr;
+		}
+
+		int nextHandle = 0; //  AFBodyPState_t * next
+		savefile->ReadInt(nextHandle);
+		switch (nextHandle) {
+			case 0:
+				next = &state[0]; break;
+			case 1:
+				next = &state[1]; break;
+			case 2:
+				next = &saved; break;
+			default:
+				next = nullptr;
+		}
+
+		idPhysics_AF_RestoreBodyPState(savefile, saved); //  AFBodyPState_t saved
+	}
+
+
+	savefile->ReadVec3( atRestOrigin ); //  idVec3 atRestOrigin
+	savefile->ReadMat3( atRestAxis ); //  idMat3 atRestAxis
+
+	savefile->ReadMatX( inverseWorldSpatialInertia ); //  idMatX inverseWorldSpatialInertia
+	savefile->ReadMatX( I );
+	savefile->ReadMatX( invI );
+	savefile->ReadMatX( J );
+
+	savefile->ReadVecX( s ); //  idVecX s // num = 6
+	savefile->ReadVecX( totalForce ); //  idVecX totalForce // num = 6
+	savefile->ReadVecX( auxForce ); //  idVecX auxForce // num = 6
+	savefile->ReadVecX( acceleration ); //  idVecX acceleration // num = 6
+
+	// this should regen on AuxiliaryForces
+	// float *					response; //  float * response
+	// int *					responseIndex; //  int * responseIndex
+
+	savefile->ReadInt( numResponses ); //  int numResponses
+	savefile->ReadInt( maxAuxiliaryIndex ); //  int maxAuxiliaryIndex
+	savefile->ReadInt( maxSubTreeAuxiliaryIndex ); //  int maxSubTreeAuxiliaryIndex
+
+	bodyFlags_s flags = fl; // bodyFlags_s fl
+	LittleBitField( &flags, sizeof( flags ) );
+	savefile->Read( &flags, sizeof( flags ) );
 }
 
 
@@ -6280,6 +6458,32 @@ const idBounds &idPhysics_AF::GetAbsBounds( int id ) const {
 	}
 }
 
+
+/*
+================
+idPhysics_AF::GetAbsBoundsMasked
+================
+*/
+const idBounds &idPhysics_AF::GetAbsBoundsMasked(int mask) const {
+	static idBounds absBounds;
+	bool boundsFound = false;
+	if (bodies.Num() > 0) {
+		if (bodies[0]->clipMask & mask) {
+			absBounds = bodies[0]->GetClipModel()->GetAbsBounds();
+			boundsFound = true;
+		}
+		for (int i = 1; i < bodies.Num(); i++) {
+			if (bodies[i]->clipMask & mask) {
+				absBounds = boundsFound ? absBounds + bodies[i]->GetClipModel()->GetAbsBounds() : bodies[i]->GetClipModel()->GetAbsBounds();
+			}
+		}
+	}
+	if (!boundsFound) {
+		absBounds.Zero();
+	}
+	return absBounds;
+}
+
 /*
 ================
 idPhysics_AF::Evaluate
@@ -6791,71 +6995,88 @@ void idPhysics_AF_RestorePState( idRestoreGame *saveFile, AFPState_t &state ) {
 idPhysics_AF::Save
 ================
 */
-void idPhysics_AF::Save( idSaveGame *saveFile ) const {
-	int i;
-
+void idPhysics_AF::Save( idSaveGame *savefile ) const {
+	// blendo eric: will be restored by Evaluate() / BuildTrees()
 	// the articulated figure structure is handled by the owner
 
-	idPhysics_AF_SavePState( saveFile, current );
-	idPhysics_AF_SavePState( saveFile, saved );
+	//  idList<idAFTree *> trees
+	
+	
+	//idList<idAFBody *> bodies
 
-	saveFile->WriteInt( bodies.Num() );
-	for ( i = 0; i < bodies.Num(); i++ ) {
-		bodies[i]->Save( saveFile );
+	//savefile->WriteInt( bodies.Num() ); //  idList<idAFBody *> bodies
+	//for ( int i = 0; i < bodies.Num(); i++ ) {
+	//	bodies[i]->Save( savefile );
+	//}
+
+	//savefile->WriteInt( constraints.Num() ); // will be restored by Evaluate() / BuildTrees()
+	//for ( int i = 0; i < constraints.Num(); i++ ) {
+	//	constraints[i]->Save( savefile );
+	//}
+
+	//  idList<idAFConstraint *>primaryConstraints // blendo eric: rebuilt
+	//  idList<idAFConstraint *>auxiliaryConstraints  // blendo eric: rebuilt
+	// idList<idAFConstraint *>frameConstraints // blendo eric: rebuilt
+	// idList<idAFConstraint_Contact *>contactConstraints // blendo eric: rebuilt
+	// SaveFileWriteArray(contactBodies, contactBodies.Num(), WriteInt ); // idList<int> contactBodies 
+	// idList<AFCollision_t>	collisions; //  idList<AFCollision_t> collisions
+
+	//  bool changedAF // true on restore
+
+	savefile->WriteInt( squeezeGraceList.Num() ); //  idList<squeezeGraceRef_t> squeezeGraceList
+	for ( int idx = 0; idx < squeezeGraceList.Num(); idx++ ) {
+		savefile->WriteObject( squeezeGraceList[idx].ent );
+		savefile->WriteInt( squeezeGraceList[idx].timer );
 	}
+
+	savefile->WriteFloat( linearFriction ); //  float linearFriction
+	savefile->WriteFloat( angularFriction ); //  float angularFriction
+	savefile->WriteFloat( contactFriction ); //  float contactFriction
+	savefile->WriteFloat( bouncyness ); //  float bouncyness
+	savefile->WriteFloat( totalMass ); //  float totalMass
+	savefile->WriteFloat( forceTotalMass ); //  float forceTotalMass
+
+	savefile->WriteVec2( suspendVelocity ); //  idVec2 suspendVelocity
+	savefile->WriteVec2( suspendAcceleration ); //  idVec2 suspendAcceleration
+	savefile->WriteFloat( noMoveTime ); //  float noMoveTime
+	savefile->WriteFloat( noMoveTranslation ); //  float noMoveTranslation
+	savefile->WriteFloat( noMoveRotation ); //  float noMoveRotation
+	savefile->WriteFloat( minMoveTime ); //  float minMoveTime
+	savefile->WriteFloat( maxMoveTime ); //  float maxMoveTime
+	savefile->WriteFloat( impulseThreshold ); //  float impulseThreshold
+
+	savefile->WriteFloat( timeScale ); //  float timeScale
+	savefile->WriteFloat( timeScaleRampStart ); //  float timeScaleRampStart
+	savefile->WriteFloat( timeScaleRampEnd ); //  float timeScaleRampEnd
+
+	savefile->WriteFloat( jointFrictionScale ); //  float jointFrictionScale
+	savefile->WriteFloat( jointFrictionDent ); //  float jointFrictionDent
+	savefile->WriteFloat( jointFrictionDentStart ); //  float jointFrictionDentStart
+	savefile->WriteFloat( jointFrictionDentEnd ); //  float jointFrictionDentEnd
+	savefile->WriteFloat( jointFrictionDentScale ); //  float jointFrictionDentScale
+
+	savefile->WriteFloat( contactFrictionScale ); //  float contactFrictionScale
+	savefile->WriteFloat( contactFrictionDent ); //  float contactFrictionDent
+	savefile->WriteFloat( contactFrictionDentStart ); //  float contactFrictionDentStart
+	savefile->WriteFloat( contactFrictionDentEnd ); //  float contactFrictionDentEnd
+	savefile->WriteFloat( contactFrictionDentScale ); //  float contactFrictionDentScale
+
+	savefile->WriteBool( enableCollision ); //  bool enableCollision
+	savefile->WriteBool( selfCollision ); //  bool selfCollision
+	savefile->WriteBool( comeToRest ); //  bool comeToRest
+	savefile->WriteBool( linearTime ); //  bool linearTime
+	savefile->WriteBool( noImpact ); //  bool noImpact
+	savefile->WriteBool( worldConstraintsLocked ); //  bool worldConstraintsLocked
+	savefile->WriteBool( forcePushable ); //  bool forcePushable
+	idPhysics_AF_SavePState( savefile, current ); //  AFPState_t current
+	idPhysics_AF_SavePState( savefile, saved ); //  AFPState_t saved
+
+	savefile->WriteBool( masterBody != nullptr ); //  idAFBody * masterBody
 	if ( masterBody ) {
-		saveFile->WriteBool( true );
-		masterBody->Save( saveFile );
-	} else {
-		saveFile->WriteBool( false );
+		masterBody->Save( savefile );
 	}
 
-	saveFile->WriteInt( constraints.Num() );
-	for ( i = 0; i < constraints.Num(); i++ ) {
-		constraints[i]->Save( saveFile );
-	}
-
-	saveFile->WriteBool( changedAF );
-
-	saveFile->WriteFloat( linearFriction );
-	saveFile->WriteFloat( angularFriction );
-	saveFile->WriteFloat( contactFriction );
-	saveFile->WriteFloat( bouncyness );
-	saveFile->WriteFloat( totalMass );
-	saveFile->WriteFloat( forceTotalMass );
-
-	saveFile->WriteVec2( suspendVelocity );
-	saveFile->WriteVec2( suspendAcceleration );
-	saveFile->WriteFloat( noMoveTime );
-	saveFile->WriteFloat( noMoveTranslation );
-	saveFile->WriteFloat( noMoveRotation );
-	saveFile->WriteFloat( minMoveTime );
-	saveFile->WriteFloat( maxMoveTime );
-	saveFile->WriteFloat( impulseThreshold );
-
-	saveFile->WriteFloat( timeScale );
-	saveFile->WriteFloat( timeScaleRampStart );
-	saveFile->WriteFloat( timeScaleRampEnd );
-
-	saveFile->WriteFloat( jointFrictionScale );
-	saveFile->WriteFloat( jointFrictionDent );
-	saveFile->WriteFloat( jointFrictionDentStart );
-	saveFile->WriteFloat( jointFrictionDentEnd );
-	saveFile->WriteFloat( jointFrictionDentScale );
-
-	saveFile->WriteFloat( contactFrictionScale );
-	saveFile->WriteFloat( contactFrictionDent );
-	saveFile->WriteFloat( contactFrictionDentStart );
-	saveFile->WriteFloat( contactFrictionDentEnd );
-	saveFile->WriteFloat( contactFrictionDentScale );
-
-	saveFile->WriteBool( enableCollision );
-	saveFile->WriteBool( selfCollision );
-	saveFile->WriteBool( comeToRest );
-	saveFile->WriteBool( linearTime );
-	saveFile->WriteBool( noImpact );
-	saveFile->WriteBool( worldConstraintsLocked );
-	saveFile->WriteBool( forcePushable );
+	 //  idLCP * lcp // regened
 }
 
 /*
@@ -6863,75 +7084,97 @@ void idPhysics_AF::Save( idSaveGame *saveFile ) const {
 idPhysics_AF::Restore
 ================
 */
-void idPhysics_AF::Restore( idRestoreGame *saveFile ) {
-	int i, num;
-	bool hasMaster;
+void idPhysics_AF::Restore( idRestoreGame *savefile ) {
+	int num;
 
-	// the articulated figure structure should have already been restored
 
-	idPhysics_AF_RestorePState( saveFile, current );
-	idPhysics_AF_RestorePState( saveFile, saved );
+	Evaluate(0.0f,0.0f);
 
-	saveFile->ReadInt( num );
-	assert( num == bodies.Num() );
-	for ( i = 0; i < bodies.Num(); i++ ) {
-		bodies[i]->Restore( saveFile );
+	// blendo eric: will be restored by Evaluate() / BuildTrees()
+	// the articulated figure structure is handled by the owner
+
+	//  idList<idAFTree *> trees
+	//  idList<idAFBody *> bodies
+
+	//savefile->ReadInt( bodies.Num() ); //  idList<idAFBody *> bodies
+	// assert(bodies.Num()) == num);
+	//for ( int i = 0; i < bodies.Num(); i++ ) {
+	//	bodies[i]->Restore( savefile );
+	//}
+
+	//savefile->ReadInt( num ); // will be restored by Evaluate() / BuildTrees()
+	//assert(constraints.Num() == num);
+	//for ( int i = 0; i < num; i++ ) {
+	//	constraints[i]->Restore( savefile );
+	//}
+
+	//  idList<idAFConstraint *>primaryConstraints // blendo eric: rebuilt
+	//  idList<idAFConstraint *>auxiliaryConstraints  // blendo eric: rebuilt
+	// idList<idAFConstraint *>frameConstraints // blendo eric: rebuilt
+	// idList<idAFConstraint_Contact *>contactConstraints // blendo eric: rebuilt
+	// SaveFileReadArray(contactBodies, ReadInt );
+	// idList<AFCollision_t>	collisions; //  idList<AFCollision_t> collisions
+
+	changedAF = true; //  bool changedAF // always true
+
+	savefile->ReadInt( num ); //  idList<squeezeGraceRef_t> squeezeGraceList
+	squeezeGraceList.SetNum( num );
+	for ( int idx = 0; idx < squeezeGraceList.Num(); idx++ ) {
+		savefile->ReadObject( squeezeGraceList[idx].ent );
+		savefile->ReadInt( squeezeGraceList[idx].timer );
 	}
-	saveFile->ReadBool( hasMaster );
-	if ( hasMaster ) {
+
+	savefile->ReadFloat( linearFriction ); //  float linearFriction
+	savefile->ReadFloat( angularFriction ); //  float angularFriction
+	savefile->ReadFloat( contactFriction ); //  float contactFriction
+	savefile->ReadFloat( bouncyness ); //  float bouncyness
+	savefile->ReadFloat( totalMass ); //  float totalMass
+	savefile->ReadFloat( forceTotalMass ); //  float forceTotalMass
+
+	savefile->ReadVec2( suspendVelocity ); //  idVec2 suspendVelocity
+	savefile->ReadVec2( suspendAcceleration ); //  idVec2 suspendAcceleration
+	savefile->ReadFloat( noMoveTime ); //  float noMoveTime
+	savefile->ReadFloat( noMoveTranslation ); //  float noMoveTranslation
+	savefile->ReadFloat( noMoveRotation ); //  float noMoveRotation
+	savefile->ReadFloat( minMoveTime ); //  float minMoveTime
+	savefile->ReadFloat( maxMoveTime ); //  float maxMoveTime
+	savefile->ReadFloat( impulseThreshold ); //  float impulseThreshold
+
+	savefile->ReadFloat( timeScale ); //  float timeScale
+	savefile->ReadFloat( timeScaleRampStart ); //  float timeScaleRampStart
+	savefile->ReadFloat( timeScaleRampEnd ); //  float timeScaleRampEnd
+
+	savefile->ReadFloat( jointFrictionScale ); //  float jointFrictionScale
+	savefile->ReadFloat( jointFrictionDent ); //  float jointFrictionDent
+	savefile->ReadFloat( jointFrictionDentStart ); //  float jointFrictionDentStart
+	savefile->ReadFloat( jointFrictionDentEnd ); //  float jointFrictionDentEnd
+	savefile->ReadFloat( jointFrictionDentScale ); //  float jointFrictionDentScale
+
+	savefile->ReadFloat( contactFrictionScale ); //  float contactFrictionScale
+	savefile->ReadFloat( contactFrictionDent ); //  float contactFrictionDent
+	savefile->ReadFloat( contactFrictionDentStart ); //  float contactFrictionDentStart
+	savefile->ReadFloat( contactFrictionDentEnd ); //  float contactFrictionDentEnd
+	savefile->ReadFloat( contactFrictionDentScale ); //  float contactFrictionDentScale
+
+	savefile->ReadBool( enableCollision ); //  bool enableCollision
+	savefile->ReadBool( selfCollision ); //  bool selfCollision
+	savefile->ReadBool( comeToRest ); //  bool comeToRest
+	savefile->ReadBool( linearTime ); //  bool linearTime
+	savefile->ReadBool( noImpact ); //  bool noImpact
+	savefile->ReadBool( worldConstraintsLocked ); //  bool worldConstraintsLocked
+	savefile->ReadBool( forcePushable ); //  bool forcePushable
+	idPhysics_AF_RestorePState( savefile, current ); //  AFPState_t current
+	idPhysics_AF_RestorePState( savefile, saved ); //  AFPState_t saved
+
+	bool masterBodyExists;
+	savefile->ReadBool( masterBodyExists ); //  idAFBody * masterBody
+	if ( masterBodyExists ) {
+		delete masterBody;
 		masterBody = new idAFBody();
-		masterBody->Restore( saveFile );
+		masterBody->Restore( savefile );
 	}
 
-	saveFile->ReadInt( num );
-	assert( num == constraints.Num() );
-	for ( i = 0; i < constraints.Num(); i++ ) {
-		constraints[i]->Restore( saveFile );
-	}
-
-	saveFile->ReadBool( changedAF );
-
-	saveFile->ReadFloat( linearFriction );
-	saveFile->ReadFloat( angularFriction );
-	saveFile->ReadFloat( contactFriction );
-	saveFile->ReadFloat( bouncyness );
-	saveFile->ReadFloat( totalMass );
-	saveFile->ReadFloat( forceTotalMass );
-
-	saveFile->ReadVec2( suspendVelocity );
-	saveFile->ReadVec2( suspendAcceleration );
-	saveFile->ReadFloat( noMoveTime );
-	saveFile->ReadFloat( noMoveTranslation );
-	saveFile->ReadFloat( noMoveRotation );
-	saveFile->ReadFloat( minMoveTime );
-	saveFile->ReadFloat( maxMoveTime );
-	saveFile->ReadFloat( impulseThreshold );
-
-	saveFile->ReadFloat( timeScale );
-	saveFile->ReadFloat( timeScaleRampStart );
-	saveFile->ReadFloat( timeScaleRampEnd );
-
-	saveFile->ReadFloat( jointFrictionScale );
-	saveFile->ReadFloat( jointFrictionDent );
-	saveFile->ReadFloat( jointFrictionDentStart );
-	saveFile->ReadFloat( jointFrictionDentEnd );
-	saveFile->ReadFloat( jointFrictionDentScale );
-
-	saveFile->ReadFloat( contactFrictionScale );
-	saveFile->ReadFloat( contactFrictionDent );
-	saveFile->ReadFloat( contactFrictionDentStart );
-	saveFile->ReadFloat( contactFrictionDentEnd );
-	saveFile->ReadFloat( contactFrictionDentScale );
-
-	saveFile->ReadBool( enableCollision );
-	saveFile->ReadBool( selfCollision );
-	saveFile->ReadBool( comeToRest );
-	saveFile->ReadBool( linearTime );
-	saveFile->ReadBool( noImpact );
-	saveFile->ReadBool( worldConstraintsLocked );
-	saveFile->ReadBool( forcePushable );
-
-	changedAF = true;
+	//  idLCP * lcp // regened
 
 	UpdateClipModels();
 }

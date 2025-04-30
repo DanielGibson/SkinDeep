@@ -46,14 +46,46 @@ void idGameblock::Spawn(void)
 
 void idGameblock::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteVec3( startPos ); // idVec3 startPos
+	savefile->WriteAngles( startAngle ); // idAngles startAngle
+
+	savefile->WriteVec3( targetPos ); // idVec3 targetPos
+	savefile->WriteAngles( targetAngle ); // idAngles targetAngle
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteFloat( distanceToPlayerEye ); // float distanceToPlayerEye
 }
 
 void idGameblock::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadVec3( startPos ); // idVec3 startPos
+	savefile->ReadAngles( startAngle ); // idAngles startAngle
+
+	savefile->ReadVec3( targetPos ); // idVec3 targetPos
+	savefile->ReadAngles( targetAngle ); // idAngles targetAngle
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadFloat( distanceToPlayerEye ); // float distanceToPlayerEye
 }
 
 void idGameblock::Think(void)
 {
+	// SW 3rd March 2025
+	// This is the event that tells the game gui to update its state.
+	// The key here is that the game *will not* update if the game block itself can't think.
+	// So the game doesn't update if time is stopped (e.g. if the player is in the pause menu)
+	if (this->renderEntity.gui[0])
+	{
+		this->renderEntity.gui[0]->HandleNamedEvent("updateGame");
+	}
+	
+
 	if (state == GB_RAISINGUP)
 	{
 		float lerpAmount = (gameLocal.time - stateTimer) / (float)GB_RAISETIME;
@@ -75,7 +107,7 @@ void idGameblock::Think(void)
 			state = GB_UP;
 			gameLocal.GetLocalPlayer()->Event_setPlayerFrozen(0);
 			Event_SetGuiInt("noninteractive", 0); //is now fully up. make it interactive.
-			StartSound("snd_music", SND_CHANNEL_BODY2); // Start game music
+			StartSound("snd_music", SND_CHANNEL_MUSIC); // Start game music
 			distanceToPlayerEye = GetDistanceFromBlock();
 		}
 	}
@@ -123,7 +155,7 @@ void idGameblock::Think(void)
 		{
 			state = GB_IDLE;
 			isFrobbable = true;
-			StopSound(SND_CHANNEL_BODY2, 0); // Stop game music
+			StopSound(SND_CHANNEL_MUSIC, 0); // Stop game music
 		}
 	}
 

@@ -65,7 +65,7 @@ public:
 
 	void			Spawn( void );
 
-	void			Save( idSaveGame *savefile ) const;					// archives object for save game file
+	void			Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void			Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
 	virtual void	UpdateChangeableSpawnArgs( const idDict *source );

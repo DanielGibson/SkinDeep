@@ -95,18 +95,23 @@ void idVacuumSpline::Spawn()
 	gameLocal.SpawnEntityDef(args, &mover);
 	if (!mover)
 	{
-		common->Error("idCameraView %s failed to spawn mover.\n", GetName());
+		common->Error("idVacuumSpline %s failed to spawn mover.\n", GetName());
 		return;
 	}		
 	mover->SetOrigin(splineEnt->GetPhysics()->GetOrigin());	
 
-	//make player duck when on the vacuum spline.
+	// SW 17th Feb 2025: Because the mover isn't guaranteed to stay inside the world,
+	// we can't just bind the player to it. We have to use a bespoke function here.
 	if (is_player)
 	{
 		gameLocal.GetLocalPlayer()->ForceDuck(100);
+		gameLocal.GetLocalPlayer()->SetBeingVacuumSplined(true, static_cast<idMover*>(mover));
 	}
-
-	targetActor.GetEntity()->Bind(mover, false);
+	else
+	{
+		targetActor.GetEntity()->Bind(mover, false);
+	}
+	
 	((idMover *)mover)->Event_DisableSplineAngles();
 	((idMover *)mover)->Event_StartSpline(splineEnt);
 
@@ -118,17 +123,48 @@ void idVacuumSpline::Spawn()
 	state = VS_VACUUMING;
 }
 
+void idVacuumSpline::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( state ); // int state
+	savefile->WriteObject( targetActor ); // idEntityPtr<idEntity> targetActor
+
+	savefile->WriteBool( spline != nullptr ); // idCurve_Spline<idVec3> * spline
+
+	savefile->WriteCurve(spline); // idCurve_Spline<idVec3> * spline
+
+	savefile->WriteObject( mover ); // idEntity * mover
+
+	savefile->WriteInt( startTime ); // int startTime
+	savefile->WriteObject( splineEnt ); // idEntity * splineEnt
+	savefile->WriteVec3( flingDirection ); // idVec3 flingDirection
+	savefile->WriteBool( is_player ); // bool is_player
+}
+void idVacuumSpline::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( state ); // int state
+	savefile->ReadObject( targetActor ); // idEntityPtr<idEntity> targetActor
+
+	savefile->ReadCurve(spline); // idCurve_Spline<idVec3> * spline
+
+	savefile->ReadObject( mover ); // idEntity * mover
+
+	savefile->ReadInt( startTime ); // int startTime
+	savefile->ReadObject( splineEnt ); // idEntity * splineEnt
+	savefile->ReadVec3( flingDirection ); // idVec3 flingDirection
+	savefile->ReadBool( is_player ); // bool is_player
+}
 
 void idVacuumSpline::Think(void)
 {
 	if (state == VS_VACUUMING)
 	{
-		if (!gameLocal.GetAirlessAtPoint(mover->GetPhysics()->GetOrigin()))
+		// SW 17th Feb 2025: do not detach if there is no location at this point
+		// (this should prevent the mover from trapping the player if it accidentally moves inside a wall, as it occasionally does)
+		if (!gameLocal.GetAirlessAtPoint(mover->GetPhysics()->GetOrigin()) && gameLocal.LocationForPoint(mover->GetPhysics()->GetOrigin()))
 		{
 			Detach();
 		}
-
-		if (gameLocal.time >= startTime + (int)(MOVETIME * 1000.0f) )
+		else if (gameLocal.time >= startTime + (int)(MOVETIME * 1000.0f) )
 		{
 			//End of the move.
 			Detach();
@@ -140,6 +176,14 @@ void idVacuumSpline::Think(void)
 void idVacuumSpline::Detach()
 {
 	state = VS_DONE;
-	targetActor.GetEntity()->Unbind();
+	if (is_player)
+	{
+		gameLocal.GetLocalPlayer()->SetBeingVacuumSplined(false, NULL);
+	}
+	else
+	{
+		targetActor.GetEntity()->Unbind();
+	}
+	
 	this->PostEventMS(&EV_Remove, 0);
 }

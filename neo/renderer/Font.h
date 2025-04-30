@@ -55,10 +55,12 @@ public:
 	void GetScaledGlyph( float scale, uint32 idx, scaledGlyphInfo_t & glyphInfo ) const;
 
 	static const char * DEFAULT_FONT;
+
+	const idFont* GetAlias() const { return alias; }
+	int	GetGlyphIndex(uint32 idx) const;
+
 private:
 	static idFont * RemapFont( const char * baseName );
-
-	int	GetGlyphIndex( uint32 idx ) const;
 
 	bool LoadFont();
 

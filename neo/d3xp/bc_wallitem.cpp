@@ -51,10 +51,14 @@ void idWallItem::Spawn(void)
 
 void idWallItem::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( targetTimer ); // int targetTimer
 }
 
 void idWallItem::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( targetTimer ); // int targetTimer
 }
 
 void idWallItem::Think(void)

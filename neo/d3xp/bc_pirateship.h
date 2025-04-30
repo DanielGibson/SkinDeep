@@ -11,7 +11,7 @@ public:
 							idPirateship(void);
 	virtual					~idPirateship(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -33,10 +33,10 @@ private:
 	void					DestroyAccumulatorsInRoom(idLocationEntity *locationEnt);
 
 
-	idFuncEmitter			*boosterEmitter[2];
+	idFuncEmitter			*boosterEmitter[2] = {};
 
-	idBeam*					wireOrigin;
-	idBeam*					wireTarget;
+	idBeam*					wireOrigin = nullptr;
+	idBeam*					wireTarget = nullptr;
 
     int                     state;
     enum                   
@@ -62,7 +62,7 @@ private:
     idEntityPtr<idEntity>   airlockEnt;
     idEntity                *FindMyAirlock();
 
-    idEntity *              openFrobcube;
+    idEntity *              openFrobcube = nullptr;
 
     int                     smokegrenadeCounter;
     int                     smokegrenadeTimer;
@@ -73,10 +73,10 @@ private:
 	idList<int>				spawnList;
 	bool					SpawnPersonInAirlockViaEntNum(int idx);
 
-	const idDeclParticle *	smoketrail;
+	const idDeclParticle *	smoketrail = nullptr;
 	int						smoketrailFlyTime;
 
-	idEntity				*ftlPortal;
+	idEntity				*ftlPortal = nullptr;
 	int						portalFadeTimer;
 	bool					portalActive;
 
@@ -87,7 +87,7 @@ private:
 
 	int						keylocationTimer;
 	void					UpdateKeyLocation();
-	idEntity				*dynatipEnt;
+	idEntity				*dynatipEnt = nullptr;
 
 
 	idVec3					GetAirlockClearPosition();

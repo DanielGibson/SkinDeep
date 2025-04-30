@@ -169,6 +169,7 @@ void idClipModel::SaveTraceModels( idSaveGame *savefile ) {
 		savefile->WriteFloat( entry->volume );
 		savefile->WriteVec3( entry->centerOfMass );
 		savefile->WriteMat3( entry->inertiaTensor );
+		savefile->WriteInt( entry->refCount );
 	}
 }
 
@@ -193,7 +194,8 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 		savefile->ReadFloat( entry->volume );
 		savefile->ReadVec3( entry->centerOfMass );
 		savefile->ReadMat3( entry->inertiaTensor );
-		entry->refCount = 0;
+		savefile->ReadInt( entry->refCount );
+		//entry->refCount = 0;
 
 		traceModelCache[i] = entry;
 		traceModelHash.Add( GetTraceModelHashKey( entry->trm ), i );
@@ -272,10 +274,11 @@ idClipModel::Init
 ================
 */
 void idClipModel::Init( void ) {
+	entity = new idEntityPtr<idEntity>();
+	owner = new idEntityPtr<idEntity>();
+
 	enabled = true;
-	entity = NULL;
 	id = 0;
-	owner = NULL;
 	origin.Zero();
 	axis.Identity();
 	bounds.Zero();
@@ -335,10 +338,13 @@ idClipModel::idClipModel
 ================
 */
 idClipModel::idClipModel( const idClipModel *model ) {
+	entity = new idEntityPtr<idEntity>();
+	owner = new idEntityPtr<idEntity>();
+	*owner = model->owner->GetEntity();
+	*entity = model->entity->GetEntity();
+
 	enabled = model->enabled;
-	entity = model->entity;
 	id = model->id;
-	owner = model->owner;
 	origin = model->origin;
 	axis = model->axis;
 	bounds = model->bounds;
@@ -366,6 +372,12 @@ idClipModel::~idClipModel( void ) {
 	if ( traceModelIndex != -1 ) {
 		FreeTraceModel( traceModelIndex );
 	}
+
+	material = NULL;
+	clipLinks = NULL;
+
+	delete entity; // idEntityPtr<idEntity>
+	delete owner; // idEntityPtr<idEntity>
 }
 
 /*
@@ -374,25 +386,26 @@ idClipModel::Save
 ================
 */
 void idClipModel::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( enabled );
-	savefile->WriteObject( entity );
-	savefile->WriteInt( id );
-	savefile->WriteObject( owner );
-	savefile->WriteVec3( origin );
-	savefile->WriteMat3( axis );
-	savefile->WriteBounds( bounds );
-	savefile->WriteBounds( absBounds );
-	savefile->WriteMaterial( material );
-	savefile->WriteInt( contents );
-	if ( collisionModelHandle >= 0 ) {
+	savefile->WriteBool( enabled ); // bool enabled
+	savefile->WriteObject( *entity ); // idEntity * entity
+	savefile->WriteInt( id ); // int id
+	savefile->WriteObject( *owner ); // idEntity * owner
+	savefile->WriteVec3( origin ); // idVec3 origin
+	savefile->WriteMat3( axis ); // idMat3 axis
+	savefile->WriteBounds( bounds ); // idBounds bounds
+	savefile->WriteBounds( absBounds ); // idBounds absBounds
+	savefile->WriteMaterial( material ); // const idMaterial * material
+	savefile->WriteInt( contents ); // int contents
+	if ( collisionModelHandle >= 0 ) { // cmHandle_t collisionModelHandle
 		savefile->WriteString( collisionModelManager->GetModelName( collisionModelHandle ) );
 	} else {
 		savefile->WriteString( "" );
 	}
-	savefile->WriteInt( traceModelIndex );
-	savefile->WriteInt( renderModelHandle );
-	savefile->WriteBool( clipLinks != NULL );
-	savefile->WriteInt( touchCount );
+	savefile->WriteInt( traceModelIndex ); // int traceModelIndex
+	savefile->WriteInt( renderModelHandle ); // int renderModelHandle
+
+	savefile->WriteBool( clipLinks != NULL ); // struct clipLink_s * clipLinks;
+	savefile->WriteInt( touchCount ); // int touchCount
 }
 
 /*
@@ -404,29 +417,35 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	idStr collisionModelName;
 	bool linked;
 
-	savefile->ReadBool( enabled );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( entity ) );
-	savefile->ReadInt( id );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( owner ) );
-	savefile->ReadVec3( origin );
-	savefile->ReadMat3( axis );
-	savefile->ReadBounds( bounds );
-	savefile->ReadBounds( absBounds );
-	savefile->ReadMaterial( material );
-	savefile->ReadInt( contents );
-	savefile->ReadString( collisionModelName );
+	savefile->ReadBool( enabled ); // bool enabled
+	savefile->ReadObject( *entity ); // idEntity * entity
+	savefile->ReadInt( id ); // int id
+	savefile->ReadObject( *owner ); // idEntity * owner
+	savefile->ReadVec3( origin ); // idVec3 origin
+	savefile->ReadMat3( axis ); // idMat3 axis
+	savefile->ReadBounds( bounds ); // idBounds bounds
+	savefile->ReadBounds( absBounds ); // idBounds absBounds
+	savefile->ReadMaterial( material ); // const idMaterial * material
+	savefile->ReadInt( contents ); // int contents
+
+	savefile->ReadString( collisionModelName ); // cmHandle_t collisionModelHandle
 	if ( collisionModelName.Length() ) {
 		collisionModelHandle = collisionModelManager->LoadModel( collisionModelName, false );
 	} else {
 		collisionModelHandle = -1;
 	}
-	savefile->ReadInt( traceModelIndex );
-	if ( traceModelIndex >= 0 ) {
-		traceModelCache[traceModelIndex]->refCount++;
-	}
-	savefile->ReadInt( renderModelHandle );
-	savefile->ReadBool( linked );
-	savefile->ReadInt( touchCount );
+
+	savefile->ReadInt( traceModelIndex ); // int traceModelIndex
+	//if (traceModelIndex >= 0 && traceModelIndex < traceModelCache.Num() ) {
+	//	traceModelCache[traceModelIndex]->refCount++;
+	//}
+	//else {
+	//	traceModelIndex = -1;
+	//}
+	savefile->ReadInt( renderModelHandle ); // int renderModelHandle
+
+	savefile->ReadBool( linked ); // struct clipLink_s * clipLinks;
+	savefile->ReadInt( touchCount ); // int touchCount
 
 	// the render model will be set when the clip model is linked
 	renderModelHandle = -1;
@@ -434,8 +453,25 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	touchCount = -1;
 
 	if ( linked ) {
-		Link( gameLocal.clip, entity, id, origin, axis, renderModelHandle );
+		Link( gameLocal.clip, GetEntity(), id, origin, axis, renderModelHandle );
 	}
+}
+
+
+void idClipModel::SetOwner( idEntity *newOwner ) {
+	*owner = newOwner;
+}
+
+idEntity *idClipModel::GetOwner( void ) const {
+	return owner->GetEntity();
+}
+
+void idClipModel::SetEntity( idEntity *newEntity ) {
+	*entity = newEntity;
+}
+
+idEntity *idClipModel::GetEntity( void ) const {
+	return entity->GetEntity();
 }
 
 /*
@@ -464,7 +500,7 @@ cmHandle_t idClipModel::Handle( void ) const {
 		return collisionModelManager->SetupTrmModel( *GetCachedTraceModel( traceModelIndex ), material );
 	} else {
 		// this happens in multiplayer on the combat models
-		gameLocal.Warning( "idClipModel::Handle: clip model %d on '%s' (%x) is not a collision or trace model", id, entity->name.c_str(), entity->entityNumber );
+		gameLocal.Warning( "idClipModel::Handle: clip model %d on '%s' (%x) is not a collision or trace model", id, GetEntity()->name.c_str(), GetEntity()->entityNumber );
 		return 0;
 	}
 }
@@ -476,7 +512,7 @@ idClipModel::GetMassProperties
 */
 void idClipModel::GetMassProperties( const float density, float &mass, idVec3 &centerOfMass, idMat3 &inertiaTensor ) const {
 	if ( traceModelIndex == -1 ) {
-		gameLocal.Error( "idClipModel::GetMassProperties: clip model %d on '%s' is not a trace model\n", id, entity->name.c_str() );
+		gameLocal.Error( "idClipModel::GetMassProperties: clip model %d on '%s' is not a trace model\n", id, GetEntity()->name.c_str() );
 	}
 
 	trmCache_t *entry = traceModelCache[traceModelIndex];
@@ -584,7 +620,7 @@ idClipModel::Link
 */
 void idClipModel::Link( idClip &clp, idEntity *ent, int newId, const idVec3 &newOrigin, const idMat3 &newAxis, int renderModelHandle ) {
 
-	this->entity = ent;
+	SetEntity( ent );
 	this->id = newId;
 	this->origin = newOrigin;
 	this->axis = newAxis;
@@ -760,7 +796,9 @@ void idClip::ClipModelsTouchingBounds_r( const struct clipSector_s *node, listPa
 		}
 	}
 
-	for ( clipLink_t *link = node->clipLinks; link; link = link->nextInSector ) {
+	// blendo eric: just check the parms.maxcount every iter before doing calc
+	// TODO this is an optimization target, quitting out early should be handled by callee more appropriately
+	for ( clipLink_t *link = node->clipLinks; link && parms.count < parms.maxCount; link = link->nextInSector ) {
 		idClipModel	*check = link->clipModel;
 
 		// if the clip model is enabled
@@ -788,10 +826,12 @@ void idClip::ClipModelsTouchingBounds_r( const struct clipSector_s *node, listPa
 			continue;
 		}
 
-		if ( parms.count >= parms.maxCount ) {
-			gameLocal.Warning( "idClip::ClipModelsTouchingBounds_r: max count" );
-			return;
-		}
+		//// blendo eric: the warning seems unnecessary, should also change calls to quit out early
+		//if ( parms.count >= parms.maxCount ) {
+		//
+		//	 gameLocal.Warning( "idClip::ClipModelsTouchingBounds_r: max count" ); 
+		//	return;
+		//}
 
 		check->touchCount = touchCount;
 		parms.list[parms.count] = check;
@@ -843,7 +883,7 @@ int idClip::EntitiesTouchingBounds( const idBounds &bounds, int contentMask, idE
 	for ( i = 0; i < count; i++ ) {
 		// entity could already be in the list because an entity can use multiple clip models
 		for ( j = 0; j < entCount; j++ ) {
-			if ( entityList[j] == clipModelList[i]->entity ) {
+			if ( entityList[j] == clipModelList[i]->GetEntity() ) {
 				break;
 			}
 		}
@@ -852,7 +892,7 @@ int idClip::EntitiesTouchingBounds( const idBounds &bounds, int contentMask, idE
 				gameLocal.Warning( "idClip::EntitiesTouchingBounds: max count" );
 				return entCount;
 			}
-			entityList[entCount] = clipModelList[i]->entity;
+			entityList[entCount] = clipModelList[i]->GetEntity();
 			entCount++;
 		}
 	}
@@ -893,14 +933,14 @@ int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const i
 		cm = clipModelList[i];
 
 		// check if we should ignore this entity
-		if ( cm->entity == passEntity ) {
+		if ( cm->GetEntity() == passEntity ) {
 			clipModelList[i] = NULL;			// don't clip against the pass entity
-		} else if ( cm->entity == passOwner ) {
+		} else if ( cm->GetEntity() == passOwner ) {
 			clipModelList[i] = NULL;			// missiles don't clip with their owner
-		} else if ( cm->owner ) {
-			if ( cm->owner == passEntity ) {
+		} else if ( cm->GetOwner() ) {
+			if ( cm->GetOwner() == passEntity ) {
 				clipModelList[i] = NULL;		// don't clip against own missiles
-			} else if ( cm->owner == passOwner ) {
+			} else if ( cm->GetOwner() == passOwner ) {
 				clipModelList[i] = NULL;		// don't clip against other missiles from same owner
 			}
 		}
@@ -1045,7 +1085,7 @@ void idClip::TranslationEntities( trace_t &results, const idVec3 &start, const i
 
 		if ( trace.fraction < results.fraction ) {
 			results = trace;
-			results.c.entityNum = touch->entity->entityNumber;
+			results.c.entityNum = touch->GetEntity()->entityNumber;
 			results.c.id = touch->id;
 			if ( results.fraction == 0.0f ) {
 				break;
@@ -1117,7 +1157,7 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 
 		if ( trace.fraction < results.fraction ) {
 			results = trace;
-			results.c.entityNum = touch->entity->entityNumber;
+			results.c.entityNum = touch->GetEntity()->entityNumber;
 			results.c.id = touch->id;
 			if ( results.fraction == 0.0f ) {
 				break;
@@ -1184,7 +1224,7 @@ bool idClip::Rotation( trace_t &results, const idVec3 &start, const idRotation &
 
 		if ( trace.fraction < results.fraction ) {
 			results = trace;
-			results.c.entityNum = touch->entity->entityNumber;
+			results.c.entityNum = touch->GetEntity()->entityNumber;
 			results.c.id = touch->id;
 			if ( results.fraction == 0.0f ) {
 				break;
@@ -1283,7 +1323,7 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 
 			if ( trace.fraction < translationalTrace.fraction ) {
 				translationalTrace = trace;
-				translationalTrace.c.entityNum = touch->entity->entityNumber;
+				translationalTrace.c.entityNum = touch->GetEntity()->entityNumber;
 				translationalTrace.c.id = touch->id;
 				if ( translationalTrace.fraction == 0.0f ) {
 					break;
@@ -1335,7 +1375,7 @@ bool idClip::Motion( trace_t &results, const idVec3 &start, const idVec3 &end, c
 
 			if ( trace.fraction < rotationalTrace.fraction ) {
 				rotationalTrace = trace;
-				rotationalTrace.c.entityNum = touch->entity->entityNumber;
+				rotationalTrace.c.entityNum = touch->GetEntity()->entityNumber;
 				rotationalTrace.c.id = touch->id;
 				if ( rotationalTrace.fraction == 0.0f ) {
 					break;
@@ -1414,7 +1454,7 @@ int idClip::Contacts( contactInfo_t *contacts, const int maxContacts, const idVe
 									touch->Handle(), touch->origin, touch->axis, ignoreContentMask );
 
 		for ( j = 0; j < n; j++ ) {
-			contacts[numContacts].entityNum = touch->entity->entityNumber;
+			contacts[numContacts].entityNum = touch->GetEntity()->entityNumber;
 			contacts[numContacts].id = touch->id;
 			numContacts++;
 		}

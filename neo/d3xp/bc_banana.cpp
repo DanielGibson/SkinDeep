@@ -24,10 +24,14 @@ END_CLASS
 
 void idBanana::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( spawnTime ); //  int spawnTime
+	savefile->WriteBool( hasBecomePeel ); //  bool hasBecomePeel
 }
 
 void idBanana::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( spawnTime ); //  int spawnTime
+	savefile->ReadBool( hasBecomePeel ); //  bool hasBecomePeel
 }
 
 void idBanana::Spawn(void)

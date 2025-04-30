@@ -69,10 +69,14 @@ void idExteriorStrut::Event_PostSpawn(void)
 
 void idExteriorStrut::Save(idSaveGame *savefile) const
 {
+	savefile->WriteJoint( armJoint ); //  saveJoint_t armJoint
+	savefile->WriteObject( nullEnt ); //  idEntity * nullEnt
 }
 
 void idExteriorStrut::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadJoint( armJoint ); //  saveJoint_t armJoint
+	savefile->ReadObject( nullEnt ); //  idEntity * nullEnt
 }
 
 void idExteriorStrut::Think(void)

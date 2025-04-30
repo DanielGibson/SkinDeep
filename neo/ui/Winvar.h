@@ -29,7 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __WINVAR_H__
 #define __WINVAR_H__
 
-#include "framework/File.h"
+#include "gamesys/SaveGame.h"
 #include "ui/Rectangle.h"
 
 extern const char *VAR_GUIPREFIX;
@@ -74,8 +74,8 @@ public:
 	virtual const char *c_str() const = 0;
 	virtual size_t Size() {	size_t sz = (name) ? strlen(name) : 0; return sz + sizeof(*this); }
 
-	virtual void WriteToSaveGame( idFile *savefile ) = 0;
-	virtual void ReadFromSaveGame( idFile *savefile ) = 0;
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const = 0;
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) = 0;
 
 	virtual float x( void ) const = 0;
 
@@ -134,11 +134,11 @@ public:
 	virtual const char *c_str() const {return va("%i", data); }
 
 	// SaveGames
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 		savefile->Write( &data, sizeof( data ) );
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
 	}
@@ -225,7 +225,7 @@ public:
 	}
 
 	// SaveGames
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 
 		int len = data.Length();
@@ -233,8 +233,10 @@ public:
 		if ( len > 0 ) {
 			savefile->Write( data.c_str(), len );
 		}
+
+		savefile->WriteCheckSizeMarker();
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 
 		int len;
@@ -243,6 +245,8 @@ public:
 			data.Fill( ' ', len );
 			savefile->Read( &data[0], len );
 		}
+
+		savefile->ReadCheckSizeMarker();
 	}
 
 	// return wether string is emtpy
@@ -295,13 +299,17 @@ public:
 	}
 
 	// SaveGames
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 		savefile->Write( &data, sizeof( data ) );
+
+		savefile->WriteCheckSizeMarker();
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
+
+		savefile->ReadCheckSizeMarker();
 	}
 
 	// no suitable conversion
@@ -352,13 +360,17 @@ public:
 		return va("%f", data);
 	}
 
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 		savefile->Write( &data, sizeof( data ) );
+
+		savefile->WriteCheckSizeMarker();
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
+
+		savefile->ReadCheckSizeMarker();
 	}
 
 	virtual float x( void ) const { return data; };
@@ -460,13 +472,17 @@ public:
 		return data.ToVec4().ToString();
 	}
 
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 		savefile->Write( &data, sizeof( data ) );
+
+		savefile->WriteCheckSizeMarker();
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
+
+		savefile->ReadCheckSizeMarker();
 	}
 
 protected:
@@ -531,11 +547,11 @@ public:
 		data.Zero();
 	}
 
-	virtual void WriteToSaveGame( idFile *savefile ) {
-		savefile->Write( &eval, sizeof( eval ) );
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
+		savefile->Write( &eval, sizeof( eval ) ); 
 		savefile->Write( &data, sizeof( data ) );
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
 	}
@@ -619,13 +635,17 @@ public:
 		return data.ToVec3();
 	}
 
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 		savefile->Write( &data, sizeof( data ) );
+
+		savefile->WriteCheckSizeMarker();
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
+
+		savefile->ReadCheckSizeMarker();
 	}
 
 protected:
@@ -696,13 +716,17 @@ public:
 		}
 	}
 
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 		savefile->Write( &data, sizeof( data ) );
+
+		savefile->WriteCheckSizeMarker();
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 		savefile->Read( &data, sizeof( data ) );
+
+		savefile->ReadCheckSizeMarker();
 	}
 
 protected:
@@ -807,7 +831,7 @@ public:
 		mat = m;
 	}
 
-	virtual void WriteToSaveGame( idFile *savefile ) {
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const {
 		savefile->Write( &eval, sizeof( eval ) );
 
 		int len = data.Length();
@@ -816,7 +840,7 @@ public:
 			savefile->Write( data.c_str(), len );
 		}
 	}
-	virtual void ReadFromSaveGame( idFile *savefile ) {
+	virtual void ReadFromSaveGame( idRestoreGame *savefile ) {
 		savefile->Read( &eval, sizeof( eval ) );
 
 		int len;

@@ -57,6 +57,8 @@ const int SNAPNECK_FROBINDEX = 0;
 #include "SmokeParticles.h"
 #include "Misc.h"
 
+#include "idlib/LangDict.h"
+
 #include "bc_ventdoor.h"
 #include "bc_meta.h"
 #include "bc_frobcube.h"
@@ -67,6 +69,9 @@ const int SNAPNECK_FROBINDEX = 0;
 #include "bc_enemyspawnpoint.h"
 
 #include "ai/AI.h"
+#include "bc_ftl.h"
+#include "WorldSpawn.h"
+
 
 static const char *moveCommandString[ NUM_MOVE_COMMANDS ] = {
 	"MOVE_NONE",
@@ -119,25 +124,25 @@ idMoveState::Save
 =====================
 */
 void idMoveState::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( (int)moveType );
-	savefile->WriteInt( (int)moveCommand );
-	savefile->WriteInt( (int)moveStatus );
-	savefile->WriteVec3( moveDest );
-	savefile->WriteVec3( moveDir );
-	goalEntity.Save( savefile );
-	savefile->WriteVec3( goalEntityOrigin );
-	savefile->WriteInt( toAreaNum );
-	savefile->WriteInt( startTime );
-	savefile->WriteInt( duration );
-	savefile->WriteFloat( speed );
-	savefile->WriteFloat( range );
-	savefile->WriteFloat( wanderYaw );
-	savefile->WriteInt( nextWanderTime );
-	savefile->WriteInt( blockTime );
-	obstacle.Save( savefile );
-	savefile->WriteVec3( lastMoveOrigin );
-	savefile->WriteInt( lastMoveTime );
-	savefile->WriteInt( anim );
+	savefile->WriteInt( (int)moveType ); // moveType_t moveType
+	savefile->WriteInt( (int)moveCommand ); // moveCommand_t moveCommand
+	savefile->WriteInt( (int)moveStatus ); // moveStatus_t moveStatus
+	savefile->WriteVec3( moveDest ); // idVec3 moveDest
+	savefile->WriteVec3( moveDir ); // idVec3 moveDir
+	savefile->WriteObject( goalEntity ); // idEntityPtr<idEntity> goalEntity
+	savefile->WriteVec3( goalEntityOrigin ); // idVec3 goalEntityOrigin
+	savefile->WriteInt( toAreaNum ); // int toAreaNum
+	savefile->WriteInt( startTime ); // int startTime
+	savefile->WriteInt( duration ); // int duration
+	savefile->WriteFloat( speed ); // float speed
+	savefile->WriteFloat( range ); // float range
+	savefile->WriteFloat( wanderYaw ); // float wanderYaw
+	savefile->WriteInt( nextWanderTime ); // int nextWanderTime
+	savefile->WriteInt( blockTime ); // int blockTime
+	savefile->WriteObject( obstacle ); // idEntityPtr<idEntity> obstacle
+	savefile->WriteVec3( lastMoveOrigin ); // idVec3 lastMoveOrigin
+	savefile->WriteInt( lastMoveTime ); // int lastMoveTime
+	savefile->WriteInt( anim ); // int anim
 }
 
 /*
@@ -146,25 +151,25 @@ idMoveState::Restore
 =====================
 */
 void idMoveState::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( (int &)moveType );
-	savefile->ReadInt( (int &)moveCommand );
-	savefile->ReadInt( (int &)moveStatus );
-	savefile->ReadVec3( moveDest );
-	savefile->ReadVec3( moveDir );
-	goalEntity.Restore( savefile );
-	savefile->ReadVec3( goalEntityOrigin );
-	savefile->ReadInt( toAreaNum );
-	savefile->ReadInt( startTime );
-	savefile->ReadInt( duration );
-	savefile->ReadFloat( speed );
-	savefile->ReadFloat( range );
-	savefile->ReadFloat( wanderYaw );
-	savefile->ReadInt( nextWanderTime );
-	savefile->ReadInt( blockTime );
-	obstacle.Restore( savefile );
-	savefile->ReadVec3( lastMoveOrigin );
-	savefile->ReadInt( lastMoveTime );
-	savefile->ReadInt( anim );
+	savefile->ReadInt( (int&)moveType ); // moveType_t moveType
+	savefile->ReadInt( (int&)moveCommand ); // moveCommand_t moveCommand
+	savefile->ReadInt( (int&)moveStatus ); // moveStatus_t moveStatus
+	savefile->ReadVec3( moveDest ); // idVec3 moveDest
+	savefile->ReadVec3( moveDir ); // idVec3 moveDir
+	savefile->ReadObject( goalEntity ); // idEntityPtr<idEntity> goalEntity
+	savefile->ReadVec3( goalEntityOrigin ); // idVec3 goalEntityOrigin
+	savefile->ReadInt( toAreaNum ); // int toAreaNum
+	savefile->ReadInt( startTime ); // int startTime
+	savefile->ReadInt( duration ); // int duration
+	savefile->ReadFloat( speed ); // float speed
+	savefile->ReadFloat( range ); // float range
+	savefile->ReadFloat( wanderYaw ); // float wanderYaw
+	savefile->ReadInt( nextWanderTime ); // int nextWanderTime
+	savefile->ReadInt( blockTime ); // int blockTime
+	savefile->ReadObject( obstacle ); // idEntityPtr<idEntity> obstacle
+	savefile->ReadVec3( lastMoveOrigin ); // idVec3 lastMoveOrigin
+	savefile->ReadInt( lastMoveTime ); // int lastMoveTime
+	savefile->ReadInt( anim ); // int anim
 }
 
 /*
@@ -729,6 +734,7 @@ idAI::idAI() {
 	playedBleedoutbeep2 = false;
 	playedBleedoutbeep3 = false;
 	
+	outerspaceUpdateTimer = 0;
 
 	//BC INIT end.
 
@@ -740,6 +746,8 @@ idAI::idAI() {
 
 	currentskin = nullptr;
 	damageFlashSkin = nullptr;
+
+	missileLaunchOffset.SetGranularity( 1 );
 }
 
 /*
@@ -766,14 +774,22 @@ idAI::~idAI() {
 	if (spawnArgs.GetBool("has_laser", "0") && lasersightbeam != NULL)
 	{
 		lasersightbeam->PostEventMS(&EV_Remove, 0);
-		lasersightbeamTarget->PostEventMS(&EV_Remove, 0);
-		laserdot->PostEventMS(&EV_Remove, 0);
+		lasersightbeam = nullptr;
+		if ( lasersightbeamTarget ){
+			lasersightbeamTarget->PostEventMS(&EV_Remove, 0);
+			lasersightbeamTarget = nullptr;
+		}
+		if ( laserdot ) {
+			laserdot->PostEventMS(&EV_Remove, 0);
+			laserdot = nullptr;
+		}
 	}
 
 	//When cleaning up, delete the bleedout gui model.
-	if (bleedoutTube != NULL)
+	if (bleedoutTube.IsValid())
 	{
-		bleedoutTube->PostEventMS(&EV_Remove, 0);
+		bleedoutTube.GetEntity()->PostEventMS(&EV_Remove, 0);
+		bleedoutTube = nullptr;
 	}
 
 	//Update the combat meta state.
@@ -783,6 +799,11 @@ idAI::~idAI() {
     {
         static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->UpdateMetaLKP(false);
     }
+
+	if (helmetPtr.IsValid())
+	{
+		helmetPtr.GetEntity()->GetPhysics()->GetClipModel()->SetOwner(nullptr);
+	}
 }
 
 /*
@@ -793,140 +814,243 @@ idAI::Save
 void idAI::Save( idSaveGame *savefile ) const {
 	int i;
 
-	savefile->WriteInt( travelFlags );
-	move.Save( savefile );
-	savedMove.Save( savefile );
-	savefile->WriteFloat( kickForce );
-	savefile->WriteBool( ignore_obstacles );
-	savefile->WriteFloat( blockedRadius );
-	savefile->WriteInt( blockedMoveTime );
-	savefile->WriteInt( blockedAttackTime );
 
-	savefile->WriteFloat( ideal_yaw );
-	savefile->WriteFloat( current_yaw );
-	savefile->WriteFloat( turnRate );
-	savefile->WriteFloat( turnVel );
-	savefile->WriteFloat( anim_turn_yaw );
-	savefile->WriteFloat( anim_turn_amount );
-	savefile->WriteFloat( anim_turn_angles );
+	savefile->WriteBool( lastFovCheck ); //  bool lastFovCheck
+	savefile->WriteInt( combatState ); //  int combatState
+	savefile->WriteInt( aiState ); //  int aiState
+	savefile->WriteObject( lastEnemySeen ); //  idEntityPtr<idEntity> lastEnemySeen
+	savefile->WriteBool( doesRepairVerify ); //  bool doesRepairVerify
 
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteBool(aas != nullptr ); //  idAAS * aas // restore using SetAAS if active
 
-	savefile->WriteFloat( fly_speed );
-	savefile->WriteFloat( fly_bob_strength );
-	savefile->WriteFloat( fly_bob_vert );
-	savefile->WriteFloat( fly_bob_horz );
-	savefile->WriteInt( fly_offset );
-	savefile->WriteFloat( fly_seek_scale );
-	savefile->WriteFloat( fly_roll_scale );
-	savefile->WriteFloat( fly_roll_max );
-	savefile->WriteFloat( fly_roll );
-	savefile->WriteFloat( fly_pitch_scale );
-	savefile->WriteFloat( fly_pitch_max );
-	savefile->WriteFloat( fly_pitch );
+	savefile->WriteInt( travelFlags ); //  int travelFlags
 
-	savefile->WriteBool( allowMove );
-	savefile->WriteBool( allowHiddenMovement );
-	savefile->WriteBool( disableGravity );
-	savefile->WriteBool( af_push_moveables );
+	move.Save( savefile ); //  idMoveState move
+	savedMove.Save( savefile ); //  idMoveState savedMove
 
-	savefile->WriteBool( lastHitCheckResult );
-	savefile->WriteInt( lastHitCheckTime );
-	savefile->WriteInt( lastAttackTime );
-	savefile->WriteFloat( melee_range );
-	savefile->WriteFloat( projectile_height_to_distance_ratio );
+	savefile->WriteFloat( kickForce ); //  float kickForce
+	savefile->WriteBool( ignore_obstacles ); //  bool ignore_obstacles
+	savefile->WriteFloat( blockedRadius ); //  float blockedRadius
+	savefile->WriteInt( blockedMoveTime ); //  int blockedMoveTime
+	savefile->WriteInt( blockedAttackTime ); //  int blockedAttackTime
+	savefile->WriteInt( yieldPriority ); //  int yieldPriority
+	savefile->WriteInt( nextYieldPriority ); // static int nextYieldPriority // blendo eric: static, but should be ok
 
-	savefile->WriteInt( missileLaunchOffset.Num() );
-	for( i = 0; i < missileLaunchOffset.Num(); i++ ) {
-		savefile->WriteVec3( missileLaunchOffset[ i ] );
-	}
+	savefile->WriteFloat( ideal_yaw ); //  float ideal_yaw
+	savefile->WriteFloat( current_yaw ); //  float current_yaw
+	savefile->WriteFloat( turnRate ); //  float turnRate
+	savefile->WriteFloat( turnVel ); //  float turnVel
+	savefile->WriteFloat( anim_turn_yaw ); //  float anim_turn_yaw
+	savefile->WriteFloat( anim_turn_amount ); //  float anim_turn_amount
+	savefile->WriteFloat( anim_turn_angles ); //  float anim_turn_angles
 
+	savefile->WriteStaticObject( idAI::physicsObj ); //  idPhysics_Monster physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteJoint( flyTiltJoint ); //  saveJoint_t flyTiltJoint
+	savefile->WriteFloat( fly_speed ); //  float fly_speed
+	savefile->WriteFloat( fly_bob_strength ); //  float fly_bob_strength
+	savefile->WriteFloat( fly_bob_vert ); //  float fly_bob_vert
+	savefile->WriteFloat( fly_bob_horz ); //  float fly_bob_horz
+	savefile->WriteInt( fly_offset ); //  int fly_offset
+	savefile->WriteFloat( fly_seek_scale ); //  float fly_seek_scale
+	savefile->WriteFloat( fly_roll_scale ); //  float fly_roll_scale
+	savefile->WriteFloat( fly_roll_max ); //  float fly_roll_max
+	savefile->WriteFloat( fly_roll ); //  float fly_roll
+	savefile->WriteFloat( fly_pitch_scale ); //  float fly_pitch_scale
+	savefile->WriteFloat( fly_pitch_max ); //  float fly_pitch_max
+	savefile->WriteFloat( fly_pitch ); //  float fly_pitch
+
+	savefile->WriteBool( allowMove ); //  bool allowMove
+	savefile->WriteBool( allowHiddenMovement ); //  bool allowHiddenMovement
+	savefile->WriteBool( disableGravity ); //  bool disableGravity
+	savefile->WriteBool( af_push_moveables ); //  bool af_push_moveables
+	savefile->WriteBool( lastHitCheckResult ); //  bool lastHitCheckResult
+	savefile->WriteInt( lastHitCheckTime ); //  int lastHitCheckTime
+	savefile->WriteInt( lastAttackTime ); //  int lastAttackTime
+	savefile->WriteFloat( melee_range ); //  float melee_range
+	savefile->WriteFloat( projectile_height_to_distance_ratio ); //  float projectile_height_to_distance_ratio
+
+	SaveFileWriteArray(missileLaunchOffset, missileLaunchOffset.Num(), WriteVec3);  //  idList<idVec3> missileLaunchOffset
+
+	//savefile->WriteDict( projectileDef ); // const  idDict * projectileDef
 	idStr projectileName;
 	spawnArgs.GetString( "def_projectile", "", projectileName );
 	savefile->WriteString( projectileName );
-	savefile->WriteFloat( projectileRadius );
-	savefile->WriteFloat( projectileSpeed );
-	savefile->WriteVec3( projectileVelocity );
-	savefile->WriteVec3( projectileGravity );
-	projectile.Save( savefile );
-	savefile->WriteString( attack );
 
-	savefile->WriteSoundShader( chat_snd );
-	savefile->WriteInt( chat_min );
-	savefile->WriteInt( chat_max );
-	savefile->WriteInt( chat_time );
-	savefile->WriteInt( talk_state );
-	talkTarget.Save( savefile );
+	savefile->WriteClipModel( projectileClipModel ); // mutable idClipModel *projectileClipModel
 
-	savefile->WriteInt( num_cinematics );
-	savefile->WriteInt( current_cinematic );
+	savefile->WriteFloat( projectileRadius ); //  float projectileRadius
+	savefile->WriteFloat( projectileSpeed ); //  float projectileSpeed
+	savefile->WriteVec3( projectileVelocity ); //  idVec3 projectileVelocity
+	savefile->WriteVec3( projectileGravity ); //  idVec3 projectileGravity
 
-	savefile->WriteBool( allowJointMod );
-	focusEntity.Save( savefile );
-	savefile->WriteVec3( currentFocusPos );
-	savefile->WriteInt( focusTime );
-	savefile->WriteInt( alignHeadTime );
-	savefile->WriteInt( forceAlignHeadTime );
-	savefile->WriteAngles( eyeAng );
-	savefile->WriteAngles( lookAng );
-	savefile->WriteAngles( destLookAng );
-	savefile->WriteAngles( lookMin );
-	savefile->WriteAngles( lookMax );
+	projectile.Save( savefile ); //  idEntityPtr<idProjectile> projectile
 
-	savefile->WriteInt( lookJoints.Num() );
-	for( i = 0; i < lookJoints.Num(); i++ ) {
-		savefile->WriteJoint( lookJoints[ i ] );
-		savefile->WriteAngles( lookJointAngles[ i ] );
-	}
+	savefile->WriteString( attack ); //  idString attack
 
-	savefile->WriteFloat( shrivel_rate );
-	savefile->WriteInt( shrivel_start );
+	savefile->WriteSoundShader( chat_snd ); //  const idSoundShader	*chat_snd
+	savefile->WriteInt( chat_min ); //  int chat_min
+	savefile->WriteInt( chat_max ); //  int chat_max
+	savefile->WriteInt( chat_time ); //  int chat_time
+	savefile->WriteInt( talk_state ); //  talkState_t talk_state
+	talkTarget.Save( savefile ); //  idEntityPtr<idActor> talkTarget
 
-	savefile->WriteInt( particles.Num() );
+	savefile->WriteInt( num_cinematics ); //  int num_cinematics
+	savefile->WriteInt( current_cinematic ); //  int current_cinematic
+
+	savefile->WriteBool( allowJointMod ); //  bool allowJointMod
+	savefile->WriteObject( focusEntity ); //  idEntityPtr<idEntity> focusEntity
+	savefile->WriteVec3( currentFocusPos ); //  idVec3 currentFocusPos
+	savefile->WriteInt( focusTime ); //  int focusTime
+
+	savefile->WriteInt( alignHeadTime ); //  int alignHeadTime
+	savefile->WriteInt( forceAlignHeadTime ); //  int forceAlignHeadTime
+
+	savefile->WriteAngles( eyeAng ); //  idAngles eyeAng
+	savefile->WriteAngles( lookAng ); //  idAngles lookAng
+	savefile->WriteAngles( destLookAng ); //  idAngles destLookAng
+	savefile->WriteAngles( lookMin ); //  idAngles lookMin
+	savefile->WriteAngles( lookMax ); //  idAngles lookMax
+
+	SaveFileWriteArray(lookJoints, lookJoints.Num(), WriteJoint); //  idList<jointHandle_t> lookJoints
+	SaveFileWriteArray(lookJointAngles, lookJointAngles.Num(), WriteAngles); //  idList<idAngles> lookJointAngles
+
+	savefile->WriteFloat( eyeVerticalOffset ); //  float eyeVerticalOffset
+	savefile->WriteFloat( eyeHorizontalOffset ); //  float eyeHorizontalOffset
+	savefile->WriteFloat( eyeFocusRate ); //  float eyeFocusRate
+	savefile->WriteFloat( headFocusRate ); //  float headFocusRate
+	savefile->WriteInt( focusAlignTime ); //  int focusAlignTime
+	savefile->WriteFloat( shrivel_rate ); //  float shrivel_rate
+	savefile->WriteInt( shrivel_start ); //  int shrivel_start
+
+	savefile->WriteBool( restartParticles ); //  bool restartParticles
+	savefile->WriteBool( useBoneAxis ); //  bool useBoneAxis
+
+	savefile->WriteInt( particles.Num() ); //  idList<particleEmitter_t> particles
 	for  ( i = 0; i < particles.Num(); i++ ) {
 		savefile->WriteParticle( particles[i].particle );
 		savefile->WriteInt( particles[i].time );
 		savefile->WriteJoint( particles[i].joint );
 	}
-	savefile->WriteBool( restartParticles );
-	savefile->WriteBool( useBoneAxis );
 
-	enemy.Save( savefile );
-	savefile->WriteVec3( lastVisibleEnemyPos );
-	savefile->WriteVec3( lastVisibleEnemyEyeOffset );
-	savefile->WriteVec3( lastVisibleReachableEnemyPos );
-	savefile->WriteVec3( lastReachableEnemyPos );
-	savefile->WriteBool( wakeOnFlashlight );
+	savefile->WriteRenderLight( worldMuzzleFlash ); //  renderLight_t worldMuzzleFlash
+	savefile->WriteInt( worldMuzzleFlashHandle ); //  int worldMuzzleFlashHandle
+	savefile->WriteJoint( flashJointWorld ); //  saveJoint_t flashJointWorld
+	savefile->WriteInt( muzzleFlashEnd ); //  int muzzleFlashEnd
+	savefile->WriteInt( flashTime ); //  int flashTime
+	savefile->WriteAngles( eyeMin ); //  idAngles eyeMin
+	savefile->WriteAngles( eyeMax ); //  idAngles eyeMax
+	savefile->WriteJoint( focusJoint ); //  saveJoint_t focusJoint
+	savefile->WriteJoint( orientationJoint ); //  saveJoint_t orientationJoint
 
-	savefile->WriteAngles( eyeMin );
-	savefile->WriteAngles( eyeMax );
+	enemy.Save( savefile ); //  idEntityPtr<idActor> enemy
+	savefile->WriteVec3( lastVisibleEnemyPos ); //  idVec3 lastVisibleEnemyPos
+	savefile->WriteVec3( lastVisibleEnemyEyeOffset ); //  idVec3 lastVisibleEnemyEyeOffset
+	savefile->WriteVec3( lastVisibleReachableEnemyPos ); //  idVec3 lastVisibleReachableEnemyPos
+	savefile->WriteVec3( lastReachableEnemyPos ); //  idVec3 lastReachableEnemyPos
+	savefile->WriteBool( wakeOnFlashlight ); //  bool wakeOnFlashlight
 
-	savefile->WriteFloat( eyeVerticalOffset );
-	savefile->WriteFloat( eyeHorizontalOffset );
-	savefile->WriteFloat( eyeFocusRate );
-	savefile->WriteFloat( headFocusRate );
-	savefile->WriteInt( focusAlignTime );
 
-	savefile->WriteJoint( flashJointWorld );
-	savefile->WriteInt( muzzleFlashEnd );
+	savefile->WriteBool( spawnClearMoveables ); //  bool spawnClearMoveables
 
-	savefile->WriteJoint( focusJoint );
-	savefile->WriteJoint( orientationJoint );
-	savefile->WriteJoint( flyTiltJoint );
-
-	savefile->WriteBool( GetPhysics() == static_cast<const idPhysics *>(&physicsObj) );
-
-#ifdef _D3XP
 	savefile->WriteInt(funcEmitters.Num());
-	for(int i = 0; i < funcEmitters.Num(); i++) {
-		funcEmitter_t* emitter = funcEmitters.GetIndex(i);
-		savefile->WriteString(emitter->name);
-		savefile->WriteJoint(emitter->joint);
-		savefile->WriteObject(emitter->particle);
+	for (int idx = 0; idx < funcEmitters.Num(); idx++) { //  idHashTable<funcEmitter_t> funcEmitters
+		idStr outKey;
+		funcEmitter_t outVal;
+		funcEmitters.GetIndex(idx, &outKey, &outVal);
+		savefile->WriteString( outKey );
+		savefile->WriteString( outVal.name );
+		savefile->WriteInt( outVal.joint );
+		savefile->WriteObject( outVal.particle );
 	}
 
-	harvestEnt.Save( savefile);
-#endif
+	harvestEnt.Save( savefile ); //  idEntityPtr<idHarvestable> harvestEnt
+
+	// hook up on load
+	// 	LinkScriptVariables();
+	//idScriptBool			AI_TALK; //  idScriptBool AI_TALK
+	//idScriptBool			AI_DAMAGE; //  idScriptBool AI_DAMAGE
+	//idScriptBool			AI_PAIN; //  idScriptBool AI_PAIN
+	//idScriptFloat			AI_SPECIAL_DAMAGE; //  idScriptFloat AI_SPECIAL_DAMAGE
+	//idScriptBool			AI_DEAD; //  idScriptBool AI_DEAD
+	//idScriptBool			AI_ENEMY_VISIBLE; //  idScriptBool AI_ENEMY_VISIBLE
+	//idScriptBool			AI_ENEMY_IN_FOV; //  idScriptBool AI_ENEMY_IN_FOV
+	//idScriptBool			AI_ENEMY_DEAD; //  idScriptBool AI_ENEMY_DEAD
+	//idScriptBool			AI_MOVE_DONE; //  idScriptBool AI_MOVE_DONE
+	//idScriptBool			AI_ONGROUND; //  idScriptBool AI_ONGROUND
+	//idScriptBool			AI_ACTIVATED; //  idScriptBool AI_ACTIVATED
+	//idScriptBool			AI_FORWARD; //  idScriptBool AI_FORWARD
+	//idScriptBool			AI_JUMP; //  idScriptBool AI_JUMP
+	//idScriptBool			AI_ENEMY_REACHABLE; //  idScriptBool AI_ENEMY_REACHABLE
+	//idScriptBool			AI_BLOCKED; //  idScriptBool AI_BLOCKED
+	//idScriptBool			AI_OBSTACLE_IN_PATH; //  idScriptBool AI_OBSTACLE_IN_PATH
+	//idScriptBool			AI_DEST_UNREACHABLE; //  idScriptBool AI_DEST_UNREACHABLE
+	//idScriptBool			AI_HIT_ENEMY; //  idScriptBool AI_HIT_ENEMY
+	//idScriptBool			AI_PUSHED; //  idScriptBool AI_PUSHED
+	//idScriptBool			AI_BACKWARD; //  idScriptBool AI_BACKWARD
+	//idScriptBool			AI_LEFT; //  idScriptBool AI_LEFT
+	//idScriptBool			AI_RIGHT; //  idScriptBool AI_RIGHT
+	//idScriptBool			AI_SHIELDHIT; //  idScriptBool AI_SHIELDHIT
+	//idScriptBool			AI_CUSTOMIDLEANIM; //  idScriptBool AI_CUSTOMIDLEANIM
+	//idScriptBool			AI_NODEANIM; //  idScriptBool AI_NODEANIM
+	//idScriptBool			AI_DODGELEFT; //  idScriptBool AI_DODGELEFT
+	//idScriptBool			AI_DODGERIGHT; //  idScriptBool AI_DODGERIGHT
+
+	savefile->WriteObject( lasersightbeam ); //  idBeam* lasersightbeam
+	savefile->WriteObject( lasersightbeamTarget ); //  idBeam* lasersightbeamTarget
+	savefile->WriteObject( laserdot ); //  idEntity* laserdot
+
+	savefile->WriteVec3( laserLockPosition ); //  idVec3 laserLockPosition
+	savefile->WriteVec3( laserEndLockPosition ); //  idVec3 laserEndLockPosition
+
+	savefile->WriteVec3( laserRadarEndPos ); //  idVec3 laserRadarEndPos
+	savefile->WriteVec3( laserRadarStartPos ); //  idVec3 laserRadarStartPos
+	savefile->WriteInt( laserRadarTimer ); //  int laserRadarTimer
+	savefile->WriteInt( laserRadarState ); //  int laserRadarState
+	savefile->WriteVec3( laserRadarDir ); //  idVec3 laserRadarDir
+
+	savefile->WriteInt( lastVisibleEnemyTime ); //  int lastVisibleEnemyTime
+	savefile->WriteBool( canSeeEnemy ); //  bool canSeeEnemy
+
+	// idActorIcon actorIcon; //  idActorIcon actorIcon // blendo eric: regens with draw?
+
+	savefile->WriteJoint( brassJoint ); //  saveJoint_t brassJoint
+	savefile->WriteDict( &brassDict ); //  idDict brassDict
+
+	savefile->WriteInt( lastPlayerSightTimer ); //  int lastPlayerSightTimer
+	savefile->WriteInt( playersightCounter ); //  int playersightCounter
+
+	SaveFileWriteArray(dragButtons, AI_LIMBCOUNT, WriteObject); // idEntity* dragButtons[AI_LIMBCOUNT];
+
+	savefile->WriteSkin( currentskin );// const idDeclSkin *currentskin;
+	savefile->WriteSkin( damageFlashSkin ); // const  idDeclSkin* damageFlashSkin
+	savefile->WriteInt( damageflashTimer ); //  int damageflashTimer
+	savefile->WriteBool( damageFlashActive ); //  bool damageFlashActive
+
+	savefile->WriteInt( lastBrassTime ); //  int lastBrassTime
+	savefile->WriteObject( bleedoutTube ); //  idEntityPtr<idEntity> bleedoutTube
+	savefile->WriteInt( bleedoutTime ); //  int bleedoutTime
+	savefile->WriteInt( bleedoutState ); //  int bleedoutState
+	savefile->WriteInt( bleedoutDamageTimer ); //  int bleedoutDamageTimer
+
+
+	savefile->WriteObject( skullEnt ); //  idEntity* skullEnt
+
+	skullSpawnOrigLoc.Save( savefile ); //  idEntityPtr<idLocationEntity> skullSpawnOrigLoc
+
+
+	savefile->WriteInt( triggerTimer ); //  int triggerTimer
+
+	savefile->WriteBool( playedBleedoutbeep1 ); //  bool playedBleedoutbeep1
+	savefile->WriteBool( playedBleedoutbeep2 ); //  bool playedBleedoutbeep2
+	savefile->WriteBool( playedBleedoutbeep3 ); //  bool playedBleedoutbeep3
+
+
+	savefile->WriteInt( outerspaceUpdateTimer ); //  int outerspaceUpdateTimer
+
+	savefile->WriteObject( helmetPtr ); // idEntityPtr<idEntity> helmetPtr;
 }
 
 /*
@@ -935,61 +1059,74 @@ idAI::Restore
 =====================
 */
 void idAI::Restore( idRestoreGame *savefile ) {
-	bool		restorePhysics;
-	int			i;
 	int			num;
-	idBounds	bounds;
 
-	savefile->ReadInt( travelFlags );
-	move.Restore( savefile );
-	savedMove.Restore( savefile );
-	savefile->ReadFloat( kickForce );
-	savefile->ReadBool( ignore_obstacles );
-	savefile->ReadFloat( blockedRadius );
-	savefile->ReadInt( blockedMoveTime );
-	savefile->ReadInt( blockedAttackTime );
 
-	savefile->ReadFloat( ideal_yaw );
-	savefile->ReadFloat( current_yaw );
-	savefile->ReadFloat( turnRate );
-	savefile->ReadFloat( turnVel );
-	savefile->ReadFloat( anim_turn_yaw );
-	savefile->ReadFloat( anim_turn_amount );
-	savefile->ReadFloat( anim_turn_angles );
+	savefile->ReadBool( lastFovCheck ); //  bool lastFovCheck
+	savefile->ReadInt( combatState ); //  int combatState
+	savefile->ReadInt( aiState ); //  int aiState
+	savefile->ReadObject( lastEnemySeen ); //  idEntityPtr<idEntity> lastEnemySeen
+	savefile->ReadBool( doesRepairVerify ); //  bool doesRepairVerify
 
-	savefile->ReadStaticObject( physicsObj );
+	bool setAAS = false;
+	savefile->ReadBool(setAAS); //  idAAS * aas // restore using SetAAS if active
 
-	savefile->ReadFloat( fly_speed );
-	savefile->ReadFloat( fly_bob_strength );
-	savefile->ReadFloat( fly_bob_vert );
-	savefile->ReadFloat( fly_bob_horz );
-	savefile->ReadInt( fly_offset );
-	savefile->ReadFloat( fly_seek_scale );
-	savefile->ReadFloat( fly_roll_scale );
-	savefile->ReadFloat( fly_roll_max );
-	savefile->ReadFloat( fly_roll );
-	savefile->ReadFloat( fly_pitch_scale );
-	savefile->ReadFloat( fly_pitch_max );
-	savefile->ReadFloat( fly_pitch );
+	savefile->ReadInt( travelFlags ); //  int travelFlags
 
-	savefile->ReadBool( allowMove );
-	savefile->ReadBool( allowHiddenMovement );
-	savefile->ReadBool( disableGravity );
-	savefile->ReadBool( af_push_moveables );
+	move.Restore( savefile ); //  idMoveState move
+	savedMove.Restore( savefile ); //  idMoveState savedMove
 
-	savefile->ReadBool( lastHitCheckResult );
-	savefile->ReadInt( lastHitCheckTime );
-	savefile->ReadInt( lastAttackTime );
-	savefile->ReadFloat( melee_range );
-	savefile->ReadFloat( projectile_height_to_distance_ratio );
+	savefile->ReadFloat( kickForce ); //  float kickForce
+	savefile->ReadBool( ignore_obstacles ); //  bool ignore_obstacles
+	savefile->ReadFloat( blockedRadius ); //  float blockedRadius
+	savefile->ReadInt( blockedMoveTime ); //  int blockedMoveTime
+	savefile->ReadInt( blockedAttackTime ); //  int blockedAttackTime
+	savefile->ReadInt( yieldPriority ); //  int yieldPriority
+	savefile->ReadInt( nextYieldPriority ); // static int nextYieldPriority // blendo eric: static, but should be ok
 
-	savefile->ReadInt( num );
-	missileLaunchOffset.SetGranularity( 1 );
-	missileLaunchOffset.SetNum( num );
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadVec3( missileLaunchOffset[ i ] );
+	savefile->ReadFloat( ideal_yaw ); //  float ideal_yaw
+	savefile->ReadFloat( current_yaw ); //  float current_yaw
+	savefile->ReadFloat( turnRate ); //  float turnRate
+	savefile->ReadFloat( turnVel ); //  float turnVel
+	savefile->ReadFloat( anim_turn_yaw ); //  float anim_turn_yaw
+	savefile->ReadFloat( anim_turn_amount ); //  float anim_turn_amount
+	savefile->ReadFloat( anim_turn_angles ); //  float anim_turn_angles
+
+	savefile->ReadStaticObject( physicsObj ); //  idPhysics_Monster physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
 	}
 
+	savefile->ReadJoint( flyTiltJoint ); //  saveJoint_t flyTiltJoint
+	savefile->ReadFloat( fly_speed ); //  float fly_speed
+	savefile->ReadFloat( fly_bob_strength ); //  float fly_bob_strength
+	savefile->ReadFloat( fly_bob_vert ); //  float fly_bob_vert
+	savefile->ReadFloat( fly_bob_horz ); //  float fly_bob_horz
+	savefile->ReadInt( fly_offset ); //  int fly_offset
+	savefile->ReadFloat( fly_seek_scale ); //  float fly_seek_scale
+	savefile->ReadFloat( fly_roll_scale ); //  float fly_roll_scale
+	savefile->ReadFloat( fly_roll_max ); //  float fly_roll_max
+	savefile->ReadFloat( fly_roll ); //  float fly_roll
+	savefile->ReadFloat( fly_pitch_scale ); //  float fly_pitch_scale
+	savefile->ReadFloat( fly_pitch_max ); //  float fly_pitch_max
+	savefile->ReadFloat( fly_pitch ); //  float fly_pitch
+
+	savefile->ReadBool( allowMove ); //  bool allowMove
+	savefile->ReadBool( allowHiddenMovement ); //  bool allowHiddenMovement
+	savefile->ReadBool( disableGravity ); //  bool disableGravity
+	savefile->ReadBool( af_push_moveables ); //  bool af_push_moveables
+	savefile->ReadBool( lastHitCheckResult ); //  bool lastHitCheckResult
+	savefile->ReadInt( lastHitCheckTime ); //  int lastHitCheckTime
+	savefile->ReadInt( lastAttackTime ); //  int lastAttackTime
+	savefile->ReadFloat( melee_range ); //  float melee_range
+	savefile->ReadFloat( projectile_height_to_distance_ratio ); //  float projectile_height_to_distance_ratio
+
+	SaveFileReadList(missileLaunchOffset, ReadVec3);  //  idList<idVec3> missileLaunchOffset
+
+	//savefile->ReadDict( projectileDef ); // const  idDict * projectileDef
 	idStr projectileName;
 	savefile->ReadString( projectileName );
 	if ( projectileName.Length() ) {
@@ -997,139 +1134,195 @@ void idAI::Restore( idRestoreGame *savefile ) {
 	} else {
 		projectileDef = NULL;
 	}
-	savefile->ReadFloat( projectileRadius );
-	savefile->ReadFloat( projectileSpeed );
-	savefile->ReadVec3( projectileVelocity );
-	savefile->ReadVec3( projectileGravity );
-	projectile.Restore( savefile );
-	savefile->ReadString( attack );
 
-	savefile->ReadSoundShader( chat_snd );
-	savefile->ReadInt( chat_min );
-	savefile->ReadInt( chat_max );
-	savefile->ReadInt( chat_time );
-	savefile->ReadInt( i );
-	talk_state = static_cast<talkState_t>( i );
-	talkTarget.Restore( savefile );
+	savefile->ReadClipModel( projectileClipModel ); // mutable idClipModel *projectileClipModel
 
-	savefile->ReadInt( num_cinematics );
-	savefile->ReadInt( current_cinematic );
+	savefile->ReadFloat( projectileRadius ); //  float projectileRadius
+	savefile->ReadFloat( projectileSpeed ); //  float projectileSpeed
+	savefile->ReadVec3( projectileVelocity ); //  idVec3 projectileVelocity
+	savefile->ReadVec3( projectileGravity ); //  idVec3 projectileGravity
 
-	savefile->ReadBool( allowJointMod );
-	focusEntity.Restore( savefile );
-	savefile->ReadVec3( currentFocusPos );
-	savefile->ReadInt( focusTime );
-	savefile->ReadInt( alignHeadTime );
-	savefile->ReadInt( forceAlignHeadTime );
-	savefile->ReadAngles( eyeAng );
-	savefile->ReadAngles( lookAng );
-	savefile->ReadAngles( destLookAng );
-	savefile->ReadAngles( lookMin );
-	savefile->ReadAngles( lookMax );
+	projectile.Restore( savefile ); //  idEntityPtr<idProjectile> projectile
 
-	savefile->ReadInt( num );
-	lookJoints.SetGranularity( 1 );
-	lookJoints.SetNum( num );
-	lookJointAngles.SetGranularity( 1 );
-	lookJointAngles.SetNum( num );
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadJoint( lookJoints[ i ] );
-		savefile->ReadAngles( lookJointAngles[ i ] );
-	}
+	savefile->ReadString( attack ); //  idString attack
 
-	savefile->ReadFloat( shrivel_rate );
-	savefile->ReadInt( shrivel_start );
+	savefile->ReadSoundShader( chat_snd ); //  const idSoundShader	*chat_snd
+	savefile->ReadInt( chat_min ); //  int chat_min
+	savefile->ReadInt( chat_max ); //  int chat_max
+	savefile->ReadInt( chat_time ); //  int chat_time
+	savefile->ReadInt( (int&)talk_state ); // enum talkState_t talk_state
+	talkTarget.Restore( savefile ); //  idEntityPtr<idActor> talkTarget
 
-	savefile->ReadInt( num );
+	savefile->ReadInt( num_cinematics ); //  int num_cinematics
+	savefile->ReadInt( current_cinematic ); //  int current_cinematic
+
+	savefile->ReadBool( allowJointMod ); //  bool allowJointMod
+	savefile->ReadObject( focusEntity ); //  idEntityPtr<idEntity> focusEntity
+	savefile->ReadVec3( currentFocusPos ); //  idVec3 currentFocusPos
+	savefile->ReadInt( focusTime ); //  int focusTime
+
+	savefile->ReadInt( alignHeadTime ); //  int alignHeadTime
+	savefile->ReadInt( forceAlignHeadTime ); //  int forceAlignHeadTime
+
+	savefile->ReadAngles( eyeAng ); //  idAngles eyeAng
+	savefile->ReadAngles( lookAng ); //  idAngles lookAng
+	savefile->ReadAngles( destLookAng ); //  idAngles destLookAng
+	savefile->ReadAngles( lookMin ); //  idAngles lookMin
+	savefile->ReadAngles( lookMax ); //  idAngles lookMax
+
+	SaveFileReadList(lookJoints, ReadJoint); //  idList<saveJoint_t> lookJoints
+	SaveFileReadList(lookJointAngles, ReadAngles); //  idList<idAngles> lookJointAngles
+
+	savefile->ReadFloat( eyeVerticalOffset ); //  float eyeVerticalOffset
+	savefile->ReadFloat( eyeHorizontalOffset ); //  float eyeHorizontalOffset
+	savefile->ReadFloat( eyeFocusRate ); //  float eyeFocusRate
+	savefile->ReadFloat( headFocusRate ); //  float headFocusRate
+	savefile->ReadInt( focusAlignTime ); //  int focusAlignTime
+	savefile->ReadFloat( shrivel_rate ); //  float shrivel_rate
+	savefile->ReadInt( shrivel_start ); //  int shrivel_start
+
+	savefile->ReadBool( restartParticles ); //  bool restartParticles
+	savefile->ReadBool( useBoneAxis ); //  bool useBoneAxis
+
+	savefile->ReadInt( num ); //  idList<particleEmitter_t> particles
 	particles.SetNum( num );
-	for  ( i = 0; i < particles.Num(); i++ ) {
-		savefile->ReadParticle( particles[i].particle );
-		savefile->ReadInt( particles[i].time );
-		savefile->ReadJoint( particles[i].joint );
+	for  ( int idx = 0; idx < num; idx++ ) {
+		savefile->ReadParticle( particles[idx].particle );
+		savefile->ReadInt( particles[idx].time );
+		savefile->ReadJoint( particles[idx].joint );
 	}
-	savefile->ReadBool( restartParticles );
-	savefile->ReadBool( useBoneAxis );
 
-	enemy.Restore( savefile );
-	savefile->ReadVec3( lastVisibleEnemyPos );
-	savefile->ReadVec3( lastVisibleEnemyEyeOffset );
-	savefile->ReadVec3( lastVisibleReachableEnemyPos );
-	savefile->ReadVec3( lastReachableEnemyPos );
-
-	savefile->ReadBool( wakeOnFlashlight );
-
-	savefile->ReadAngles( eyeMin );
-	savefile->ReadAngles( eyeMax );
-
-	savefile->ReadFloat( eyeVerticalOffset );
-	savefile->ReadFloat( eyeHorizontalOffset );
-	savefile->ReadFloat( eyeFocusRate );
-	savefile->ReadFloat( headFocusRate );
-	savefile->ReadInt( focusAlignTime );
-
-	savefile->ReadJoint( flashJointWorld );
-	savefile->ReadInt( muzzleFlashEnd );
-
-	savefile->ReadJoint( focusJoint );
-	savefile->ReadJoint( orientationJoint );
-	savefile->ReadJoint( flyTiltJoint );
-
-	savefile->ReadBool( restorePhysics );
-
-	// Set the AAS if the character has the correct gravity vector
-	idVec3 gravity = spawnArgs.GetVector( "gravityDir", "0 0 -1" );
-	gravity *= g_gravity.GetFloat();
-	if ( gravity == gameLocal.GetGravity() ) {
-		SetAAS();
+	savefile->ReadRenderLight( worldMuzzleFlash ); //  renderLight_t worldMuzzleFlash
+	savefile->ReadInt( worldMuzzleFlashHandle ); //  int worldMuzzleFlashHandle
+	if ( worldMuzzleFlashHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( worldMuzzleFlashHandle, &worldMuzzleFlash );
 	}
+
+	savefile->ReadJoint( flashJointWorld ); //  saveJoint_t flashJointWorld
+	savefile->ReadInt( muzzleFlashEnd ); //  int muzzleFlashEnd
+	savefile->ReadInt( flashTime ); //  int flashTime
+	savefile->ReadAngles( eyeMin ); //  idAngles eyeMin
+	savefile->ReadAngles( eyeMax ); //  idAngles eyeMax
+	savefile->ReadJoint( focusJoint ); //  saveJoint_t focusJoint
+	savefile->ReadJoint( orientationJoint ); //  saveJoint_t orientationJoint
+
+	enemy.Restore( savefile ); //  idEntityPtr<idActor> enemy
+	savefile->ReadVec3( lastVisibleEnemyPos ); //  idVec3 lastVisibleEnemyPos
+	savefile->ReadVec3( lastVisibleEnemyEyeOffset ); //  idVec3 lastVisibleEnemyEyeOffset
+	savefile->ReadVec3( lastVisibleReachableEnemyPos ); //  idVec3 lastVisibleReachableEnemyPos
+	savefile->ReadVec3( lastReachableEnemyPos ); //  idVec3 lastReachableEnemyPos
+	savefile->ReadBool( wakeOnFlashlight ); //  bool wakeOnFlashlight
+
+
+	savefile->ReadBool( spawnClearMoveables ); //  bool spawnClearMoveables
+
+	assert(funcEmitters.Num() == 0);
+	savefile->ReadInt(num);
+	for (int idx = 0; idx < num; idx++) { //  idHashTable<funcEmitter_t> funcEmitters
+		idStr outKey;
+		funcEmitter_t outVal;
+		savefile->ReadString( outKey );
+		savefile->ReadCharArray( outVal.name );
+		savefile->ReadJoint( outVal.joint );
+		savefile->ReadObject( CastClassPtrRef(outVal.particle) );
+		funcEmitters.Set( outKey, outVal );
+	}
+
+	harvestEnt.Restore( savefile ); //  idEntityPtr<idHarvestable> harvestEnt
+
+	LinkScriptVariables();
+	//idScriptBool			AI_TALK; //  idScriptBool AI_TALK
+	//idScriptBool			AI_DAMAGE; //  idScriptBool AI_DAMAGE
+	//idScriptBool			AI_PAIN; //  idScriptBool AI_PAIN
+	//idScriptFloat			AI_SPECIAL_DAMAGE; //  idScriptFloat AI_SPECIAL_DAMAGE
+	//idScriptBool			AI_DEAD; //  idScriptBool AI_DEAD
+	//idScriptBool			AI_ENEMY_VISIBLE; //  idScriptBool AI_ENEMY_VISIBLE
+	//idScriptBool			AI_ENEMY_IN_FOV; //  idScriptBool AI_ENEMY_IN_FOV
+	//idScriptBool			AI_ENEMY_DEAD; //  idScriptBool AI_ENEMY_DEAD
+	//idScriptBool			AI_MOVE_DONE; //  idScriptBool AI_MOVE_DONE
+	//idScriptBool			AI_ONGROUND; //  idScriptBool AI_ONGROUND
+	//idScriptBool			AI_ACTIVATED; //  idScriptBool AI_ACTIVATED
+	//idScriptBool			AI_FORWARD; //  idScriptBool AI_FORWARD
+	//idScriptBool			AI_JUMP; //  idScriptBool AI_JUMP
+	//idScriptBool			AI_ENEMY_REACHABLE; //  idScriptBool AI_ENEMY_REACHABLE
+	//idScriptBool			AI_BLOCKED; //  idScriptBool AI_BLOCKED
+	//idScriptBool			AI_OBSTACLE_IN_PATH; //  idScriptBool AI_OBSTACLE_IN_PATH
+	//idScriptBool			AI_DEST_UNREACHABLE; //  idScriptBool AI_DEST_UNREACHABLE
+	//idScriptBool			AI_HIT_ENEMY; //  idScriptBool AI_HIT_ENEMY
+	//idScriptBool			AI_PUSHED; //  idScriptBool AI_PUSHED
+	//idScriptBool			AI_BACKWARD; //  idScriptBool AI_BACKWARD
+	//idScriptBool			AI_LEFT; //  idScriptBool AI_LEFT
+	//idScriptBool			AI_RIGHT; //  idScriptBool AI_RIGHT
+	//idScriptBool			AI_SHIELDHIT; //  idScriptBool AI_SHIELDHIT
+	//idScriptBool			AI_CUSTOMIDLEANIM; //  idScriptBool AI_CUSTOMIDLEANIM
+	//idScriptBool			AI_NODEANIM; //  idScriptBool AI_NODEANIM
+	//idScriptBool			AI_DODGELEFT; //  idScriptBool AI_DODGELEFT
+	//idScriptBool			AI_DODGERIGHT; //  idScriptBool AI_DODGERIGHT
+
+	savefile->ReadObject( CastClassPtrRef(lasersightbeam) ); //  idBeam* lasersightbeam
+	savefile->ReadObject( CastClassPtrRef(lasersightbeamTarget) ); //  idBeam* lasersightbeamTarget
+	savefile->ReadObject( laserdot ); //  idEntity* laserdot
+
+	savefile->ReadVec3( laserLockPosition ); //  idVec3 laserLockPosition
+	savefile->ReadVec3( laserEndLockPosition ); //  idVec3 laserEndLockPosition
+
+	savefile->ReadVec3( laserRadarEndPos ); //  idVec3 laserRadarEndPos
+	savefile->ReadVec3( laserRadarStartPos ); //  idVec3 laserRadarStartPos
+	savefile->ReadInt( laserRadarTimer ); //  int laserRadarTimer
+	savefile->ReadInt( laserRadarState ); //  int laserRadarState
+	savefile->ReadVec3( laserRadarDir ); //  idVec3 laserRadarDir
+
+	savefile->ReadInt( lastVisibleEnemyTime ); //  int lastVisibleEnemyTime
+	savefile->ReadBool( canSeeEnemy ); //  bool canSeeEnemy
+
+	// idActorIcon actorIcon; //  idActorIcon actorIcon // blendo eric: regens with draw?
+
+	savefile->ReadJoint( brassJoint ); //  saveJoint_t brassJoint
+	savefile->ReadDict( &brassDict ); //  idDict brassDict
+
+	savefile->ReadInt( lastPlayerSightTimer ); //  int lastPlayerSightTimer
+	savefile->ReadInt( playersightCounter ); //  int playersightCounter
+
+	SaveFileReadArray(dragButtons, ReadObject); // idEntity* dragButtons[AI_LIMBCOUNT];
+
+	savefile->ReadSkin( currentskin );// const idDeclSkin *currentskin;
+	savefile->ReadSkin( damageFlashSkin ); // const  idDeclSkin* damageFlashSkin
+	savefile->ReadInt( damageflashTimer ); //  int damageflashTimer
+	savefile->ReadBool( damageFlashActive ); //  bool damageFlashActive
+
+	savefile->ReadInt( lastBrassTime ); //  int lastBrassTime
+	savefile->ReadObject( bleedoutTube ); //  idEntityPtr<idEntity> bleedoutTube
+	savefile->ReadInt( bleedoutTime ); //  int bleedoutTime
+	savefile->ReadInt( bleedoutState ); //  int bleedoutState
+	savefile->ReadInt( bleedoutDamageTimer ); //  int bleedoutDamageTimer
+
+	savefile->ReadObject( skullEnt ); //  idEntity* skullEnt
+
+	skullSpawnOrigLoc.Restore( savefile ); //  idEntityPtr<idLocationEntity> skullSpawnOrigLoc
+
+	savefile->ReadInt( triggerTimer ); //  int triggerTimer
+
+	savefile->ReadBool( playedBleedoutbeep1 ); //  bool playedBleedoutbeep1
+	savefile->ReadBool( playedBleedoutbeep2 ); //  bool playedBleedoutbeep2
+	savefile->ReadBool( playedBleedoutbeep3 ); //  bool playedBleedoutbeep3
+
+
+	savefile->ReadInt( outerspaceUpdateTimer ); //  int outerspaceUpdateTimer
+
+	savefile->ReadObject( helmetPtr ); // idEntityPtr<idEntity> helmetPtr;
 
 	SetCombatModel();
 	LinkCombat();
 
-	InitMuzzleFlash();
+	if (setAAS) {
+		SetAAS();
 
-	// Link the script variables back to the scriptobject
-	LinkScriptVariables();
-
-	if ( restorePhysics ) {
-		RestorePhysics( &physicsObj );
+		// replaced:
+		//// Set the AAS if the character has the correct gravity vector
+		//idVec3 gravity = spawnArgs.GetVector( "gravityDir", "0 0 -1" );
+		//gravity *= g_gravity.GetFloat();
+		//if ( gravity == gameLocal.GetGravity() )
 	}
-
-#ifdef _D3XP
-
-	//Clean up the emitters
-	for(int i = 0; i < funcEmitters.Num(); i++) {
-		funcEmitter_t* emitter = funcEmitters.GetIndex(i);
-		if(emitter->particle) {
-			//Destroy the emitters
-			emitter->particle->PostEventMS(&EV_Remove, 0 );
-		}
-	}
-	funcEmitters.Clear();
-
-	int emitterCount;
-	savefile->ReadInt( emitterCount );
-	for(int i = 0; i < emitterCount; i++) {
-		funcEmitter_t newEmitter;
-		memset(&newEmitter, 0, sizeof(newEmitter));
-
-		idStr name;
-		savefile->ReadString( name );
-
-		strcpy( newEmitter.name, name.c_str() );
-
-		savefile->ReadJoint( newEmitter.joint );
-		savefile->ReadObject(reinterpret_cast<idClass *&>(newEmitter.particle));
-
-		funcEmitters.Set(newEmitter.name, newEmitter);
-	}
-
-	harvestEnt.Restore(savefile);
-	//if(harvestEnt.GetEntity()) {
-	//	harvestEnt.GetEntity()->SetParent(this);
-	//}
-
-#endif
 }
 
 /*
@@ -1454,7 +1647,7 @@ void idAI::Spawn( void ) {
 	if (spawnArgs.GetBool("can_snapneck"))
 	{
 		//The snap neck frob box.
-		SpawnDragButton(SNAPNECK_FROBINDEX, spawnArgs.GetString("snapneck_joint", "head"), "EJECT HEAD");
+		SpawnDragButton(SNAPNECK_FROBINDEX, spawnArgs.GetString("snapneck_joint", "head"), common->GetLanguageDict()->GetString("#str_def_gameplay_ejecthead"));
 	}
 
 
@@ -1485,9 +1678,9 @@ void idAI::Gib( const idVec3 &dir, const char *damageDefName ) {
 	}
 	idActor::Gib(dir, damageDefName);
 
-	if (bleedoutTube != NULL)
+	if (bleedoutTube.IsValid())
 	{
-		bleedoutTube->Hide();
+		bleedoutTube.GetEntity()->Hide();
 	}	
 
 	SpawnSkullsaver();
@@ -1721,7 +1914,7 @@ void idAI::Think( void ) //AI calls this every frame.
 		gameRenderWorld->DrawText( "No AAS", physicsObj.GetAbsBounds().GetCenter(), 0.1f, colorWhite, gameLocal.GetLocalPlayer()->viewAngles.ToMat3(), 1, gameLocal.msec );
 	}
 */
-
+	UpdateSpacePush();
 	UpdateMuzzleFlash();
 	UpdateAnimation();
 	UpdateParticles();
@@ -1854,7 +2047,7 @@ void idAI::Think( void ) //AI calls this every frame.
 	//	}
 	//}
 
-	if (health <= 0 && bleedoutTube != NULL && team == 1 && bleedoutState == BLEEDOUT_ACTIVE)
+	if (health <= 0 && bleedoutTube.IsValid() && team == 1 && bleedoutState == BLEEDOUT_ACTIVE)
 	{
 		TouchTriggers();
 
@@ -1862,9 +2055,9 @@ void idAI::Think( void ) //AI calls this every frame.
 		idMat3 tubeAxis;
 		jointHandle_t headJoint = animator.GetJointHandle("head");
 		GetJointWorldTransform(headJoint, gameLocal.time, tubeOrigin, tubeAxis);
-		bleedoutTube->SetOrigin(tubeOrigin + idVec3(0,0,32));	
+		bleedoutTube.GetEntity()->SetOrigin(tubeOrigin + idVec3(0,0,32));	
 		
-		bleedoutTube->Event_SetGuiInt("gui_bleedout0", (bleedoutTime - gameLocal.time) / 1000);
+		bleedoutTube.GetEntity()->Event_SetGuiInt("gui_bleedout0", (bleedoutTime - gameLocal.time) / 1000);
 
 
 
@@ -1893,7 +2086,9 @@ void idAI::Think( void ) //AI calls this every frame.
 			// SW: burnawaytime is the time it takes the corpse to fully burn away. 
 			// This should be equal to (or longer) than the time it takes the model shader to fully erase the body once parm7 is set
 			bleedoutTime = gameLocal.time + spawnArgs.GetFloat("burnawaytime", "2.5") * 1000; 
-			bleedoutTube->Hide();
+			if (bleedoutTube.IsValid()) {
+				bleedoutTube.GetEntity()->Hide();
+			}
 
 			GetPhysics()->SetContents(0);
 			fl.takedamage = false;
@@ -4127,9 +4322,11 @@ int idAI::ReactionTo(idEntity *ent ) {
 			//}
 
 			#define UNSEEN_VIEWDISTANCE 80 //at this distance, I can "see" into darkness.
+			#define UNSEEN_VIEWDISTANCE_HEAVY 200 // SW 16th April 2025: heavies can see a little further in the dark to compensate for their lack of flashlights
+			bool hasFlashlight = spawnArgs.GetBool("flashlight_enabled", "1");
 			float distanceToTarget = (GetEyePosition() - actor->GetEyePosition()).Length();
 			//common->Printf("%f\n", distanceToTarget);
-			if (distanceToTarget > UNSEEN_VIEWDISTANCE)
+			if (distanceToTarget > (hasFlashlight ? UNSEEN_VIEWDISTANCE : UNSEEN_VIEWDISTANCE_HEAVY))
 			{
 				return ATTACK_IGNORE;
 			}
@@ -4356,6 +4553,7 @@ void idAI::PopoffHelmet(bool doSlowmo)
         gameLocal.SpawnEntityDef(args, &helmetEnt);
         if (helmetEnt)
         {
+			helmetPtr = helmetEnt;
             helmetEnt->GetPhysics()->SetAngularVelocity(idVec3(128, 0, 0)); //spin the helmet.
             idAngles helmetThrowDir = idAngles(-80, gameLocal.random.RandomInt(359), 0);
             helmetEnt->GetPhysics()->SetLinearVelocity(helmetThrowDir.ToForward() * 128); //throw the helmet.					
@@ -4627,7 +4825,7 @@ void idAI::Killed( idEntity *inflictor, idEntity *attacker, int damage, const id
 		args.Set("model", spawnArgs.GetString("model_healthtube"));		
 		args.Set("start_anim", "spin");
 		bleedoutTube = gameLocal.SpawnEntityType(idAnimated::Type, &args);
-		bleedoutTube->GetRenderEntity()->gui[0] = uiManager->FindGui("guis/game/bleedouttube.gui", true, true); //Create a UNIQUE gui so that its number doesn't auto sync with other guis.
+		bleedoutTube.GetEntity()->GetRenderEntity()->gui[0] = uiManager->FindGui("guis/game/bleedouttube.gui", true, true); //Create a UNIQUE gui so that its number doesn't auto sync with other guis.
 
 		bleedoutTime = gameLocal.time  + (spawnArgs.GetInt("bleedouttime", "60") * 1000);
 		bleedoutState = BLEEDOUT_ACTIVE;
@@ -4650,7 +4848,7 @@ void idAI::Killed( idEntity *inflictor, idEntity *attacker, int damage, const id
 
 	if (1)
 	{
-		gameLocal.AddEventlogDeath(this, damage, inflictor, attacker, "");
+		gameLocal.AddEventlogDeath(this, damage, inflictor, attacker, "", EL_DEATH);
 	}
 }
 
@@ -6673,15 +6871,15 @@ idCombatNode::Save
 =====================
 */
 void idCombatNode::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( min_dist );
-	savefile->WriteFloat( max_dist );
-	savefile->WriteFloat( cone_dist );
-	savefile->WriteFloat( min_height );
-	savefile->WriteFloat( max_height );
-	savefile->WriteVec3( cone_left );
-	savefile->WriteVec3( cone_right );
-	savefile->WriteVec3( offset );
-	savefile->WriteBool( disabled );
+	savefile->WriteFloat( min_dist ); // float min_dist
+	savefile->WriteFloat( max_dist ); // float max_dist
+	savefile->WriteFloat( cone_dist ); // float cone_dist
+	savefile->WriteFloat( min_height ); // float min_height
+	savefile->WriteFloat( max_height ); // float max_height
+	savefile->WriteVec3( cone_left ); // idVec3 cone_left
+	savefile->WriteVec3( cone_right ); // idVec3 cone_right
+	savefile->WriteVec3( offset ); // idVec3 offset
+	savefile->WriteBool( disabled ); // bool disabled
 }
 
 /*
@@ -6690,15 +6888,15 @@ idCombatNode::Restore
 =====================
 */
 void idCombatNode::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( min_dist );
-	savefile->ReadFloat( max_dist );
-	savefile->ReadFloat( cone_dist );
-	savefile->ReadFloat( min_height );
-	savefile->ReadFloat( max_height );
-	savefile->ReadVec3( cone_left );
-	savefile->ReadVec3( cone_right );
-	savefile->ReadVec3( offset );
-	savefile->ReadBool( disabled );
+	savefile->ReadFloat( min_dist ); // float min_dist
+	savefile->ReadFloat( max_dist ); // float max_dist
+	savefile->ReadFloat( cone_dist ); // float cone_dist
+	savefile->ReadFloat( min_height ); // float min_height
+	savefile->ReadFloat( max_height ); // float max_height
+	savefile->ReadVec3( cone_left ); // idVec3 cone_left
+	savefile->ReadVec3( cone_right ); // idVec3 cone_right
+	savefile->ReadVec3( offset ); // idVec3 offset
+	savefile->ReadBool( disabled ); // bool disabled
 }
 
 /*
@@ -7115,7 +7313,7 @@ void idAI::SpawnSkullsaver()
 	}
 
 	//Do clearance check. Find a suitable place for the skull to spawn.
-	#define AMOUNT_OF_CANDIDATESPOTS 17
+	#define AMOUNT_OF_CANDIDATESPOTS 29
 	idVec3 skullCandidateSpots[] =
 	{
 		skullSpawnPos,
@@ -7138,6 +7336,22 @@ void idAI::SpawnSkullsaver()
 		skullSpawnPos + idVec3(0,-8,32),
 		skullSpawnPos + idVec3(0,-8,48),
 
+		//BC 4-13-2025: additional checks that are more farther away.
+		//This is to handle the case where a mischievous actor somehow gets their head super jammed into world geometry.
+		skullSpawnPos + idVec3(48,0,0),
+		skullSpawnPos + idVec3(-48,0,0),
+		skullSpawnPos + idVec3(0,48,0),
+		skullSpawnPos + idVec3(0,-48,0),
+		skullSpawnPos + idVec3(64,0,0),
+		skullSpawnPos + idVec3(-64,0,0),
+		skullSpawnPos + idVec3(0,64,0),
+		skullSpawnPos + idVec3(0,-64,0),
+		skullSpawnPos + idVec3(96,0,0),
+		skullSpawnPos + idVec3(-96,0,0),
+		skullSpawnPos + idVec3(0,96,0),
+		skullSpawnPos + idVec3(0,-96,0),
+
+
 		skullSpawnPos + idVec3(0,0,-16),
 	};
 
@@ -7148,6 +7362,14 @@ void idAI::SpawnSkullsaver()
 		gameLocal.clip.TracePoint(skullLosTr, skullSpawnPos, skullCandidateSpots[i], MASK_SOLID, this);
 		if (skullLosTr.fraction < 1)
 			continue;
+
+		//BC 4-13-2025 do a check to see if point starts inside geometry
+		//This is to prevent false positives, as a bound check fully inside the void will return "valid"
+		int penetrationContents = gameLocal.clip.Contents(skullCandidateSpots[i], NULL, mat3_identity, CONTENTS_SOLID, NULL);
+		if (penetrationContents & MASK_SOLID)
+		{
+			continue; //If it starts in solid, then exit.
+		}
 
 		//Now do a bounds check to see if the space is clear.
 		gameLocal.clip.TraceBounds(skullTr, skullCandidateSpots[i], skullCandidateSpots[i], skullBounds, MASK_SOLID, this);
@@ -7350,33 +7572,61 @@ float idAI::GetSoundIntensityObstructed(idVec3 soundPos, float soundDistanceMax)
 	{ // not in area and obstructed, check for door
 
 		const int BLOCKED_BIT_CHECK = ( PS_BLOCK_VIEW | PS_BLOCK_AIR );
+
+		// We use this bool to break out of multiple nested loops at once.
+		// Note the '&& !foundSound' inside each loop declaration
+		bool foundSound = false;
+
 		// default to corner muffle
 		distanceAllowed = soundDistanceMax * (1.0f - s_aiMuffleCorner.GetFloat());
 
+		// STAGE 1: Check our immediate neighbours
+
 		// check neighbor portals to see if sound is in next area
 		int numPortals = gameRenderWorld->NumPortalsInArea( listenArea );
-		const idWinding * bestPortWindings[2] = {nullptr,nullptr};
-		for( int p = 0; p < numPortals; p++ )
+		const idWinding * bestPortWindings[3] = {nullptr,nullptr,nullptr};
+		for( int p = 0; p < numPortals && !foundSound; p++ )
 		{
 			exitPortal_t port = gameRenderWorld->GetPortal( listenArea, p );
 
 			if( port.areas[0] == soundArea || port.areas[1] == soundArea )
-			{ // neighbor area
+			{ 
+				// We have found the sound in an immediate neighbour
 				if(port.blockingBits & BLOCKED_BIT_CHECK)
 				{ // replace corner muffle with door muffle
 					distanceAllowed = soundDistanceMax * (1.0f - s_aiMuffleDoor.GetFloat());
 				}
 
 				bestPortWindings[0] = port.w;
-				break;
+				bestPortWindings[1] = nullptr;
+				bestPortWindings[2] = nullptr;
+				foundSound = true;
 			}
 			else
 			{
-				for( int p2 = 0; p2 < numPortals; p2++ )
+				// STAGE 2: Check the neighbours of our neighbours
+
+				// SW 19th March 2025: Fairly sure this is broken. I think we're supposed to be recursively checking portals in the neighbouring zone,
+				// but instead we're just checking the original zone again.
+				// I'm going to try and fix this based on what I think it's trying to do.
+				
+				// One of this portal's areas will be the initial listener area. We want to get the other area and check from there.
+				int neighbourArea = (port.areas[0] == listenArea ? port.areas[1] : port.areas[0]);
+				int numPortals2 = gameRenderWorld->NumPortalsInArea(neighbourArea);
+
+				for( int p2 = 0; p2 < numPortals2 && !foundSound; p2++ )
 				{
-					exitPortal_t port2 = gameRenderWorld->GetPortal( listenArea, p2 );
-					if( port.areas[0] == soundArea || port.areas[1] == soundArea )
-					{ // neighbor of neighbor 
+					exitPortal_t port2 = gameRenderWorld->GetPortal(neighbourArea, p2 );
+
+					if (port2.portalHandle == port.portalHandle)
+					{
+						// This is the portal going back into our listener area -- skip
+						continue;
+					}
+
+					if( port2.areas[0] == soundArea || port2.areas[1] == soundArea )
+					{
+						// We have found the sound in a neighbour of neighbour
 						if(port.blockingBits & BLOCKED_BIT_CHECK)
 						{ // replace corner muffle with door muffle
 							distanceAllowed = soundDistanceMax * (1.0f - s_aiMuffleDoor.GetFloat());
@@ -7388,13 +7638,62 @@ float idAI::GetSoundIntensityObstructed(idVec3 soundPos, float soundDistanceMax)
 
 						bestPortWindings[0] = port.w;
 						bestPortWindings[1] = port2.w;
-						break;
+						bestPortWindings[2] = nullptr;
+						foundSound = true;
+					}
+					else
+					{
+						// SW 20th March 2025: adding a third level of search depth
+						// 
+						// STAGE 3: Check the neighbours of our neighbours of our neighbours
+						// Hello reader. You may be wondering "what the hell is this crap? why not use recursion? isn't there a more elegant way to do this?"
+						// The answer is "we are a month away from shipping and overhauling this code carries the risk of introducing fun new bugs"
+						// That's gamedev, buckaroo.
+
+						int neighbourOfNeighbourArea = (port2.areas[0] == neighbourArea ? port2.areas[1] : port2.areas[0]);
+
+						if (neighbourOfNeighbourArea != listenArea)
+						{
+							int numPortals3 = gameRenderWorld->NumPortalsInArea(neighbourOfNeighbourArea);
+							for (int p3 = 0; p3 < numPortals3 && !foundSound; p3++)
+							{
+								exitPortal_t port3 = gameRenderWorld->GetPortal(neighbourOfNeighbourArea, p3);
+								if (port3.portalHandle == port2.portalHandle)
+								{
+									// This is the portal going back into our neighbour area -- skip
+									continue;
+								}
+
+								if (port3.areas[0] == soundArea || port3.areas[1] == soundArea)
+								{
+									// We found our sound, neighbour of neighbour of neighbour
+									if (port.blockingBits & BLOCKED_BIT_CHECK)
+									{ // replace corner muffle with door muffle
+										distanceAllowed = soundDistanceMax * (1.0f - s_aiMuffleDoor.GetFloat());
+									}
+									if (port2.blockingBits & BLOCKED_BIT_CHECK)
+									{ // compound muffle
+										distanceAllowed = distanceAllowed * (1.0f - s_aiMuffleDoor.GetFloat());
+									}
+									if (port3.blockingBits & BLOCKED_BIT_CHECK)
+									{ // compound muffle
+										distanceAllowed = distanceAllowed * (1.0f - s_aiMuffleDoor.GetFloat());
+									}
+
+									bestPortWindings[0] = port.w;
+									bestPortWindings[1] = port2.w;
+									bestPortWindings[2] = port3.w;
+									foundSound = true;
+								}
+							}
+						}
+						// else: oops we backtracked, skip
 					}
 				}
 			}
 		}
 
-		if(!bestPortWindings[0])
+		if(!foundSound)
 		{ // assume worst case, this code might be bug prone in heavily portald areas?
 			return 0.0f;
 		}
@@ -7403,7 +7702,7 @@ float idAI::GetSoundIntensityObstructed(idVec3 soundPos, float soundDistanceMax)
 		distTraveled = 0.0f;
 		idVec3 soundPosTravel = soundPos;
 
-		for( int foundIdx = 1; foundIdx >= 0 && distTraveled < distanceAllowed; foundIdx--)
+		for( int foundIdx = 2; foundIdx >= 0 && distTraveled < distanceAllowed; foundIdx--)
 		{
 			const idWinding * curWinding = bestPortWindings[foundIdx];
 			if( curWinding )
@@ -7424,10 +7723,12 @@ float idAI::GetSoundIntensityObstructed(idVec3 soundPos, float soundDistanceMax)
 				}
 #else
 				idVec3 closestPortPos = curWinding->GetCenter();
-				float closestPortDistSqr = closestPortPos.LengthSqr();
+				float closestPortDistSqr = (closestPortPos - soundPosTravel).LengthSqr(); // SW 19th March 2025: fixing this so it uses the difference instead of absolute portal position
 #endif
-
-				//gameRenderWorld->DebugArrow(colorBlue,soundPosTravel,closestPortPos,1,10000);
+				if (developer.GetBool())
+				{
+					gameRenderWorld->DebugArrow(colorBlue, soundPosTravel, closestPortPos, 1, 10000);
+				}
 
 				// readjust distance traveled
 				float lastDistTravel = idMath::Sqrt(closestPortDistSqr);
@@ -7442,4 +7743,42 @@ float idAI::GetSoundIntensityObstructed(idVec3 soundPos, float soundDistanceMax)
 
 	float intensityPct = 1.0f - idMath::ClampFloat( 0.0f, 1.0f, distTraveled / distanceAllowed );
 	return intensityPct;
+}
+
+// SW 25th Feb 2025:
+// Makes it so ragdolled enemies will be pushed in space
+void idAI::UpdateSpacePush()
+{
+	//if actor is in outer space and is space flailing (or ragdolled), then make it drift toward the 'back' of the ship, to simulate the ship moving through space.
+	if (gameLocal.time > outerspaceUpdateTimer)
+	{
+		#define SPACEPUSH_UPDATEINTERVAL 200
+		outerspaceUpdateTimer = gameLocal.time + SPACEPUSH_UPDATEINTERVAL; //how often to update the space check timer.
+
+		if (this->GetBindMaster() != NULL)
+			return; //skip if I'm bound to something
+
+		// Only do the push if FTL is active.
+		// (This is basically moot since the FTL is always active in this version of the game, but whatever)
+		idMeta* meta = static_cast<idMeta*>(gameLocal.metaEnt.GetEntity());
+		if (meta)
+		{
+			idFTL* ftl = static_cast<idFTL*>(meta->GetFTLDrive.GetEntity());
+			if (ftl)
+			{
+				if (!ftl->IsJumpActive(false, false))
+				{
+					return;
+				}
+			}
+		}
+
+		if (isInOuterSpace() && gameLocal.world->doSpacePush && (af.IsActive() || aiState == AISTATE_SPACEFLAIL))
+		{
+			#define SPACEPUSH_POWER 8
+			idVec3 spacePushPower = idVec3(0, -1, 0); //move toward back of ship.
+			spacePushPower = spacePushPower * SPACEPUSH_POWER * this->GetPhysics()->GetMass();
+			GetPhysics()->ApplyImpulse(0, GetPhysics()->GetAbsBounds().GetCenter(), spacePushPower);
+		}
+	}
 }

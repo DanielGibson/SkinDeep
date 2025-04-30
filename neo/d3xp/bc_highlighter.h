@@ -20,6 +20,10 @@ public:
 
 							idHighlighter();
 							~idHighlighter();
+
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
+
 	void					Spawn();
 
 	virtual void			Think(void);
@@ -62,7 +66,7 @@ private:
 
 	void					InitializeArrows(highlightEntity_t hlEnt0, highlightEntity_t hlEnt1);
 
-	idCameraView*			highlightCamera;	
+	idCameraView*			highlightCamera = nullptr;
 	highlightEntity_t		highlightEntityInfos[2];
 	void					SetHighlightEntityInfo(idEntity* ent0, idEntity *ent1);
 	bool					cameraRotateActive;

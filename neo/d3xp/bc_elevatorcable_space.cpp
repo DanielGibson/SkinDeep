@@ -19,11 +19,23 @@ CLASS_DECLARATION(idBeam, idElevatorcableSpace)
 	EVENT(EV_PostSpawn,	idElevatorcableSpace::Event_PostSpawn)
 END_CLASS
 
-
-void idElevatorcableSpace::Spawn(void)
+idElevatorcableSpace::idElevatorcableSpace()
 {
 	frobTrigger = NULL;
 	lastZipDirection = 0;
+}
+
+idElevatorcableSpace::~idElevatorcableSpace()
+{
+	if (frobTrigger)
+	{
+		frobTrigger->PostEventMS(&EV_Remove, 0);
+		frobTrigger = nullptr;
+	}
+}
+
+void idElevatorcableSpace::Spawn(void)
+{
 }
 
 void idElevatorcableSpace::Event_PostSpawn(void)
@@ -79,7 +91,7 @@ void idElevatorcableSpace::Event_PostSpawn(void)
 	args.SetVector("mins", idVec3(-FROBTRIGGER_WIDTH, -FROBTRIGGER_WIDTH, 0));
 	args.SetVector("maxs", idVec3(FROBTRIGGER_WIDTH, FROBTRIGGER_WIDTH, lengthOfBeam));
 	args.SetBool("frobcable_space", true);
-	args.Set("displayname", "ZIPCORD");
+	args.Set("displayname", "#str_def_gameplay_100022"); //BC 3-20-2025: fixed loc bug
 	frobTrigger = (idFrobcube *)gameLocal.SpawnEntityType(idFrobcube::Type, &args);
 	//common->Printf("%s\n", frobTrigger->GetName());	
 	//frobTrigger->GetPhysics()->SetContents(CONTENTS_CORPSE);
@@ -140,10 +152,22 @@ void idElevatorcableSpace::Event_PostSpawn(void)
 
 void idElevatorcableSpace::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( topEnt ); //  idEntityPtr<idEntity> topEnt
+	savefile->WriteObject( bottomEnt ); //  idEntityPtr<idEntity> bottomEnt
+
+	savefile->WriteObject( frobTrigger ); //  idFrobcube* frobTrigger
+
+	savefile->WriteInt( lastZipDirection ); //  int lastZipDirection
 }
 
 void idElevatorcableSpace::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( topEnt ); //  idEntityPtr<idEntity> topEnt
+	savefile->ReadObject( bottomEnt ); //  idEntityPtr<idEntity> bottomEnt
+
+	savefile->ReadObject( CastClassPtrRef(frobTrigger) ); //  idFrobcube* frobTrigger
+
+	savefile->ReadInt( lastZipDirection ); //  int lastZipDirection
 }
 
 void idElevatorcableSpace::Think(void)

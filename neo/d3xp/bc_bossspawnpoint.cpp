@@ -13,10 +13,12 @@ END_CLASS
 
 void idBossSpawnpoint::Save(idSaveGame *savefile) const
 {
+	// savegame no data
 }
 
 void idBossSpawnpoint::Restore(idRestoreGame *savefile)
 {
+	// savegame no data
 }
 
 

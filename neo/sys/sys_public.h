@@ -60,7 +60,8 @@ typedef enum {
 	SE_MOUSE,				// evValue and evValue2 are reletive signed x / y moves
 	SE_JOYSTICK,			//QC evValue is an axis number and evValue2 is the current state (-127 to 127)
 	SE_CONSOLE,				// evPtr is a char*, from typing something at a non-game console
-	SE_MOUSEGAMEPAD			// BC: emulating mouse via gamepad
+	SE_MOUSEGAMEPAD,			// BC: emulating mouse via gamepad
+	SE_MOUSEWIN			// blendo eric: mouse movement using the windowing speed/accel (for use later)
 } sysEventType_t;
 
 typedef enum {
@@ -164,6 +165,7 @@ enum controllerType_t
 	CT_PS4,
 	CT_PS5,
 	CT_SWITCHPRO,
+	CT_STEAMDECK,
 	CT_NUM
 };
 
@@ -283,8 +285,15 @@ void			Sys_ShowConsole( int visLevel, bool quitOnClose );
 // blendo eric: is window in focus
 bool			Sys_IsWindowActive();
 
-void			Sys_Mkdir( const char *path );
-ID_TIME_T			Sys_FileTimeStamp( FILE *fp );
+enum SYS_ACCESS_MODE {
+	SYS_ACCESS_EXISTENCE = 0,
+	SYS_ACCESS_WRITE = 2,
+	SYS_ACCESS_READ = 4,
+	SYS_ACCESS_READWRITE = 6
+};
+int				Sys_Access( const char *path, SYS_ACCESS_MODE mode ); 
+int				Sys_Mkdir( const char *path );
+ID_TIME_T		Sys_FileTimeStamp( FILE *fp );
 // NOTE: do we need to guarantee the same output on all platforms?
 const char *	Sys_TimeStampToStr( ID_TIME_T timeStamp );
 ID_TIME_T		Sys_GetTime();

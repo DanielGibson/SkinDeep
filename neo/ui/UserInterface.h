@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __USERINTERFACE_H__
 #define __USERINTERFACE_H__
 
+#include "gamesys/SaveGame.h"
 #include "idlib/Dict.h"
 #include "ui/ListGUI.h"
 #include "ui/Rectangle.h"
@@ -46,7 +47,8 @@ class idFile;
 class idDemoFile;
 
 
-class idUserInterface {
+class idUserInterface : public idSaveGamePtr
+{
 public:
 	virtual						~idUserInterface() {};
 
@@ -62,6 +64,9 @@ public:
 	virtual bool				IsUniqued() const = 0;
 
 	virtual void				SetUniqued( bool b ) = 0;
+
+	virtual bool				IsShared() const = 0;
+
 								// returns false if it failed to load
 	virtual bool				InitFromFile( const char *qpath, bool rebuild = true, bool cache = true ) = 0;
 
@@ -113,17 +118,23 @@ public:
 	virtual	void				ReadFromDemoFile( class idDemoFile *f ) = 0;
 	virtual	void				WriteToDemoFile( class idDemoFile *f ) = 0;
 
-	virtual bool				WriteToSaveGame( idFile *savefile ) const = 0;
-	virtual bool				ReadFromSaveGame( idFile *savefile ) = 0;
+	// blendo eric: moved to idSaveGamePtr
+	virtual void				WriteToSaveGame(idSaveGame* savefile) const { idSaveGamePtr::WriteToSaveGame(savefile); }
+	virtual void				ReadFromSaveGame( idRestoreGame *savefile ) { idSaveGamePtr::ReadFromSaveGame(savefile); }
+
 	virtual void				SetKeyBindingNames( void ) = 0;
 
 	virtual void				SetCursor( float x, float y ) = 0;
 	virtual float				CursorX() = 0;
 	virtual float				CursorY() = 0;
+
+	virtual	const char *		GetGroup() const = 0;
+	virtual	void				SetGroup( const char * newId ) = 0;
 };
 
 
 class idUserInterfaceManager {
+	friend class idSaveGame;
 public:
 	virtual						~idUserInterfaceManager( void ) {};
 
@@ -154,7 +165,7 @@ public:
 	virtual void				DeAlloc( idUserInterface *gui ) = 0;
 
 								// Returns NULL if gui by that name does not exist.
-	virtual idUserInterface *	FindGui( const char *qpath, bool autoLoad = false, bool needUnique = false, bool forceNOTUnique = false ) = 0;
+	virtual idUserInterface *	FindGui( const char *qpath, bool autoLoad = false, bool needUnique = false, bool forceNOTUnique = false, bool * owned = nullptr ) = 0;
 
 								// Returns NULL if gui by that name does not exist.
 	virtual idUserInterface *	FindDemoGui( const char *qpath ) = 0;
@@ -164,8 +175,76 @@ public:
 
 								// De-allocates a list gui
 	virtual void				FreeListGUI( idListGUI *listgui ) = 0;
+
+	virtual const idStr&		GetGroup() const = 0;
+	virtual void				SetGroup( const char* group, bool persists ) = 0;
+
+protected:                   
+
+	virtual idList<idUserInterface*> & GetGuis( ) = 0;
 };
 
 extern idUserInterfaceManager *	uiManager;
+
+struct idUserInterfacePtr // holds the params that creates a gui, which can be used later to reconstruct autosaves
+{
+	idUserInterfacePtr(const char* _name, bool _autosave, bool _uniqued, bool _shared) :
+		name(_name), autosave(_autosave), uniqued(_uniqued), shared(_shared) {
+	}
+
+	idUserInterface* operator=(idUserInterfacePtr& uiPtr) { return uiPtr.GetUI(); }
+
+
+	operator idUserInterface*() const { return GetUI(); }
+
+
+	idUserInterface* GetUI() const {
+		return GetUI();
+	}
+
+	idUserInterface* GetUI()
+	{
+		if (!name.IsEmpty())
+		{
+			ui = uiManager->FindGui(name, autosave, uniqued, shared, &owned);
+			return ui;
+		}
+		return nullptr;
+	}
+
+	virtual void WriteToSaveGame(idSaveGame* savefile) const
+	{
+		savefile->WriteBool( ui != nullptr );
+		if (ui)
+		{
+			savefile->WriteString(name);
+			savefile->WriteBool(autosave);
+			savefile->WriteBool(uniqued);
+			savefile->WriteBool(shared);
+			savefile->WriteBool(owned);
+		}
+	}
+	
+	virtual void ReadFromSaveGame(idRestoreGame* savefile)
+	{
+		bool bExists;
+		savefile->ReadBool( bExists );
+		savefile->ReadString(name);
+		savefile->ReadBool(autosave);
+		savefile->ReadBool(uniqued);
+		savefile->ReadBool(shared);
+		savefile->ReadBool(owned);
+	}
+
+	// construct/findgui params
+	idStr name = idStr();
+	bool autosave = true;
+	bool uniqued = false;
+	bool shared = false;
+	bool owned = false;
+
+	// holder vals
+	idUserInterface * ui = nullptr;
+};
 
 #endif /* !__USERINTERFACE_H__ */

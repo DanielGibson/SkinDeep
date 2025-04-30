@@ -30,10 +30,26 @@ idAlgaeball::~idAlgaeball(void)
 
 void idAlgaeball::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteObject(displayModel); //  idAnimated* displayModel
+
+	savefile->WriteVec3( wallNormal ); //  idVec3 wallNormal
+
+	savefile->WriteInt( spawnTime ); //  int spawnTime
 }
 
 void idAlgaeball::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadObject(CastClassPtrRef(displayModel)); //  idAnimated* displayModel
+
+	savefile->ReadVec3( wallNormal ); //  idVec3 wallNormal
+
+	savefile->ReadInt( spawnTime ); //  int spawnTime
 }
 
 void idAlgaeball::Spawn(void)

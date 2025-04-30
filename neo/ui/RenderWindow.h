@@ -39,6 +39,9 @@ public:
 	idRenderWindow(idUserInterfaceLocal *gui);
 	idRenderWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	virtual ~idRenderWindow();
+	
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void ReadFromSaveGame( idRestoreGame *savefile );
 
 	virtual void PostParse();
 	virtual void Draw(int time, float x, float y);

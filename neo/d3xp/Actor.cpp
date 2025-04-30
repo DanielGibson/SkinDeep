@@ -131,46 +131,33 @@ idAnimState::Save
 =====================
 */
 void idAnimState::Save( idSaveGame *savefile ) const {
+	savefile->WriteBool( idleAnim ); // bool idleAnim
+	savefile->WriteString( state ); // idString state
+	savefile->WriteInt( animBlendFrames ); // int animBlendFrames
+	savefile->WriteInt( lastAnimBlendFrames ); // int lastAnimBlendFrames
 
-	savefile->WriteObject( self );
-
-	// Save the entity owner of the animator
-	savefile->WriteObject( animator->GetEntity() );
-
-	savefile->WriteObject( thread );
-
-	savefile->WriteString( state );
-
-	savefile->WriteInt( animBlendFrames );
-	savefile->WriteInt( lastAnimBlendFrames );
-	savefile->WriteInt( channel );
-	savefile->WriteBool( idleAnim );
-	savefile->WriteBool( disabled );
+	savefile->WriteObject( self ); // idActor * self
+	savefile->WriteAnimatorPtr( animator ); // idAnimator * animator
+	savefile->WriteObject( thread ); // idThread * thread
+	savefile->WriteInt( channel ); // int channel
+	savefile->WriteBool( disabled ); // bool disabled
 }
-
 /*
 =====================
 idAnimState::Restore
 =====================
 */
 void idAnimState::Restore( idRestoreGame *savefile ) {
-	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
+	savefile->ReadBool( idleAnim ); // bool idleAnim
+	savefile->ReadString( state ); // idString state
+	savefile->ReadInt( animBlendFrames ); // int animBlendFrames
+	savefile->ReadInt( lastAnimBlendFrames ); // int lastAnimBlendFrames
 
-	idEntity *animowner;
-	savefile->ReadObject( reinterpret_cast<idClass *&>( animowner ) );
-	if ( animowner ) {
-		animator = animowner->GetAnimator();
-	}
-
-	savefile->ReadObject( reinterpret_cast<idClass *&>( thread ) );
-
-	savefile->ReadString( state );
-
-	savefile->ReadInt( animBlendFrames );
-	savefile->ReadInt( lastAnimBlendFrames );
-	savefile->ReadInt( channel );
-	savefile->ReadBool( idleAnim );
-	savefile->ReadBool( disabled );
+	savefile->ReadObject( CastClassPtrRef(self) ); // idActor * self
+	savefile->ReadAnimatorPtr( animator ); // idAnimator * animator
+	savefile->ReadObject( CastClassPtrRef(thread) ); // idThread * thread
+	savefile->ReadInt( channel ); // int channel
+	savefile->ReadBool( disabled ); // bool disabled
 }
 
 /*
@@ -578,6 +565,7 @@ idActor::idActor( void ) {
 	hasAttachedBeltItems = false;
 	stunTime = 0;
 	stunStartTime = 0;
+	helmetModel = NULL;
 }
 
 	
@@ -604,20 +592,43 @@ idActor::~idActor( void ) {
 		head.GetEntity()->PostEventMS( &EV_Remove, 0 );
 	}
 
+	// blendo eric: TODO need to come back to this, forgot if this fixed anything? probably for missing ent bug?
+	// but i don't think we should unbind/remove on inactive ents anyhow
+#if 1
 	// remove any attached entities
 	for( i = 0; i < attachments.Num(); i++ ) {
 		ent = attachments[ i ].ent.GetEntity();
 		if ( ent ) {
+			ent->Unbind();
 			ent->PostEventMS( &EV_Remove, 0 );
 		}
 	}
 
 	for (i = 0; i < attachmentsToDrop.Num(); i++) {
 		ent = attachmentsToDrop[i].ent.GetEntity();
-		if (ent) {
+		if ( ent ) {
+			ent->Unbind();
 			ent->PostEventMS(&EV_Remove, 0);
 		}
 	}
+#else
+	// remove any attached entities
+	for( i = 0; i < attachments.Num(); i++ ) {
+		ent = attachments[ i ].ent.GetEntity();
+		if ( ent && ent->IsActive() ) {
+			ent->Unbind();
+			ent->PostEventMS( &EV_Remove, 0 );
+		}
+	}
+
+	for (i = 0; i < attachmentsToDrop.Num(); i++) {
+		ent = attachmentsToDrop[i].ent.GetEntity();
+		if (ent && ent->IsActive()) {
+			ent->Unbind();
+			ent->PostEventMS(&EV_Remove, 0);
+		}
+	}
+#endif
 
 	//DOOM BFG
 	aimAssistNode.Remove();
@@ -626,6 +637,7 @@ idActor::~idActor( void ) {
 	if (energyShieldModel != NULL)
 	{
 		energyShieldModel->PostEventMS(&EV_Remove, 0);
+		energyShieldModel = nullptr;
 	}
 	
 
@@ -997,6 +1009,9 @@ void idActor::AttachItem(idStr itemDefName, idStr jointName, idVec3 originOffset
 		gameLocal.Error("Actor '%s' failed to spawn attachitem '%s'", GetName(), jointName.c_str());
 	}
 
+	//BC 3-11-2025: fixed bug where belt attachment angles were bad. Force it to change angle here.
+	ent->SetAxis(newAxis);
+
 	attach.channel = animator.GetChannelForJoint(joint);
 	attach.ent = ent;	
 	
@@ -1200,87 +1215,81 @@ archive object for savegame file
 ================
 */
 void idActor::Save( idSaveGame *savefile ) const {
-	idActor *ent;
-	int i;
 
-	savefile->WriteInt( team );
-	savefile->WriteInt( rank );
-	savefile->WriteMat3( viewAxis );
+	savefile->WriteInt( rank ); //  int rank
+	savefile->WriteMat3( viewAxis ); //  idMat3 viewAxis
 
-	savefile->WriteInt( enemyList.Num() );
-	for ( ent = enemyList.Next(); ent != NULL; ent = ent->enemyNode.Next() ) {
+	//  idLinkList<idActor> enemyNode
+	savefile->WriteInt( enemyList.Num() ); //  idLinkList<idActor> enemyList
+	for ( idActor *ent = enemyList.Next(); ent != NULL; ent = ent->enemyNode.Next() ) {
 		savefile->WriteObject( ent );
 	}
 
-	savefile->WriteFloat( fovDot );
-	savefile->WriteVec3( eyeOffset );
-	savefile->WriteVec3( modelOffset );
-	savefile->WriteAngles( deltaViewAngles );
+	savefile->WriteInt( energyShieldCurrent ); //  int energyShieldCurrent
+	savefile->WriteInt( energyShieldMax ); //  int energyShieldMax
 
-	savefile->WriteInt( pain_debounce_time );
-	savefile->WriteInt( pain_delay );
-	savefile->WriteInt( pain_threshold );
 
-	savefile->WriteInt( damageGroups.Num() );
-	for( i = 0; i < damageGroups.Num(); i++ ) {
+	savefile->WriteVec3( lastDamageOrigin ); //  idVec3 lastDamageOrigin
+	savefile->WriteVec3( lastAttackerDamageOrigin ); //  idVec3 lastAttackerDamageOrigin
+	savefile->WriteObject( lastAttacker ); // idEntityPtr<idEntity> lastAttacker
+	savefile->WriteInt( lastDamagedTime ); //  int lastDamagedTime
+
+
+	savefile->WriteInt( stunStartTime ); //  int stunStartTime
+	savefile->WriteInt( stunTime ); //  int stunTime
+	savefile->WriteString( stunAnimationName ); //  idString stunAnimationName
+
+
+	savefile->WriteInt( vo_lastSpeakTime ); //  int vo_lastSpeakTime
+	savefile->WriteInt( vo_lastCategory ); //  int vo_lastCategory
+
+	savefile->WriteInt( pointdefenseAmount ); //  int pointdefenseAmount
+
+	savefile->WriteInt( attachmentsToDrop.Num() ); //  idList<idAttachInfo> attachments
+	for ( int i = 0; i < attachmentsToDrop.Num(); i++ ) {
+		attachmentsToDrop[i].ent.Save( savefile );
+		savefile->WriteInt( attachmentsToDrop[i].channel );
+	}
+
+	savefile->WriteBool( hasHelmet ); //  bool hasHelmet
+
+	savefile->WriteFloat( fovDot ); //  float fovDot
+	savefile->WriteVec3( eyeOffset ); //  idVec3 eyeOffset
+	savefile->WriteVec3( modelOffset ); //  idVec3 modelOffset
+
+	savefile->WriteAngles( deltaViewAngles ); //  idAngles deltaViewAngles
+
+	savefile->WriteInt( pain_debounce_time ); //  int pain_debounce_time
+	savefile->WriteInt( pain_delay ); //  int pain_delay
+	savefile->WriteInt( pain_threshold ); //  int pain_threshold
+
+	savefile->WriteInt( damageGroups.Num() );  //  idStrList damageGroups
+	for( int i = 0; i < damageGroups.Num(); i++ ) {
 		savefile->WriteString( damageGroups[ i ] );
 	}
-
-	savefile->WriteInt( damageScale.Num() );
-	for( i = 0; i < damageScale.Num(); i++ ) {
+	savefile->WriteInt( damageScale.Num() ); //  idList<float> damageScale
+	for( int i = 0; i < damageScale.Num(); i++ ) {
 		savefile->WriteFloat( damageScale[ i ] );
 	}
+	savefile->WriteInt( damageBonus.Num() ); //  idList<int> damageBonus
+	for( int i = 0; i < damageBonus.Num(); i++ ) {
+		savefile->WriteInt( damageBonus[ i ] );
+	}
 
-	savefile->WriteBool( use_combat_bbox );
-	head.Save( savefile );
+	savefile->WriteBool( use_combat_bbox ); //  bool use_combat_bbox
 
-	savefile->WriteInt( copyJoints.Num() );
-	for( i = 0; i < copyJoints.Num(); i++ ) {
+	head.Save( savefile ); //  idEntityPtr<idAFAttachment> head
+
+	savefile->WriteInt( copyJoints.Num() ); //  idList<copyJoints_t> copyJoints
+	for( int i = 0; i < copyJoints.Num(); i++ ) {
 		savefile->WriteInt( copyJoints[i].mod );
 		savefile->WriteJoint( copyJoints[i].from );
 		savefile->WriteJoint( copyJoints[i].to );
 	}
 
-	savefile->WriteJoint( leftEyeJoint );
-	savefile->WriteJoint( rightEyeJoint );
-	savefile->WriteJoint( soundJoint );
-
-	walkIK.Save( savefile );
-
-	savefile->WriteString( animPrefix );
-	savefile->WriteString( painAnim );
-
-	savefile->WriteInt( blink_anim );
-	savefile->WriteInt( blink_time );
-	savefile->WriteInt( blink_min );
-	savefile->WriteInt( blink_max );
-
-	// script variables
-	savefile->WriteObject( scriptThread );
-
-	savefile->WriteString( waitState );
-
-	headAnim.Save( savefile );
-	torsoAnim.Save( savefile );
-	legsAnim.Save( savefile );
-
-	savefile->WriteBool( allowPain );
-	savefile->WriteBool( allowEyeFocus );
-
-	savefile->WriteInt( painTime );
-
-	savefile->WriteInt( attachments.Num() );
-	for ( i = 0; i < attachments.Num(); i++ ) {
-		attachments[i].ent.Save( savefile );
-		savefile->WriteInt( attachments[i].channel );
-	}
-
-	savefile->WriteBool( finalBoss );
-
 	idToken token;
-
 	//FIXME: this is unneccesary
-	if ( state ) {
+	if ( state ) { // const function_t		*state;
 		idLexer src( state->Name(), idStr::Length( state->Name() ), "idAI::Save" );
 
 		src.ReadTokenOnLine( &token );
@@ -1292,7 +1301,7 @@ void idActor::Save( idSaveGame *savefile ) const {
 		savefile->WriteString( "" );
 	}
 
-	if ( idealState ) {
+	if ( idealState ) { // const function_t		*idealState;
 		idLexer src( idealState->Name(), idStr::Length( idealState->Name() ), "idAI::Save" );
 
 		src.ReadTokenOnLine( &token );
@@ -1304,10 +1313,57 @@ void idActor::Save( idSaveGame *savefile ) const {
 		savefile->WriteString( "" );
 	}
 
-#ifdef _D3XP
-	savefile->WriteInt(damageCap);
-#endif
+	savefile->WriteJoint( leftEyeJoint ); //  saveJoint_t leftEyeJoint
+	savefile->WriteJoint( rightEyeJoint ); //  saveJoint_t rightEyeJoint
+	savefile->WriteJoint( soundJoint ); //  saveJoint_t soundJoint
 
+	walkIK.Save(savefile); //  idIK_Walk walkIK
+
+	savefile->WriteString( animPrefix ); //  idString animPrefix
+	savefile->WriteString( painAnim ); //  idString painAnim
+
+	savefile->WriteInt( blink_anim ); //  int blink_anim
+	savefile->WriteInt( blink_time ); //  int blink_time
+	savefile->WriteInt( blink_min ); //  int blink_min
+	savefile->WriteInt( blink_max ); //  int blink_max
+
+	// script variables
+	savefile->WriteObject( scriptThread ); //  idThread * scriptThread
+	savefile->WriteString( waitState ); //  idString waitState
+
+	headAnim.Save( savefile ); //  idAnimState headAnim
+	torsoAnim.Save( savefile ); //  idAnimState torsoAnim
+	legsAnim.Save( savefile ); //  idAnimState legsAnim
+
+	savefile->WriteBool( allowPain ); //  bool allowPain
+	savefile->WriteBool( allowEyeFocus ); //  bool allowEyeFocus
+	savefile->WriteBool( finalBoss ); //  bool finalBoss
+
+	savefile->WriteInt( painTime ); //  int painTime
+
+	savefile->WriteInt( attachments.Num() ); //  idList<idAttachInfo> attachments
+	for ( int i = 0; i < attachments.Num(); i++ ) {
+		attachments[i].ent.Save( savefile );
+		savefile->WriteInt( attachments[i].channel );
+	}
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( damageCap ); //  int damageCap
+
+	savefile->WriteJoint( leftFootJoint ); //  saveJoint_t leftFootJoint
+	savefile->WriteJoint( rightFootJoint ); //  saveJoint_t rightFootJoint
+	savefile->WriteObject( visionBox ); //  idTrigger * visionBox
+	savefile->WriteJoint( eyeJoint ); //  saveJoint_t eyeJoint
+
+	savefile->WriteInt( energyShieldTimer ); //  int energyShieldTimer
+	savefile->WriteInt( energyShieldState ); //  int energyShieldState
+	savefile->WriteObject( energyShieldModel ); //  idEntity * energyShieldModel
+
+	savefile->WriteString( customIdleAnim ); //  idString customIdleAnim
+
+	savefile->WriteObject( helmetModel ); //  idEntity * helmetModel
+
+	savefile->WriteBool( hasAttachedBeltItems ); //  bool hasAttachedBeltItems
 }
 
 /*
@@ -1318,15 +1374,15 @@ unarchives object from save game file
 ================
 */
 void idActor::Restore( idRestoreGame *savefile ) {
-	int i, num;
-	idActor *ent;
+	int num;
 
-	savefile->ReadInt( team );
-	savefile->ReadInt( rank );
-	savefile->ReadMat3( viewAxis );
+	savefile->ReadInt( rank ); //  int rank
+	savefile->ReadMat3( viewAxis ); //  idMat3 viewAxis
 
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
+	//  idLinkList<idActor> enemyNode
+	savefile->ReadInt( num ); //  idLinkList<idActor> enemyList
+	for ( int i = 0; i < num; i++ ) {
+		idActor* ent = nullptr;
 		savefile->ReadObject( reinterpret_cast<idClass *&>( ent ) );
 		assert( ent );
 		if ( ent ) {
@@ -1334,92 +1390,139 @@ void idActor::Restore( idRestoreGame *savefile ) {
 		}
 	}
 
-	savefile->ReadFloat( fovDot );
-	savefile->ReadVec3( eyeOffset );
-	savefile->ReadVec3( modelOffset );
-	savefile->ReadAngles( deltaViewAngles );
+	savefile->ReadInt( energyShieldCurrent ); //  int energyShieldCurrent
+	savefile->ReadInt( energyShieldMax ); //  int energyShieldMax
 
-	savefile->ReadInt( pain_debounce_time );
-	savefile->ReadInt( pain_delay );
-	savefile->ReadInt( pain_threshold );
+	savefile->ReadVec3( lastDamageOrigin ); //  idVec3 lastDamageOrigin
+	savefile->ReadVec3( lastAttackerDamageOrigin ); //  idVec3 lastAttackerDamageOrigin
+	savefile->ReadObject( lastAttacker ); // idEntityPtr<idEntity> lastAttacker
+	savefile->ReadInt( lastDamagedTime ); //  int lastDamagedTime
 
-	savefile->ReadInt( num );
-	damageGroups.SetGranularity( 1 );
+	savefile->ReadInt( stunStartTime ); //  int stunStartTime
+	savefile->ReadInt( stunTime ); //  int stunTime
+	savefile->ReadString( stunAnimationName ); //  idString stunAnimationName
+
+
+	savefile->ReadInt( vo_lastSpeakTime ); //  int vo_lastSpeakTime
+	savefile->ReadInt( vo_lastCategory ); //  int vo_lastCategory
+
+	savefile->ReadInt( pointdefenseAmount ); //  int pointdefenseAmount
+
+	savefile->ReadInt( num ); //  idList<idAttachInfo> attachments
+	attachmentsToDrop.SetNum( num );
+	for ( int i = 0; i < attachmentsToDrop.Num(); i++ ) {
+		attachmentsToDrop[i].ent.Restore( savefile );
+		savefile->ReadInt( attachmentsToDrop[i].channel );
+	}
+
+	savefile->ReadBool( hasHelmet ); //  bool hasHelmet
+
+	savefile->ReadFloat( fovDot ); //  float fovDot
+	savefile->ReadVec3( eyeOffset ); //  idVec3 eyeOffset
+	savefile->ReadVec3( modelOffset ); //  idVec3 modelOffset
+
+	savefile->ReadAngles( deltaViewAngles ); //  idAngles deltaViewAngles
+
+	savefile->ReadInt( pain_debounce_time ); //  int pain_debounce_time
+	savefile->ReadInt( pain_delay ); //  int pain_delay
+	savefile->ReadInt( pain_threshold ); //  int pain_threshold
+
+	savefile->ReadInt( num );  //  idStrList damageGroups
 	damageGroups.SetNum( num );
-	for( i = 0; i < num; i++ ) {
+	damageGroups.SetGranularity(1);
+	for( int i = 0; i < damageGroups.Num(); i++ ) {
 		savefile->ReadString( damageGroups[ i ] );
 	}
-
-	savefile->ReadInt( num );
+	savefile->ReadInt( num); //  idList<float> damageScale
 	damageScale.SetNum( num );
-	for( i = 0; i < num; i++ ) {
+	for( int i = 0; i < damageScale.Num(); i++ ) {
 		savefile->ReadFloat( damageScale[ i ] );
 	}
+	savefile->ReadInt( num ); //  idList<int> damageBonus
+	damageBonus.SetNum( num );
+	for( int i = 0; i < damageBonus.Num(); i++ ) {
+		savefile->ReadInt( damageBonus[ i ] );
+	}
 
-	savefile->ReadBool( use_combat_bbox );
-	head.Restore( savefile );
+	savefile->ReadBool( use_combat_bbox ); //  bool use_combat_bbox
 
-	savefile->ReadInt( num );
+	head.Restore( savefile ); //  idEntityPtr<idAFAttachment> head
+
+	savefile->ReadInt( num ); //  idList<copyJoints_t> copyJoints
 	copyJoints.SetNum( num );
-	for( i = 0; i < num; i++ ) {
+	for( int i = 0; i < copyJoints.Num(); i++ ) {
 		int val;
 		savefile->ReadInt( val );
-		copyJoints[i].mod = static_cast<jointModTransform_t>( val );
+		copyJoints[i].mod = (jointModTransform_t)val;
 		savefile->ReadJoint( copyJoints[i].from );
 		savefile->ReadJoint( copyJoints[i].to );
 	}
 
-	savefile->ReadJoint( leftEyeJoint );
-	savefile->ReadJoint( rightEyeJoint );
-	savefile->ReadJoint( soundJoint );
-
-	walkIK.Restore( savefile );
-
-	savefile->ReadString( animPrefix );
-	savefile->ReadString( painAnim );
-
-	savefile->ReadInt( blink_anim );
-	savefile->ReadInt( blink_time );
-	savefile->ReadInt( blink_min );
-	savefile->ReadInt( blink_max );
-
-	savefile->ReadObject( reinterpret_cast<idClass *&>( scriptThread ) );
-
-	savefile->ReadString( waitState );
-
-	headAnim.Restore( savefile );
-	torsoAnim.Restore( savefile );
-	legsAnim.Restore( savefile );
-
-	savefile->ReadBool( allowPain );
-	savefile->ReadBool( allowEyeFocus );
-
-	savefile->ReadInt( painTime );
-
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
-		idAttachInfo &attach = attachments.Alloc();
-		attach.ent.Restore( savefile );
-		savefile->ReadInt( attach.channel );
-	}
-
-	savefile->ReadBool( finalBoss );
-
 	idStr statename;
-
-	savefile->ReadString( statename );
+	savefile->ReadString( statename );  // const function_t *state
 	if ( statename.Length() > 0 ) {
 		state = GetScriptFunction( statename );
 	}
 
-	savefile->ReadString( statename );
+	savefile->ReadString( statename ); // const function_t *idealState;
 	if ( statename.Length() > 0 ) {
 		idealState = GetScriptFunction( statename );
 	}
 
-#ifdef _D3XP
-	savefile->ReadInt(damageCap);
-#endif
+	savefile->ReadJoint( leftEyeJoint ); //  saveJoint_t leftEyeJoint
+	savefile->ReadJoint( rightEyeJoint ); //  saveJoint_t rightEyeJoint
+	savefile->ReadJoint( soundJoint ); //  saveJoint_t soundJoint
+
+	walkIK.Restore(savefile); //  idIK_Walk walkIK
+
+	savefile->ReadString( animPrefix ); //  idString animPrefix
+	savefile->ReadString( painAnim ); //  idString painAnim
+
+	savefile->ReadInt( blink_anim ); //  int blink_anim
+	savefile->ReadInt( blink_time ); //  int blink_time
+	savefile->ReadInt( blink_min ); //  int blink_min
+	savefile->ReadInt( blink_max ); //  int blink_max
+
+	// script variables
+	savefile->ReadObject( reinterpret_cast<idClass *&>( scriptThread ) ); //  idThread * scriptThread
+	savefile->ReadString( waitState ); //  idString waitState
+
+	headAnim.Restore( savefile ); //  idAnimState headAnim
+	torsoAnim.Restore( savefile ); //  idAnimState torsoAnim
+	legsAnim.Restore( savefile ); //  idAnimState legsAnim
+
+	savefile->ReadBool( allowPain ); //  bool allowPain
+	savefile->ReadBool( allowEyeFocus ); //  bool allowEyeFocus
+	savefile->ReadBool( finalBoss ); //  bool finalBoss
+
+	savefile->ReadInt( painTime ); //  int painTime
+
+	savefile->ReadInt( num ); //  idList<idAttachInfo> attachments
+	for ( int i = 0; i < num; i++ ) {
+		idAttachInfo &attach = attachments.Alloc();
+		attach.ent.Restore( savefile );
+		savefile->ReadInt( attach.channel );
+	}
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( damageCap ); //  int damageCap
+
+	savefile->ReadJoint( leftFootJoint ); //  saveJoint_t leftFootJoint
+	savefile->ReadJoint( rightFootJoint ); //  saveJoint_t rightFootJoint
+	savefile->ReadObject( reinterpret_cast<idClass *&>( visionBox ) ); //  idTrigger * visionBox
+	savefile->ReadJoint( eyeJoint ); //  saveJoint_t eyeJoint
+
+	savefile->ReadInt( energyShieldTimer ); //  int energyShieldTimer
+	savefile->ReadInt( energyShieldState ); //  int energyShieldState
+	savefile->ReadObject( energyShieldModel ); //  idEntity * energyShieldModel
+
+	savefile->ReadString( customIdleAnim ); //  idString customIdleAnim
+
+	savefile->ReadObject( helmetModel ); //  idEntity * helmetModel
+
+	savefile->ReadBool( hasAttachedBeltItems ); //  bool hasAttachedBeltItems
+
+	//af.SetAnimator( GetAnimator() );
 }
 
 /*
@@ -1772,7 +1875,7 @@ idActor::SetState
 */
 void idActor::SetState( const function_t *newState, bool updateScriptImmediate ) {
 
-	if (ai_showPlayerState.GetBool()) { // blendo eric: collect start debug states
+	if (ai_showPlayerState.GetBool() && this->IsType(idPlayer::Type)) { // blendo eric: collect start debug states
 		for (int chidx = 0; chidx < DEBUG_Anim_State_Count; chidx++) {
 			int channel = DEBUG_Anim_State_Channels[chidx];
 			DEBUG_Anim_State_Changed[channel].Append(GetAnimState(channel));
@@ -1845,7 +1948,7 @@ void idActor::UpdateScript( void ) {
 	}
 
 
-	if (ai_showPlayerState.GetInteger() == 1) {  // blendo eric: print state changes post update
+	if (ai_showPlayerState.GetInteger() == 1 && this->IsType(idPlayer::Type)) {  // blendo eric: print state changes post update
 		for (int chidx = 0; chidx < DEBUG_Anim_State_Count; chidx++) {
 			int channel = DEBUG_Anim_State_Channels[chidx];
 			if (DEBUG_Anim_State_Changed[channel].Find(">") >= 0) {
@@ -2235,10 +2338,12 @@ bool idActor::CanSee( idEntity *ent, bool useFov ) {
 	gravityDir = gameLocal.GetLocalPlayer()->GetPhysics()->GetGravityNormal();
 	enemyDir = (enemyViewaxis[0] - gravityDir * (gravityDir * enemyViewaxis[0])).Cross(gravityDir); //Get angle perpendicular to 'playerViewaxis'.
 	
-	int distanceArray[] = { 1, -1 }; //Do LOS checks on head. Check a few different offsets.
-	for (int i = 0; i < 2; i++)
+	//BC 3-11-2025: make more offset checks to handle more types of geometry, such as grate bars.
+	#define PERCEPTIONOFFSET 1.5f
+	idVec2 distanceArrays[] = { idVec2(PERCEPTIONOFFSET, 0), idVec2(-PERCEPTIONOFFSET, 0), idVec2(0, PERCEPTIONOFFSET), idVec2(0, -PERCEPTIONOFFSET) };
+	for (int i = 0; i < 4; i++)
 	{
-		idVec3 headPos = toPos + (enemyDir * distanceArray[i]);
+		idVec3 headPos = toPos + (enemyDir * distanceArrays[i].x) + (idVec3(0,0,distanceArrays[i].y));
 		gameLocal.clip.TracePoint(tr, myEye, headPos, MASK_SOLID, this);		
 		if (tr.fraction >= 1.0f || (gameLocal.GetTraceEntity(tr) == ent))
 		{
@@ -2776,7 +2881,7 @@ idActor::GetAnimName
 // blendo eric
 */
 const char* idActor::GetAnimName(int channel) {
-	return animator.CurrentAnim(channel)->AnimName();
+	return animator.CurrentAnim(channel)->AnimFullName();
 }
 
 /*
@@ -2841,7 +2946,7 @@ idActor::UpdateAnimState
 */
 void idActor::UpdateAnimState(void) {
 
-	if (ai_showPlayerState.GetBool()) { // blendo eric: collect start debug states
+	if (ai_showPlayerState.GetBool() && this->IsType(idPlayer::Type)) { // blendo eric: collect start debug states
 		for (int chidx = 0; chidx < DEBUG_Anim_State_Count; chidx++) {
 			int channel = DEBUG_Anim_State_Channels[chidx];
 			DEBUG_Anim_State_Changed[channel].Append(GetAnimState(channel));
@@ -2858,7 +2963,7 @@ void idActor::UpdateAnimState(void) {
 
 	DEBUG_Anim_Channel_Executing = ANIMCHANNEL_ALL;
 
-	if (ai_showPlayerState.GetBool()) {
+	if (ai_showPlayerState.GetBool() && this->IsType(idPlayer::Type)) {
 		if (ai_showPlayerState.GetInteger() == 1) {
 			for (int chidx = 0; chidx < DEBUG_Anim_State_Count; chidx++) {  // blendo eric: print changes to states
 				int channel = DEBUG_Anim_State_Channels[chidx];
@@ -3375,22 +3480,28 @@ void idActor::Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir,
 		}
 
 	}
-	else
-	{
-		// don't accumulate knockback
-		if ( af.IsLoaded() ) {
-			// clear impacts
-			af.Rest();
 
-			// physics is turned off by calling af.Rest()
-			BecomeActive( TH_PHYSICS );
-		}
-	}
+	// SW 24th Feb 2025:
+	// Removing this so that zero-damage stimuli (e.g. gas jets) don't cause ragdolls to freeze in mid-air
+	// I don't know exactly why Doom 3 needed this, so let's hope we don't miss it!
+	//else
+	//{
+	//	// don't accumulate knockback
+	//	if ( af.IsLoaded() ) {
+	//		// clear impacts
+	//		af.Rest();
+
+	//		// physics is turned off by calling af.Rest()
+	//		BecomeActive( TH_PHYSICS );
+	//	}
+	//}
 
 
 	if (health > 0 && team == TEAM_ENEMY && attacker != NULL)
 	{
-		if (attacker == gameLocal.GetLocalPlayer())
+		//BC 2-21-2025: do not do the player inflict damage vo during jockey
+		//BC 3-19-2025: also don't do this if player is currently in defib state.
+		if (attacker == gameLocal.GetLocalPlayer() && !gameLocal.GetLocalPlayer()->IsJockeying() && !gameLocal.GetLocalPlayer()->GetDefibState())
 		{
 			//Play player VO: "I damaged an enemy"
 			bool isWorldCombatstate = (static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->GetCombatState() == COMBATSTATE_IDLE);
@@ -3964,7 +4075,7 @@ idActor::Event_PlayAnim
 */
 void idActor::Event_PlayAnim( int channel, const char *animname ) {
 
-	if (ai_showPlayerState.GetInteger() >= 2) { // blendo eric: print anim change with their "respective" state change
+	if (ai_showPlayerState.GetInteger() >= 2 && this->IsType(idPlayer::Type)) { // blendo eric: print anim change with their "respective" state change
 		common->Printf("%05d ^2Play anim ^4%s ^6%s^7>^6%s ^2[%s]\n", gameLocal.time, ANIMCHANNEL_Names[channel], DEBUG_Anim_State_Prev[channel].c_str(), GetAnimState(channel), animname);
 	}
 
@@ -4069,7 +4180,7 @@ idActor::Event_PlayCycle
 */
 void idActor::Event_PlayCycle( int channel, const char *animname ) {
 
-	if (ai_showPlayerState.GetInteger() >= 2) { // blendo eric: print anim change with their "respective" state change
+	if (ai_showPlayerState.GetInteger() >= 2 && this->IsType(idPlayer::Type)) { // blendo eric: print anim change with their "respective" state change
 		common->Printf("%05d ^2Cycle anim ^4%s ^6%s^7>^6%s ^2[%s]\n", gameLocal.time, ANIMCHANNEL_Names[channel], DEBUG_Anim_State_Prev[channel].c_str(), GetAnimState(channel), animname);
 	}
 
@@ -4155,7 +4266,7 @@ idActor::Event_IdleAnim
 */
 void idActor::Event_IdleAnim( int channel, const char *animname ) {
 
-	if (ai_showPlayerState.GetInteger() >= 2) { // blendo eric: print anim change with their "respective" state change
+	if (ai_showPlayerState.GetInteger() >= 2 && this->IsType(idPlayer::Type)) { // blendo eric: print anim change with their "respective" state change
 		common->Printf("%05d ^2Idle anim ^4%s ^6%s^7>^6%s ^2[%s]\n", gameLocal.time, ANIMCHANNEL_Names[channel], DEBUG_Anim_State_Prev[channel].c_str(), GetAnimState(channel), animname);
 	}
 
@@ -4436,7 +4547,7 @@ idActor::Event_AnimState
 */
 void idActor::Event_AnimState( int channel, const char *statename, int blendFrames ) {
 #if _DEBUG
-	if (ai_showPlayerState.GetBool()) {
+	if (ai_showPlayerState.GetBool() && this->IsType(idPlayer::Type)) {
 		const char* curState = GetAnimState(channel);
 		if ( idStr::Cmp( statename, curState) != 0 ) {
 			DEBUG_Anim_State_Changed[channel].Append(">");
@@ -4969,6 +5080,7 @@ void idActor::SetHelmet(bool value)
 		if (helmetModel != NULL)
 		{
 			helmetModel->PostEventMS(&EV_Remove, 0);
+			helmetModel = nullptr;
 		}
 	}
 

@@ -10,7 +10,7 @@ public:
 							idCassettePlayer(void);
 	virtual					~idCassettePlayer(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -24,7 +24,7 @@ public:
 
 private:
 
-	idListGUI*				tracklist; //the gui music track list.
+	idListGUI*				tracklist = nullptr; //the gui music track list.
 
 
 	idList<idStr>           soundshaderList; //list of sound shaders

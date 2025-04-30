@@ -13,7 +13,7 @@ public:
 							idFTLCharger(void);
 	virtual					~idFTLCharger(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -39,7 +39,7 @@ private:
 
 	void					StopCharge();
 
-	idFuncEmitter*			particleEmitter;
+	idFuncEmitter*			particleEmitter = nullptr;
 	idVec3					GetEmitterOrigin();
 
 

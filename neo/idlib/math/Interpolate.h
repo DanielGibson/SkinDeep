@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #define __MATH_INTERPOLATE_H__
 
 #include "idlib/math/Extrapolate.h"
+#include "gamesys/SaveGame.h"
 
 /*
 ==============================================================================================
@@ -43,6 +44,8 @@ template< class type >
 class idInterpolate {
 public:
 						idInterpolate();
+						void Save(idSaveGame *savefile) const; // blendo eric
+						void Restore(idRestoreGame *savefile); // blendo eric
 
 	void				Init( const float startTime, const float duration, const type &startValue, const type &endValue );
 	void				SetStartTime( float time ) { this->startTime = time; }
@@ -80,6 +83,64 @@ ID_INLINE idInterpolate<type>::idInterpolate() {
 	memset( &currentValue, 0, sizeof( currentValue ) );
 	startValue = endValue = currentValue;
 }
+
+/*
+====================
+idInterpolate::idInterpolate
+====================
+*/
+template< class type >
+ID_INLINE void idInterpolate<type>::Save(idSaveGame* savefile) const {  // blendo eric
+	assert(false);
+}
+template<>
+ID_INLINE void idInterpolate<float>::Save(idSaveGame* savefile) const {  // blendo eric
+	savefile->WriteFloat( startTime ); //  float startTime
+	savefile->WriteFloat( duration ); //  float duration
+	savefile->WriteFloat( startValue ); //  type startValue
+	savefile->WriteFloat( endValue ); //  type endValue
+	savefile->WriteFloat( currentTime ); // mutable  float currentTime
+	savefile->WriteFloat( currentValue ); // mutable  type currentValue
+}
+template<>
+ID_INLINE void idInterpolate<int>::Save(idSaveGame* savefile) const {  // blendo eric
+	savefile->WriteFloat( startTime ); //  float startTime
+	savefile->WriteFloat( duration ); //  float duration
+	savefile->WriteInt( startValue ); //  type startValue
+	savefile->WriteInt( endValue ); //  type endValue
+	savefile->WriteFloat( currentTime ); // mutable  float currentTime
+	savefile->WriteInt( currentValue ); // mutable  type currentValue
+
+}
+
+/*
+====================
+idInterpolate::idInterpolate
+====================
+*/
+template< class type >
+ID_INLINE void idInterpolate<type>::Restore(idRestoreGame* savefile) {  // blendo eric
+	assert(false);
+}
+template<>
+ID_INLINE void idInterpolate<float>::Restore(idRestoreGame* savefile) {  // blendo eric
+	savefile->ReadFloat( startTime ); //  float startTime
+	savefile->ReadFloat( duration ); //  float duration
+	savefile->ReadFloat( startValue ); //  type startValue
+	savefile->ReadFloat( endValue ); //  type endValue
+	savefile->ReadFloat( currentTime ); // mutable  float currentTime
+	savefile->ReadFloat( currentValue ); // mutable  type currentValue
+}
+template<>
+ID_INLINE void idInterpolate<int>::Restore(idRestoreGame* savefile) {  // blendo eric
+	savefile->ReadFloat( startTime ); //  float startTime
+	savefile->ReadFloat( duration ); //  float duration
+	savefile->ReadInt( startValue ); //  type startValue
+	savefile->ReadInt( endValue ); //  type endValue
+	savefile->ReadFloat( currentTime ); // mutable  float currentTime
+	savefile->ReadInt( currentValue ); // mutable  type currentValue
+}
+
 
 /*
 ====================

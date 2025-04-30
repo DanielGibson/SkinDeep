@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MATH_SIMD_GENERIC_H__
 #define __MATH_SIMD_GENERIC_H__
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "idlib/math/Simd.h"
 
 /*
@@ -38,9 +40,18 @@ If you have questions concerning this license or the applicable additional terms
 
 ===============================================================================
 */
+#if defined(__BLENDO_SIMD_INLINE__) //__BLENDO_SIMD_INLINE__
 
+class idSIMD_Generic {
+public:
+	idSIMD_Generic(void) { cpuid = CPUID_NONE; }
+	virtual							~idSIMD_Generic() { };
+	int								cpuid;
+#else //__BLENDO_SIMD_INLINE__
 class idSIMD_Generic : public idSIMDProcessor {
 public:
+#endif //__BLENDO_SIMD_INLINE__
+
 	virtual const char * VPCALL GetName( void ) const;
 
 	virtual void VPCALL Add( float *dst,			const float constant,	const float *src,		const int count );
@@ -135,5 +146,6 @@ public:
 	virtual void VPCALL MixSoundSixSpeakerStereo( float *mixBuffer, const float *samples, const int numSamples, const float lastV[6], const float currentV[6] );
 	virtual void VPCALL MixedSoundToSamples( short *samples, const float *mixBuffer, const int numSamples );
 };
+#endif
 
-#endif /* !__MATH_SIMD_GENERIC_H__ */
+#endif //__MATH_SIMD_GENERIC_H__

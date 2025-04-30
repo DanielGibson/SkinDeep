@@ -17,7 +17,7 @@ public:
 							idLifeboat(void);
 	virtual					~idLifeboat(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 	virtual void			Think( void );
@@ -38,11 +38,14 @@ public:
 
 	virtual bool			DoFrob(int index = 0, idEntity * frobber = NULL);
 
+	// SW 10th March 2025
+	void					EjectItems(idList<idMoveableItem*> items);
+
 protected:
 
 	virtual void			Think_Landed(void);
 	virtual void			OnLanded(void);
-	//virtual void			OnTakeoff(void);
+	virtual void			OnTakeoff(void);
 
 
 protected:
@@ -70,9 +73,9 @@ protected:
 	int						stateTimer;
 	int						lastSecondDisplay;
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
-	idAnimated*				animatedThrusters;
+	idAnimated*				animatedThrusters = nullptr;
 	
 	void					Despawn();
 
@@ -90,8 +93,8 @@ protected:
 	void					UpdateBodyPull();
 	int						bodypullTimer;
 
-	idBeam*					tractorbeam;
-	idBeam*					tractorbeamTarget;
+	idBeam*					tractorbeam = nullptr;
+	idBeam*					tractorbeamTarget = nullptr;
 	idEntityPtr<idEntity>	tractorPtr;
 
 	idMat3					displayAngle;
@@ -100,7 +103,7 @@ protected:
 
 	bool					hasTractorBeam;
 
-	idEntity *				shopMonitor;
+	idEntity *				shopMonitor = nullptr;
 	void					SetupShopMonitor();
 	void					SpawnShopMonitor(idVec3 pos);
 	void					UpdateShopMonitor(int secondsRemaining);

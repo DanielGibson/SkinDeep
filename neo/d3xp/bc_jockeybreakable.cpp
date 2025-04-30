@@ -14,6 +14,8 @@ END_CLASS
 
 idJockeyBreakable::idJockeyBreakable(void)
 {
+	frobbutton1 = nullptr;
+	itemDef = nullptr;
 }
 
 idJockeyBreakable::~idJockeyBreakable(void)
@@ -30,10 +32,22 @@ void idJockeyBreakable::Spawn(void)
 
 void idJockeyBreakable::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( vendState ); // int vendState
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteObject( frobbutton1 ); // idEntity* frobbutton1
+
+	savefile->WriteEntityDef( itemDef ); // const idDeclEntityDef	* itemDef
 }
 
 void idJockeyBreakable::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( vendState ); // int vendState
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadObject( frobbutton1 ); // idEntity* frobbutton1
+
+	savefile->ReadEntityDef( itemDef ); // const idDeclEntityDef	* itemDef
 }
 
 //void idJockeyBreakable::Think(void)

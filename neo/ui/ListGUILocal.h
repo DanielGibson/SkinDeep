@@ -45,6 +45,10 @@ class idListGUILocal : protected idList<idStr>, public idListGUI {
 public:
 						idListGUILocal() { m_pGUI = NULL; m_water = 0; m_stateUpdates = true; }
 
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				Restore( idRestoreGame *savefile );
+
+
 	// idListGUI interface
 	void				Config( idUserInterface *pGUI, const char *name ) { m_pGUI = pGUI; m_name = name; }
 	void				Add( int id, const idStr& s, bool allowDupes = false );
@@ -52,7 +56,7 @@ public:
 	void				Push( const idStr& s );
 	bool				Del( int id );
 	void				Clear( void );
-	int					Num( void ) { return idList<idStr>::Num(); }
+	int					Num( void ) const { return idList<idStr>::Num(); }
 	int					GetSelection( char *s, int size, int sel = 0 ) const; // returns the id, not the list index (or -1)
 	void				SetSelection( int sel );
 	int					GetNumSelections();

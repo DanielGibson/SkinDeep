@@ -26,12 +26,44 @@ CLASS_DECLARATION(idMoveableItem, idGlassPiece)
 EVENT(EV_Touch, idGlassPiece::Event_Touch)
 END_CLASS
 
+
+idList<idGlassPiece*> idGlassPiece::glassList;
+
+idGlassPiece::~idGlassPiece()
+{
+	glassList.Remove(this);
+}
+
 void idGlassPiece::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( nextTouchTime ); // int nextTouchTime
+
+	savefile->WriteBool( hasSettledDown ); // bool hasSettledDown
+	savefile->WriteInt( spawnTimer ); // int spawnTimer
+
+	savefile->WriteInt( shineTimer ); // int shineTimer
+
+	savefile->WriteInt( initialSpawnFallTimer ); // int initialSpawnFallTimer
+	savefile->WriteBool( spawnfallDone ); // bool spawnfallDone
+
+	savefile->WriteFloat( modelRadius ); // float modelRadius
 }
 
 void idGlassPiece::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( nextTouchTime ); // int nextTouchTime
+
+	savefile->ReadBool( hasSettledDown ); // bool hasSettledDown
+	savefile->ReadInt( spawnTimer ); // int spawnTimer
+
+	savefile->ReadInt( shineTimer ); // int shineTimer
+
+	savefile->ReadInt( initialSpawnFallTimer ); // int initialSpawnFallTimer
+	savefile->ReadBool( spawnfallDone ); // bool spawnfallDone
+
+	savefile->ReadFloat( modelRadius ); // float modelRadius
+
+	glassList.AddUnique(this);
 }
 
 
@@ -46,6 +78,10 @@ void idGlassPiece::Spawn(void)
 	shineTimer = gameLocal.time + 300;
 	initialSpawnFallTimer = 0;
 	spawnfallDone = false;
+
+	modelRadius = renderEntity.hModel->Bounds().GetRadius();
+
+	glassList.Append(this);
 
 	BecomeActive(TH_THINK);
 }
@@ -147,7 +183,10 @@ void idGlassPiece::Event_Touch(idEntity *other, trace_t *trace)
 			trace_t floorPos;
 
 			gameLocal.clip.TracePoint(floorPos, this->GetPhysics()->GetOrigin(), this->GetPhysics()->GetOrigin() + idVec3(0, 0, -8), MASK_SOLID, gameLocal.GetLocalPlayer());
-			gameLocal.ProjectDecal(floorPos.endpos, -floorPos.c.normal, 8.0f, true, 20.0f + gameLocal.random.RandomFloat() * 20.0f, "textures/decals/bloodsplat00");
+			if (g_bloodEffects.GetBool())
+			{
+				gameLocal.ProjectDecal(floorPos.endpos, -floorPos.c.normal, 8.0f, true, 20.0f + gameLocal.random.RandomFloat() * 20.0f, "textures/decals/bloodsplat00");
+			}
 			gameLocal.GetLocalPlayer()->SetGlasswound(1);
 		}
 	}
@@ -190,7 +229,7 @@ void idGlassPiece::RemoveNearbyGlassPieces()
 }
 
 
-void idGlassPiece::ShatterAndRemove()
+void idGlassPiece::ShatterAndRemove(bool fastCleanUpOnly)
 {
 	if (health <= 0)
 		return;
@@ -201,20 +240,24 @@ void idGlassPiece::ShatterAndRemove()
 	this->Hide();
 	physicsObj.SetContents(0);
 	
-
-	idAngles fxAngle;
-	fxAngle.yaw = gameLocal.random.RandomInt(350);
-	idEntityFx::StartFx("fx/glass_shard_break", GetPhysics()->GetOrigin(), fxAngle.ToMat3());
+	if (!fastCleanUpOnly)
+	{
+		idAngles fxAngle;
+		fxAngle.yaw = gameLocal.random.RandomInt(350);
+		idEntityFx::StartFx("fx/glass_shard_break", GetPhysics()->GetOrigin(), fxAngle.ToMat3());
+	}
 
 	//Remove the shard.
 	PostEventMS(&EV_Remove, 0);
 
-
-	//When a glass piece is destroyed, destroy nearby glass pieces.
-	//We do this via idMeta, because we want to limit how often this gets called. If it gets recursively called forever it causes problems, so
-	//idMeta adds a cooldown timer to how often it gets called.
-	static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->DestroyNearbyGlassPieces(GetPhysics()->GetOrigin());
-	//RemoveNearbyGlassPieces();
+	if (!fastCleanUpOnly)
+	{
+		//When a glass piece is destroyed, destroy nearby glass pieces.
+		//We do this via idMeta, because we want to limit how often this gets called. If it gets recursively called forever it causes problems, so
+		//idMeta adds a cooldown timer to how often it gets called.
+		static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->DestroyNearbyGlassPieces(GetPhysics()->GetOrigin());
+		//RemoveNearbyGlassPieces();
+	}
 }
 
 void idGlassPiece::Think(void)
@@ -307,4 +350,63 @@ bool idGlassPiece::DoFrob(int index, idEntity * frobber)
 	}
 
 	return value;
+}
+
+// blendo eric: quickly limit the amount of active glass pieces, if too many destroyed at same time
+void idGlassPiece::LimitActiveGlassPieces()
+{
+	if (glassList.Num() < GLASS_PIECES_ACTIVE_MAX)
+	{
+		return;
+	}
+
+	// get active pieces
+	float avgRadius = 0.0f;
+	for (int idx = 0 ; idx < glassList.Num(); idx++ )
+	{
+		float radius = glassList[idx]->GetPhysics()->GetBounds().GetRadius();
+		avgRadius = avgRadius > 0.0f ? avgRadius + radius : radius;
+	}
+
+	int destroyCount = (glassList.Num() - GLASS_PIECES_ACTIVE_MAX);
+
+	gameLocal.Warning("exceeded glass piece max %d / %d, destroying smallest", glassList.Num(), GLASS_PIECES_ACTIVE_MAX);
+
+	while (destroyCount > 0)
+	{
+		int stepSize = Max( glassList.Num() / destroyCount, GLASS_PIECES_SAMPLE_SIZE );
+
+		// destroy amount per pass, big-o approx ( 2*SAMPLE_SIZE * n ) ?
+		int numToDestroy = Min( glassList.Num()/ GLASS_PIECES_SAMPLE_SIZE, destroyCount);
+		destroyCount -= Max(numToDestroy,1);
+
+		// subdivide the arr , and destroy the smallest piece in each subarray, which should help distribute the deletion
+		assert(stepSize > 0);
+		int subArrStart = 0; // inclusive
+		int subArrEnd = subArrStart + stepSize; // exclusive
+		while (subArrEnd <= glassList.Num()) // logic to skip the remainder ents when less than stepSize
+		{
+			// destroy the smallest piece within subarray
+			idGlassPiece* smallestPiece = nullptr;
+			float smallestPieceSize = FLT_MAX;
+			for (int subIdx = subArrStart; subIdx < subArrEnd; subIdx++)
+			{
+				idGlassPiece* piece = glassList[subIdx];
+				float rad = glassList[subIdx]->modelRadius;
+				if (rad < smallestPieceSize)
+				{
+					smallestPiece = piece;
+					smallestPieceSize = rad;
+				}
+			}
+
+			if (smallestPiece && !smallestPiece->IsActive() && !smallestPiece->IsRemoved())
+			{
+				smallestPiece->ShatterAndRemove(true); // make sure to only destroy only this piece, not spawn fx or recursive destroy pieces
+			}
+
+			subArrStart += stepSize;
+			subArrEnd = subArrStart + stepSize;
+		}
+	}
 }

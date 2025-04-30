@@ -39,7 +39,7 @@ If you have questions concerning this license or the applicable additional terms
 
 ===============================================================================
 */
-
+#if 0
 class idJointQuat {
 public:
 
@@ -48,6 +48,26 @@ public:
 	bool operator==(const idJointQuat& b) const { return q == b.q && t == b.t; }; // blendo eric
 };
 
+#else
+class idJointQuat {
+public:
+	const float *	ToFloatPtr() const { return q.ToFloatPtr(); }
+	float *			ToFloatPtr() { return q.ToFloatPtr(); }
+
+	idQuat			q;
+	idVec3			t;
+	float			w;
+
+
+	bool operator==(const idJointQuat& b) const { return q == b.q && t == b.t && w == b.w; }; // blendo eric
+};
+
+// offsets for SIMD code
+#define JOINTQUAT_SIZE				(8*4)		// sizeof( idJointQuat )
+#define JOINTQUAT_SIZE_SHIFT		5			// log2( sizeof( idJointQuat ) )
+#define JOINTQUAT_Q_OFFSET			(0*4)		// offsetof( idJointQuat, q )
+#define JOINTQUAT_T_OFFSET			(4*4)		// offsetof( idJointQuat, t )
+#endif
 
 /*
 ===============================================================================
@@ -90,6 +110,11 @@ public:
 private:
 	float			mat[3*4];
 };
+
+// offsets for SIMD code
+#define JOINTMAT_SIZE				(4*3*4)		// sizeof( idJointMat )
+
+#define JOINTMAT_TYPESIZE			( 4 * 3 )
 
 ID_INLINE void idJointMat::SetRotation( const idMat3 &m ) {
 	// NOTE: idMat3 is transposed because it is column-major

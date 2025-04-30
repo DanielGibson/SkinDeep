@@ -10,7 +10,7 @@ class idTNT : public idMoveableItem
 public:
 	CLASS_PROTOTYPE(idTNT);
 
-	void					Save(idSaveGame* savefile) const;
+	void					Save(idSaveGame* savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame* savefile);
 
 	void					Spawn(void);
@@ -23,6 +23,8 @@ public:
 	virtual bool			Collide(const trace_t& collision, const idVec3& velocity);
 
 	virtual void			JustThrown();
+
+	virtual void			Teleport(const idVec3& origin, const idAngles& angles, idEntity* destination);
 
 private:
 
@@ -40,7 +42,7 @@ private:
 
 	void					Deploy();
 
-	idAnimated* animatedEnt;
+	idAnimated* animatedEnt = nullptr;
 	jointHandle_t			clockJoint, originJoint;
 
 	int						detonationTimer;

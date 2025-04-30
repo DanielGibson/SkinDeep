@@ -26,6 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "sys/platform.h"
 #include "idlib/geometry/DrawVert.h"
 #include "idlib/geometry/JointTransform.h"
@@ -3069,3 +3071,5 @@ void VPCALL idSIMD_Generic::MixedSoundToSamples( short *samples, const float *mi
 		}
 	}
 }
+
+#endif

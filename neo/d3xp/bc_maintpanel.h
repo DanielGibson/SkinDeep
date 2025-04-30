@@ -13,7 +13,7 @@ public:
 							idMaintPanel(void);
 	virtual					~idMaintPanel(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -43,8 +43,8 @@ private:
 	renderLight_t			headlight;
 	qhandle_t				headlightHandle;
 
-	idFuncEmitter			*smokeParticle;
-	idFuncEmitter			*soundParticle;
+	idFuncEmitter			*smokeParticle = nullptr;
+	idFuncEmitter			*soundParticle = nullptr;
 
 	int						state;
 	int						stateTimer;
@@ -60,7 +60,7 @@ private:
 	int						systemIndex;
 
 	
-	idStaticEntity*			videoSignage;
+	idStaticEntity*			videoSignage = nullptr;
 	int						videoSignageLifetimer;
 	bool					videoSignageActive;
 

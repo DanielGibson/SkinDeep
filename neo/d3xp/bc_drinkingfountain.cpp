@@ -26,6 +26,10 @@ idDrinkingFountain::idDrinkingFountain(void)
 	isSlurping = false;
 	sinkIsOn = false;
 	sinkTimer = 0;
+
+	//BC 3-28-2025: possible fix with tutorial generator room reset crash.
+	faucetEmitter = NULL;
+	drinkEmitter = NULL;
 }
 
 idDrinkingFountain::~idDrinkingFountain(void)
@@ -81,10 +85,28 @@ idVec3 idDrinkingFountain::GetFaucetPos()
 
 void idDrinkingFountain::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( faucetEmitter ); //  idFuncEmitter			* faucetEmitter
+
+	savefile->WriteBool( sinkIsOn ); //  bool sinkIsOn
+	savefile->WriteInt( sinkTimer ); //  int sinkTimer
+
+	savefile->WriteInt( slurpTimer ); //  int slurpTimer
+	savefile->WriteBool( isSlurping ); //  bool isSlurping
+
+	savefile->WriteObject( drinkEmitter ); //  idFuncEmitter*			 drinkEmitter
 }
 
 void idDrinkingFountain::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( CastClassPtrRef(faucetEmitter) ); //  idFuncEmitter			* faucetEmitter
+
+	savefile->ReadBool( sinkIsOn ); //  bool sinkIsOn
+	savefile->ReadInt( sinkTimer ); //  int sinkTimer
+
+	savefile->ReadInt( slurpTimer ); //  int slurpTimer
+	savefile->ReadBool( isSlurping ); //  bool isSlurping
+
+	savefile->ReadObject( CastClassPtrRef(drinkEmitter) ); //  idFuncEmitter*			 drinkEmitter
 }
 
 idVec3 idDrinkingFountain::GetDrinkPos()
@@ -169,6 +191,8 @@ void idDrinkingFountain::Killed(idEntity *inflictor, idEntity *attacker, int dam
 {
 	if (!fl.takedamage)
 		return;
+
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
 
 	fl.takedamage = false;
 	StopSound(SND_CHANNEL_ANY, false);

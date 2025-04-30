@@ -243,8 +243,7 @@ private:
 	void						Event_CacheSkin(const char* skinName);
 	void						Event_CacheEntityDef(const char* defName);
 
-	// DG: this one was missing
-	void					Event_SteamOpenStoreOverlay();
+	void						Event_steamOpenStoreOverlay();
 
 	//BC private end.
 

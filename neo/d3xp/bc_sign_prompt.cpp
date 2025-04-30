@@ -37,8 +37,18 @@ idSignPrompt::idSignPrompt(void)
 {
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
+
+	idleSmoke = nullptr;
+
+	infoState = 0;
 	thinktimer = 0;
+
 	spsState = SPS_ACTIVE;
+	spsTimer = 0;
+
+	//make it repairable.
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idSignPrompt::~idSignPrompt(void)
@@ -59,10 +69,6 @@ void idSignPrompt::Spawn(void)
 	GetPhysics()->SetClipMask(MASK_SOLID | CONTENTS_MOVEABLECLIP);
 
 	idleSmoke = NULL;
-	
-	//make it repairable.
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 	SetLight(true, spawnArgs.GetVector("_color"));
 
@@ -78,10 +84,33 @@ void idSignPrompt::Spawn(void)
 
 void idSignPrompt::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( infoState ); // int infoState
+	savefile->WriteInt( thinktimer ); // int thinktimer
+
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteInt( spsState ); // int spsState
+	savefile->WriteInt( spsTimer ); // int spsTimer
 }
 
 void idSignPrompt::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( infoState ); // int infoState
+	savefile->ReadInt( thinktimer ); // int thinktimer
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadInt( spsState ); // int spsState
+	savefile->ReadInt( spsTimer ); // int spsTimer
 }
 
 void idSignPrompt::Think(void)

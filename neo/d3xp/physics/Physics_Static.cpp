@@ -75,16 +75,18 @@ idPhysics_Static::Save
 ================
 */
 void idPhysics_Static::Save( idSaveGame *savefile ) const {
-	savefile->WriteObject( self );
+	savefile->WriteObject( self ); // idEntity * self
 
-	savefile->WriteVec3( current.origin );
+	savefile->WriteVec3( current.origin ); // staticPState_t current
 	savefile->WriteMat3( current.axis );
 	savefile->WriteVec3( current.localOrigin );
 	savefile->WriteMat3( current.localAxis );
-	savefile->WriteClipModel( clipModel );
+	savefile->WriteClipModel( clipModel ); // idClipModel * clipModel
 
-	savefile->WriteBool( hasMaster );
-	savefile->WriteBool( isOrientated );
+	savefile->WriteBool( neverBlock ); // bool neverBlock
+
+	savefile->WriteBool( hasMaster ); // bool hasMaster
+	savefile->WriteBool( isOrientated ); // bool isOrientated
 }
 
 /*
@@ -93,16 +95,19 @@ idPhysics_Static::Restore
 ================
 */
 void idPhysics_Static::Restore( idRestoreGame *savefile ) {
-	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
 
-	savefile->ReadVec3( current.origin );
+	savefile->ReadObject( self ); // idEntity * self
+
+	savefile->ReadVec3( current.origin ); // staticPState_t current
 	savefile->ReadMat3( current.axis );
 	savefile->ReadVec3( current.localOrigin );
 	savefile->ReadMat3( current.localAxis );
-	savefile->ReadClipModel( clipModel );
+	savefile->ReadClipModel( clipModel ); // idClipModel * clipModel
 
-	savefile->ReadBool( hasMaster );
-	savefile->ReadBool( isOrientated );
+	savefile->ReadBool( neverBlock ); // bool neverBlock
+
+	savefile->ReadBool( hasMaster ); // bool hasMaster
+	savefile->ReadBool( isOrientated ); // bool isOrientated
 }
 
 /*

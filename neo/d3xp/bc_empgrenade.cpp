@@ -38,10 +38,18 @@ idEMPGrenade::~idEMPGrenade(void)
 
 void idEMPGrenade::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteTrace( collisionTr ); //  trace_t collisionTr
 }
 
 void idEMPGrenade::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadTrace( collisionTr ); //  trace_t collisionTr
 }
 
 void idEMPGrenade::Spawn(void)

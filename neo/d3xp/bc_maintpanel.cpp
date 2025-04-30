@@ -42,11 +42,15 @@ idMaintPanel::~idMaintPanel(void)
 {
 	StopSound(SND_CHANNEL_ANY, 0);
 
-	if (smokeParticle != NULL)
+	if (smokeParticle != NULL) {
 		smokeParticle->PostEventMS(&EV_Remove, 0);
+		smokeParticle = nullptr;
+	}
 
-	if (soundParticle != NULL)
+	if (soundParticle != NULL) {
 		soundParticle->PostEventMS(&EV_Remove, 0);
+		soundParticle = nullptr;
+	}
 
 	if (headlightHandle != -1)
 		gameRenderWorld->FreeLightDef(headlightHandle);
@@ -91,10 +95,11 @@ void idMaintPanel::Spawn(void)
 	particleAngle.pitch += 140;
 	particleAngle.yaw += -45;
 
+	idVec3 smokePos = GetPhysics()->GetOrigin() + (forward * 2) + (up * -5.5f); //BC 4-4-2025: fixed where smoke emits from
 	idDict args;
 	args.Clear();
 	args.Set("model", spawnArgs.GetString("model_smoke") );
-	args.SetVector("origin", lightPos);
+	args.SetVector("origin", smokePos);
 	args.SetMatrix("rotation", particleAngle.ToMat3());	
 
 	//if no keypad, then don't do smoke.
@@ -192,10 +197,39 @@ bool idMaintPanel::IsEntTargetingMe(idEntity *ent)
 
 void idMaintPanel::Save(idSaveGame *savefile) const
 {
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteObject( smokeParticle ); // idFuncEmitter * smokeParticle
+	savefile->WriteObject( soundParticle ); // idFuncEmitter * soundParticle
+
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( systemIndex ); // int systemIndex
+
+	savefile->WriteObject( videoSignage ); // idStaticEntity* videoSignage
+	savefile->WriteInt( videoSignageLifetimer ); // int videoSignageLifetimer
+	savefile->WriteBool( videoSignageActive ); // bool videoSignageActive
 }
 
 void idMaintPanel::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadObject( CastClassPtrRef(smokeParticle) ); // idFuncEmitter * smokeParticle
+	savefile->ReadObject( CastClassPtrRef(soundParticle) ); // idFuncEmitter * soundParticle
+
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( systemIndex ); // int systemIndex
+
+	savefile->ReadObject( CastClassPtrRef(videoSignage) ); // idStaticEntity* videoSignage
+	savefile->ReadInt( videoSignageLifetimer ); // int videoSignageLifetimer
+	savefile->ReadBool( videoSignageActive ); // bool videoSignageActive
 }
 
 void idMaintPanel::Think(void)
@@ -243,6 +277,7 @@ void idMaintPanel::Think(void)
 	if (videoSignageActive && gameLocal.time > videoSignageLifetimer && videoSignage != nullptr)
 	{
 		videoSignage->PostEventMS(&EV_Remove, 0);
+		videoSignage = nullptr;
 		videoSignageActive = false;
 	}
 	
@@ -504,6 +539,11 @@ void idMaintPanel::Close()
 		gameRenderWorld->FreeLightDef(headlightHandle);
 
 	gameLocal.GetLocalPlayer()->SetArmstatsFuseboxNeedUpdate();
+
+	// SW 18th Feb 2025
+	// We overwrite the zoom inspect offset here because the maintpanel has closed, 
+	// and thus, we no longer want to be inspecting the inside of the door.
+	spawnArgs.SetVector("zoominspect_campos", spawnArgs.GetVector("zoominspect_campos_afterclosing"));
 }
 
 bool idMaintPanel::IsDone()

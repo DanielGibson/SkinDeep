@@ -15,7 +15,7 @@ public:
 							idLostandfoundMonitor(void);
 	virtual					~idLostandfoundMonitor(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -36,14 +36,14 @@ private:
 	enum					{ LFM_ACTIVE, LFM_DEAD };
 	int						securityState;	
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	int						thinkTimer;
 
     bool                    unlocked;
 	
 	idEntityPtr<idEntity>	lostandfoundMachine;
-	idListGUI *				itemList;
+	idListGUI *				itemList = nullptr;
 
 	idProximityAnnouncer	proximityAnnouncer;
 };

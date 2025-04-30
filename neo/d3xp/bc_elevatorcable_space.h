@@ -9,8 +9,10 @@ class idElevatorcableSpace : public idBeam
 {
 public:
 	CLASS_PROTOTYPE(idElevatorcableSpace);
-
-	void					Save(idSaveGame *savefile) const;
+							
+							idElevatorcableSpace();
+	virtual					~idElevatorcableSpace();
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -25,7 +27,7 @@ private:
 	idEntityPtr<idEntity>	topEnt;
 	idEntityPtr<idEntity>	bottomEnt;
 
-	idFrobcube*				frobTrigger;
+	idFrobcube*				frobTrigger = nullptr;
 
 	int						GetZipDirection();
 	enum					{ DIR_TO_START, DIR_TO_END, DIR_NONE };

@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "framework/FileSystem.h"
 #include "framework/DemoFile.h"
 #include "framework/KeyInput.h"
+#include "framework/UsercmdGen.h"
+#include "gamesys/SaveGame.h"
 #include "ui/ListGUILocal.h"
 #include "ui/DeviceContext.h"
 #include "ui/Window.h"
@@ -38,6 +40,7 @@ If you have questions concerning this license or the applicable additional terms
 
 extern idCVar r_skipGuiShaders;		// 1 = don't render any gui elements on surfaces
 extern idCVar joy_mouseFriction;
+extern idCVar r_scaleMenusTo169; // DG: for the "scale menus to 4:3" hack
 
 idUserInterfaceManagerLocal	uiManagerLocal;
 idUserInterfaceManager *	uiManager = &uiManagerLocal;
@@ -53,6 +56,7 @@ idUserInterfaceManager *	uiManager = &uiManagerLocal;
 void idUserInterfaceManagerLocal::Init() {
 	screenRect = idRectangle(0, 0, 640, 480);
 	dc.Init();
+	groupName = "mainmenu";
 }
 
 void idUserInterfaceManagerLocal::Shutdown() {
@@ -82,16 +86,32 @@ void idUserInterfaceManagerLocal::SetSize( float width, float height ) {
 	dc.SetSize( width, height );
 }
 
-void idUserInterfaceManagerLocal::BeginLevelLoad() {
-	int c = guis.Num();
-	for ( int i = 0; i < c; i++ ) {
-		if ( (guis[ i ]->GetDesktop()->GetFlags() & WIN_MENUGUI) == 0 ) {
+void idUserInterfaceManagerLocal::SetGroup( const char* group, bool persists ) {
+	groupName = group;
+	groupName.ToLower();
+	if (persists) {
+		groupPersist.AddUnique( groupName );
+	}
+}
+
+void idUserInterfaceManagerLocal::BeginLevelLoad( ) {
+	for ( int i = guis.Num()-1; i  >= 0; i--) {
+		if (groupPersist.FindIndex(guis[ i ]->GetGroup()) < 0) {
+
+			// use this to make sure no materials still reference this gui
+			bool remove = true;
+			for ( int j = 0; j < declManager->GetNumDecls( DECL_MATERIAL ); j++ ) {
+				const idMaterial *material = static_cast<const idMaterial *>(declManager->DeclByIndex( DECL_MATERIAL, j, false ));
+				if ( material->GlobalGui() == guis[i] ) {
+					remove = false;
+					break;
+				}
+			}
+			if (remove) {
+				DeAlloc(guis[i]);
+			}
+		} else if ( (guis[ i ]->GetDesktop()->GetFlags() & WIN_MENUGUI) == 0 ) {
 			guis[ i ]->ClearRefs();
-			/*
-			delete guis[ i ];
-			guis.RemoveIndex( i );
-			i--; c--;
-			*/
 		}
 	}
 }
@@ -173,6 +193,7 @@ idUserInterface *idUserInterfaceManagerLocal::Alloc( void ) const {
 
 void idUserInterfaceManagerLocal::DeAlloc( idUserInterface *gui ) {
 	if ( gui ) {
+		guisGroup.Remove((idUserInterfaceLocal*)gui);
 		int c = guis.Num();
 		for ( int i = 0; i < c; i++ ) {
 			if ( guis[i] == gui ) {
@@ -184,28 +205,67 @@ void idUserInterfaceManagerLocal::DeAlloc( idUserInterface *gui ) {
 	}
 }
 
-idUserInterface *idUserInterfaceManagerLocal::FindGui( const char *qpath, bool autoLoad, bool needUnique, bool forceNOTUnique ) {
-	int c = guis.Num();
+idUserInterface *idUserInterfaceManagerLocal::FindGui( const char *qpath, bool autoLoad, bool needUnique, bool forceShared, bool * owned ) {
+	assert( (!needUnique && !forceShared) || (needUnique != forceShared) );
+#if 0
+	assert( !(needUnique && forceShared) ); // contradictory params
+	if (owned != nullptr) {
+		*owned = false;
+	}
 
-	for ( int i = 0; i < c; i++ ) {
-		if ( !idStr::Icmp( guis[i]->GetSourceFile(), qpath ) ) {
-			if ( !forceNOTUnique && ( needUnique || guis[i]->IsInteractive() ) ) {
-				break;
+	if (forceShared || !needUnique) {
+		for (int i = 0; i < guis.Num(); i++) {
+			if (!idStr::Icmp(guis[i]->GetSourceFile(), qpath)) {
+				if ( guis[i]->IsUniqued() ) {
+					continue;
+				}
+
+				if ( needUnique || guis[i]->IsInteractive() ) {
+					continue;
+				}
+
+				guis[i]->AddRef();
+				return guis[i];
 			}
-			guis[i]->AddRef();
-			return guis[i];
+		}
+	}
+
+	if ( autoLoad ) { // duplicate/unique
+		idUserInterface *gui = Alloc();
+		if ( gui->InitFromFile( qpath ) ) {
+			if (owned != nullptr) {
+				*owned = true; // the calling obj is the creator of this class
+			}
+			gui->SetUniqued( !forceShared ? false : needUnique );
+			return gui;
+		} else {
+			delete gui;
+		}
+	}
+#else
+	if (!needUnique)
+	{
+		for (int i = 0; i < guis.Num(); i++) {
+			if (!idStr::Icmp(guis[i]->GetSourceFile(), qpath)) {
+				if (!forceShared && (guis[i]->IsUniqued() || guis[i]->IsInteractive())) {
+					break;
+				}
+				guis[i]->AddRef();
+				return guis[i];
+			}
 		}
 	}
 
 	if ( autoLoad ) {
 		idUserInterface *gui = Alloc();
 		if ( gui->InitFromFile( qpath ) ) {
-			gui->SetUniqued( forceNOTUnique ? false : needUnique );
+			gui->SetUniqued( forceShared ? false : needUnique );
 			return gui;
 		} else {
 			delete gui;
 		}
 	}
+#endif
 	return NULL;
 }
 
@@ -227,6 +287,12 @@ void idUserInterfaceManagerLocal::FreeListGUI( idListGUI *listgui ) {
 	delete listgui;
 }
 
+
+const idStr& idUserInterfaceManagerLocal::GetGroup() const
+{
+	return groupName;
+}
+
 /*
 ===============================================================================
 
@@ -236,6 +302,8 @@ void idUserInterfaceManagerLocal::FreeListGUI( idListGUI *listgui ) {
 */
 
 idUserInterfaceLocal::idUserInterfaceLocal() {
+	groupName = idStr();
+
 	cursorX = cursorY = 0.0;
 	desktop = NULL;
 	loading = false;
@@ -325,6 +393,8 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 
 	if ( uiManagerLocal.guis.Find( this ) == NULL ) {
 		uiManagerLocal.guis.Append( this );
+		groupName = uiManagerLocal.GetGroup();
+		uiManagerLocal.guisGroup.AddUnique( this );
 	}
 
 	loading = false;
@@ -350,8 +420,8 @@ const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _tim
 			float w = renderSystem->GetScreenWidth();
 			float h = renderSystem->GetScreenHeight();
 			if( w <= 0.0f || h <= 0.0f ) {
-				w = 640.0f;
-				h = 480.0f;
+				w = VIRTUAL_WIDTH;
+				h = VIRTUAL_HEIGHT;
 			}
 
 			float speedMultiplier = 1.0f;
@@ -360,9 +430,37 @@ const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _tim
 			{
 				speedMultiplier = joy_mouseFriction.GetFloat();
 			}
+			else
+			{
+#if 0
+				// blendo eric: TODO fix this for high dpi/sens mice which move too fast on the UI
+				// preferably actually using windows sens instead of raw input
 
-			cursorX += event->evValue * (640.0f/w) * speedMultiplier;
-			cursorY += event->evValue2 * (480.0f/h) * speedMultiplier;
+				const float GUIScreenArcDeg = 90.0f; // assume fullscreen gui is equivalent to turning 90 deg from side to side
+				idVec2 GUIMouseDegToCursorPixels = 1.0f;//idVec2( m_yaw.GetFloat() , m_pitch.GetFloat() )/ GUIScreenArcDeg;
+
+				idVec2 GUIMouseDegToCursorPixels = idVec2(GUIMouseDegToCursorPixels,GUIMouseDegToCursorPixels);
+				speedMultiplier *= (float(VIRTUAL_WIDTH) / w) * GUIMouseDegToCursorPixels.x;
+				speedMultiplier *= (float(VIRTUAL_HEIGHT) / h) * GUIMouseDegToCursorPixels.y;			
+#endif
+			}
+
+			if (r_scaleMenusTo169.GetBool()) {
+				// in case we're scaling menus to 4:3, we need to take that into account
+				// when scaling the mouse events.
+				// no, we can't just call uiManagerLocal.dc.GetFixScaleForMenu() or sth like that,
+				// because when we're here dc.SetMenuScaleFix(true) is not active and it'd just return (1, 1)!
+				float aspectRatio = w / h;
+				static const float virtualAspectRatio = 16.0f/9.0f;
+				if (aspectRatio > (virtualAspectRatio + 0.1f)) {
+					// widescreen (4:3 is 1.333 3:2 is 1.5, 16:10 is 1.6, 16:9 is 1.7778)
+					// => we need to modify cursorX scaling, by modifying w
+					w *= virtualAspectRatio / aspectRatio;
+				}
+			}
+
+			cursorX += event->evValue * (float(VIRTUAL_WIDTH) / w) * speedMultiplier;
+			cursorY += event->evValue2 * (float(VIRTUAL_HEIGHT) / h) * speedMultiplier;
 
 			if (cursorX > w) {
 				cursorX = w;
@@ -463,6 +561,10 @@ idRectangle idUserInterfaceLocal::DrawSubtitleText( const idStr& text, float sca
 
 	uiManagerLocal.dc.SetSize(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 	uiManagerLocal.dc.SetFont( font );
+	if (r_scaleMenusTo169.GetBool())
+	{
+		uiManagerLocal.dc.SetMenuScaleFix(true);
+	}
 
 	float textWidth = uiManagerLocal.dc.TextWidth( text, scale, 0 );
 	float height = uiManagerLocal.dc.MaxCharHeight( scale );
@@ -497,6 +599,11 @@ idRectangle idUserInterfaceLocal::DrawSubtitleText( const idStr& text, float sca
 
 		// Draw actual text
 		uiManagerLocal.dc.DrawText( text.c_str(), scale, idDeviceContext::ALIGN_CENTER, colour, drawRect, true );
+	}
+
+	if (r_scaleMenusTo169.GetBool())
+	{
+		uiManagerLocal.dc.SetMenuScaleFix(false);
 	}
 
 	return drawRect;
@@ -629,91 +736,85 @@ void idUserInterfaceLocal::WriteToDemoFile( class idDemoFile *f ) {
 	f->WriteFloat( cursorY );
 }
 
-bool idUserInterfaceLocal::WriteToSaveGame( idFile *savefile ) const {
-	int len;
-	const idKeyValue *kv;
-	const char *string;
+void idUserInterfaceLocal::WriteToSaveGame( idSaveGame *savefile ) const {
+	idSaveGamePtr::WriteToSaveGame( savefile );
 
-	int num = state.GetNumKeyVals();
-	savefile->Write( &num, sizeof( num ) );
+	savefile->WriteCheckSizeMarker();
 
-	for( int i = 0; i < num; i++ ) {
-		kv = state.GetKeyVal( i );
-		len = kv->GetKey().Length();
-		string = kv->GetKey().c_str();
-		savefile->Write( &len, sizeof( len ) );
-		savefile->Write( string, len );
+	savefile->WriteString( groupName );
 
-		len = kv->GetValue().Length();
-		string = kv->GetValue().c_str();
-		savefile->Write( &len, sizeof( len ) );
-		savefile->Write( string, len );
-	}
+	savefile->WriteBool( active ); // bool active
+	savefile->WriteBool( loading ); // bool loading
+	savefile->WriteBool( interactive ); // bool interactive
+	savefile->WriteBool( uniqued ); // bool uniqued
 
-	savefile->Write( &active, sizeof( active ) );
-	savefile->Write( &interactive, sizeof( interactive ) );
-	savefile->Write( &uniqued, sizeof( uniqued ) );
-	savefile->Write( &time, sizeof( time ) );
-	len = activateStr.Length();
-	savefile->Write( &len, sizeof( len ) );
-	savefile->Write( activateStr.c_str(), len );
-	len = pendingCmd.Length();
-	savefile->Write( &len, sizeof( len ) );
-	savefile->Write( pendingCmd.c_str(), len );
-	len = returnCmd.Length();
-	savefile->Write( &len, sizeof( len ) );
-	savefile->Write( returnCmd.c_str(), len );
+	savefile->WriteDict( &state ); // idDict state
 
-	savefile->Write( &cursorX, sizeof( cursorX ) );
-	savefile->Write( &cursorY, sizeof( cursorY ) );
+	savefile->WriteCheckSizeMarker();
 
-	desktop->WriteToSaveGame( savefile );
+	desktop->WriteToSaveGame( savefile ); // idWindow * desktop
+	//idWindow * bindHandler; // idWindow * bindHandler
 
-	return true;
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteString( source ); // idString source
+	savefile->WriteString( activateStr ); // idString activateStr
+	savefile->WriteString( pendingCmd ); // idString pendingCmd
+	savefile->WriteString( returnCmd ); // idString returnCmd
+
+	savefile->Write( &timeStamp, sizeof(timeStamp)  ); // ID_TIME_T timeStamp
+
+	savefile->WriteFloat( cursorX ); // float cursorX
+	savefile->WriteFloat( cursorY ); // float cursorY
+
+	savefile->WriteInt( time ); // int time
+
+	//savefile->WriteInt( refs ); // int refs
+
+	savefile->WriteCheckSizeMarker();
 }
 
-bool idUserInterfaceLocal::ReadFromSaveGame( idFile *savefile ) {
-	int num;
-	int i, len;
-	idStr key;
-	idStr value;
+void idUserInterfaceLocal::ReadFromSaveGame( idRestoreGame *savefile ) {
+	idSaveGamePtr::ReadFromSaveGame( savefile );
 
-	savefile->Read( &num, sizeof( num ) );
+	savefile->ReadCheckSizeMarker();
 
-	state.Clear();
-	for( i = 0; i < num; i++ ) {
-		savefile->Read( &len, sizeof( len ) );
-		key.Fill( ' ', len );
-		savefile->Read( &key[0], len );
+	savefile->ReadString( groupName );
 
-		savefile->Read( &len, sizeof( len ) );
-		value.Fill( ' ', len );
-		savefile->Read( &value[0], len );
+	savefile->ReadBool( active ); // bool active
+	savefile->ReadBool( loading ); // bool loading
+	savefile->ReadBool( interactive ); // bool interactive
+	savefile->ReadBool( uniqued ); // bool uniqued
 
-		state.Set( key, value );
+	savefile->ReadDict( &state ); // idDict state
+
+	savefile->ReadCheckSizeMarker();
+
+	desktop->ReadFromSaveGame( savefile );  // idWindow * desktop
+	//idWindow * bindHandler; // idWindow * bindHandler
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadString( source ); // idString source
+	savefile->ReadString( activateStr ); // idString activateStr
+	savefile->ReadString( pendingCmd ); // idString pendingCmd
+	savefile->ReadString( returnCmd ); // idString returnCmd
+
+	savefile->Read( &timeStamp, sizeof(timeStamp) ); // ID_TIME_T timeStamp
+
+	savefile->ReadFloat( cursorX ); // float cursorX
+	savefile->ReadFloat( cursorY ); // float cursorY
+
+	savefile->ReadInt( time ); // int time
+
+	//savefile->ReadInt( refs ); // int refs
+
+	if (active)
+	{
+
 	}
 
-	savefile->Read( &active, sizeof( active ) );
-	savefile->Read( &interactive, sizeof( interactive ) );
-	savefile->Read( &uniqued, sizeof( uniqued ) );
-	savefile->Read( &time, sizeof( time ) );
-
-	savefile->Read( &len, sizeof( len ) );
-	activateStr.Fill( ' ', len );
-	savefile->Read( &activateStr[0], len );
-	savefile->Read( &len, sizeof( len ) );
-	pendingCmd.Fill( ' ', len );
-	savefile->Read( &pendingCmd[0], len );
-	savefile->Read( &len, sizeof( len ) );
-	returnCmd.Fill( ' ', len );
-	savefile->Read( &returnCmd[0], len );
-
-	savefile->Read( &cursorX, sizeof( cursorX ) );
-	savefile->Read( &cursorY, sizeof( cursorY ) );
-
-	desktop->ReadFromSaveGame( savefile );
-
-	return true;
+	savefile->ReadCheckSizeMarker();
 }
 
 size_t idUserInterfaceLocal::Size() {

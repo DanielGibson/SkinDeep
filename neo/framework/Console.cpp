@@ -78,7 +78,7 @@ public:
 	virtual void		LoadHistory();
 
 	virtual const char * GetHistoryLine(int line);
-	virtual idStr		GetLastLines( int numLines );
+	virtual idStr		GetLastLines( int numLines, bool stripBlankLines = false );
 	//============================
 
 	const idMaterial *	charSetShader;
@@ -544,6 +544,11 @@ void idConsoleLocal::Dump( const char *fileName ) {
 
 void idConsoleLocal::SaveHistory() {
 	idFile *f = fileSystem->OpenFileWrite( "consolehistory.dat" );
+
+	//BC 2-26-2025: if consolehistory doesn't exist, then exit.
+	if (f == nullptr)
+		return;
+
 	for ( int i=0; i < COMMAND_HISTORY; ++i ) {
 		// make sure the history is in the right order
 		int line = (nextHistoryLine + i) % COMMAND_HISTORY;
@@ -581,7 +586,7 @@ const char * idConsoleLocal::GetHistoryLine(int line) {
 	return historyEditLines[lineWrapped].GetBuffer();
 }
 
-idStr idConsoleLocal::GetLastLines( int numLines ) {
+idStr idConsoleLocal::GetLastLines( int numLines, bool stripBlankLines /*= false*/) {
 	int startLine = Max( 0, current - numLines );
 	idStr str;
 	str.ReAllocate(numLines * LINE_WIDTH, false);
@@ -605,7 +610,9 @@ idStr idConsoleLocal::GetLastLines( int numLines ) {
 			char c = static_cast< char >( text[i] );
 			str.Append( c );
 		}
-		str.Append( '\n' );
+
+		if (!stripBlankLines || startIdx != endIdx)
+			str.Append( '\n' );
 	}
 	return str;
 }

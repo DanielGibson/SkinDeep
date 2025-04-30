@@ -24,10 +24,22 @@ END_CLASS
 
 void idSmokegrenade::Save(idSaveGame *savefile) const
 {
+    savefile->WriteObject( nozzleParticle ); // idFuncEmitter * nozzleParticle
+    savefile->WriteInt( spewtimer ); // int spewtimer
+    savefile->WriteInt( state ); // int state
+    savefile->WriteInt( stateTimer ); // int stateTimer
+    savefile->WriteInt( intervalTimer ); // int intervalTimer
+    savefile->WriteInt( inflictTimer ); // int inflictTimer
 }
 
 void idSmokegrenade::Restore(idRestoreGame *savefile)
 {
+    savefile->ReadObject( CastClassPtrRef(nozzleParticle) ); // idFuncEmitter * nozzleParticle
+    savefile->ReadInt( spewtimer ); // int spewtimer
+    savefile->ReadInt( state ); // int state
+    savefile->ReadInt( stateTimer ); // int stateTimer
+    savefile->ReadInt( intervalTimer ); // int intervalTimer
+    savefile->ReadInt( inflictTimer ); // int inflictTimer
 }
 
 void idSmokegrenade::Spawn(void)

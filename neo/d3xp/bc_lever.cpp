@@ -26,14 +26,18 @@ idLever::~idLever(void)
 
 void idLever::Save( idSaveGame *savefile ) const
 {
-	savefile->WriteInt(state);
-	savefile->WriteInt(nextStateTime);
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( nextStateTime ); // int nextStateTime
+	savefile->WriteBool( isActive ); // bool isActive
+	savefile->WriteObject( soundParticle ); // idFuncEmitter * soundParticle
 }
 
 void idLever::Restore( idRestoreGame *savefile )
 {
-	savefile->ReadInt(state);
-	savefile->ReadInt(nextStateTime);
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( nextStateTime ); // int nextStateTime
+	savefile->ReadBool( isActive ); // bool isActive
+	savefile->ReadObject( CastClassPtrRef(soundParticle) ); // idFuncEmitter * soundParticle
 }
 
 void idLever::Spawn( void )

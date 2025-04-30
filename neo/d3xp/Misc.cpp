@@ -108,8 +108,8 @@ void idPlayerStart::Spawn( void ) {
 idPlayerStart::Save
 ================
 */
-void idPlayerStart::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( teleportStage );
+void idPlayerStart::Save( idSaveGame *savefile ) const {  // blendo eric: savegame pass 1
+	savefile->WriteInt( teleportStage ); // int teleportStage
 }
 
 /*
@@ -118,7 +118,7 @@ idPlayerStart::Restore
 ================
 */
 void idPlayerStart::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( teleportStage );
+	savefile->ReadInt( teleportStage ); // int teleportStage
 }
 
 /*
@@ -276,8 +276,8 @@ END_CLASS
 idActivator::Save
 ================
 */
-void idActivator::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( stay_on );
+void idActivator::Save( idSaveGame *savefile ) const { // blendo eric: savegame pass 1
+	savefile->WriteBool( stay_on ); // bool stay_on
 }
 
 /*
@@ -286,7 +286,7 @@ idActivator::Restore
 ================
 */
 void idActivator::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( stay_on );
+	savefile->ReadBool( stay_on ); // bool stay_on
 
 	if ( stay_on ) {
 		BecomeActive( TH_THINK );
@@ -357,6 +357,8 @@ END_CLASS
 
 idPathCorner::idPathCorner()
 {
+	aiSearchNodes.SetOwner(this);
+	aiSearchNodes.AddToEnd(gameLocal.searchnodeEntities);
 }
 
 /*
@@ -369,6 +371,18 @@ idPathCorner::~idPathCorner()
 	aiSearchNodes.Remove();
 }
 
+void idPathCorner::Save( idSaveGame* savefile ) const // blendo eric: savegame pass 1
+{
+	SaveFileWriteArray( nodeAnimList, nodeAnimList.Num(), WriteString ); // idList<idStr> nodeAnimList
+	savefile->WriteInt( lastTimeUsed ); // int lastTimeUsed
+}
+
+void idPathCorner::Restore(idRestoreGame* savefile)
+{
+	SaveFileReadList( nodeAnimList, ReadString ); // idList<idStr> nodeAnimList
+	savefile->ReadInt( lastTimeUsed ); // int lastTimeUsed
+}
+
 /*
 =====================
 idPathCorner::Spawn
@@ -376,8 +390,6 @@ idPathCorner::Spawn
 */
 void idPathCorner::Spawn( void )
 {
-	aiSearchNodes.SetOwner(this);
-	aiSearchNodes.AddToEnd(gameLocal.searchnodeEntities);
 	lastTimeUsed = -60000;
 
 	
@@ -530,9 +542,9 @@ idDamagable::idDamagable( void ) {
 idDamagable::Save
 ================
 */
-void idDamagable::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( count );
-	savefile->WriteInt( nextTriggerTime );
+void idDamagable::Save( idSaveGame *savefile ) const { // blendo eric: savegame pass 1
+	savefile->WriteInt( count ); // int count
+	savefile->WriteInt( nextTriggerTime ); // int nextTriggerTime
 }
 
 /*
@@ -541,8 +553,8 @@ idDamagable::Restore
 ================
 */
 void idDamagable::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( count );
-	savefile->ReadInt( nextTriggerTime );
+	savefile->ReadInt( count ); // int count
+	savefile->ReadInt( nextTriggerTime ); // int nextTriggerTime
 }
 
 /*
@@ -829,6 +841,39 @@ void idSpring::Event_LinkSpring( void ) {
 	BecomeActive( TH_THINK );
 }
 
+
+idSpring::idSpring()
+{
+	ent1 = nullptr;
+	ent2 = nullptr;
+	id1 = 0;
+	id2 = 0;
+	p1 = vec3_zero;
+	p2 = vec3_zero;
+	//idForce_Spring spring;
+}
+
+void idSpring::Save(idSaveGame* savefile) const // blendo eric: savegame pass 1
+{
+	savefile->WriteObject( ent1 ); // idEntity * ent1
+	savefile->WriteObject( ent2 ); // idEntity * ent2
+	savefile->WriteInt( id1 ); // int id1
+	savefile->WriteInt( id2 ); // int id2
+	savefile->WriteVec3( p1 ); // idVec3 p1
+	savefile->WriteVec3( p2 ); // idVec3 p2
+	savefile->WriteStaticObject( idSpring::spring ); // idForce_Spring spring
+}
+void idSpring::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadObject( ent1 ); // idEntity * ent1
+	savefile->ReadObject( ent2 ); // idEntity * ent2
+	savefile->ReadInt( id1 ); // int id1
+	savefile->ReadInt( id2 ); // int id2
+	savefile->ReadVec3( p1 ); // idVec3 p1
+	savefile->ReadVec3( p2 ); // idVec3 p2
+	savefile->ReadStaticObject( spring ); // idForce_Spring spring
+}
+
 /*
 ================
 idSpring::Spawn
@@ -900,7 +945,7 @@ idForceField::Save
 ================
 */
 void idForceField::Save( idSaveGame *savefile ) const {
-	savefile->WriteStaticObject( forceField );
+	savefile->WriteStaticObject( idForceField::forceField ); // idForce_Field	forceField
 }
 
 /*
@@ -909,7 +954,7 @@ idForceField::Restore
 ================
 */
 void idForceField::Restore( idRestoreGame *savefile ) {
-	savefile->ReadStaticObject( forceField );
+	savefile->ReadStaticObject( forceField ); // idForce_Field	forceField
 }
 
 /*
@@ -1080,13 +1125,13 @@ idAnimated::Save
 ================
 */
 void idAnimated::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( current_anim_index );
-	savefile->WriteInt( num_anims );
-	savefile->WriteInt( anim );
-	savefile->WriteInt( blendFrames );
-	savefile->WriteJoint( soundJoint );
-	activator.Save( savefile );
-	savefile->WriteBool( activated );
+	savefile->WriteInt( num_anims ); //  int num_anims
+	savefile->WriteInt( current_anim_index ); //  int current_anim_index
+	savefile->WriteInt( anim ); //  int anim
+	savefile->WriteInt( blendFrames ); //  int blendFrames
+	savefile->WriteJoint( soundJoint ); //  saveJoint_t soundJoint
+	savefile->WriteObject( activator ); //  idEntityPtr<idEntity> activator
+	savefile->WriteBool( activated ); //  bool activated
 }
 
 /*
@@ -1095,13 +1140,13 @@ idAnimated::Restore
 ================
 */
 void idAnimated::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( current_anim_index );
-	savefile->ReadInt( num_anims );
-	savefile->ReadInt( anim );
-	savefile->ReadInt( blendFrames );
-	savefile->ReadJoint( soundJoint );
-	activator.Restore( savefile );
-	savefile->ReadBool( activated );
+	savefile->ReadInt( num_anims ); //  int num_anims
+	savefile->ReadInt( current_anim_index ); //  int current_anim_index
+	savefile->ReadInt( anim ); //  int anim
+	savefile->ReadInt( blendFrames ); //  int blendFrames
+	savefile->ReadJoint( soundJoint ); //  saveJoint_t soundJoint
+	savefile->ReadObject( activator ); //  idEntityPtr<idEntity> activator
+	savefile->ReadBool( activated ); //  bool activated
 }
 
 /*
@@ -1630,13 +1675,14 @@ idStaticEntity::Save
 ===============
 */
 void idStaticEntity::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( spawnTime );
-	savefile->WriteBool( active );
-	savefile->WriteVec4( fadeFrom );
-	savefile->WriteVec4( fadeTo );
-	savefile->WriteInt( fadeStart );
-	savefile->WriteInt( fadeEnd );
-	savefile->WriteBool( runGui );
+	savefile->WriteInt( spawnTime ); //  int spawnTime
+	savefile->WriteBool( active ); //  bool active
+	savefile->WriteVec4( fadeFrom ); //  idVec4 fadeFrom
+	savefile->WriteVec4( fadeTo ); //  idVec4 fadeTo
+	savefile->WriteInt( fadeStart ); //  int fadeStart
+	savefile->WriteInt( fadeEnd ); //  int fadeEnd
+	savefile->WriteBool( runGui ); //  bool runGui
+	savefile->WriteBool( spin ); //  bool spin
 }
 
 /*
@@ -1645,13 +1691,14 @@ idStaticEntity::Restore
 ===============
 */
 void idStaticEntity::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( spawnTime );
-	savefile->ReadBool( active );
-	savefile->ReadVec4( fadeFrom );
-	savefile->ReadVec4( fadeTo );
-	savefile->ReadInt( fadeStart );
-	savefile->ReadInt( fadeEnd );
-	savefile->ReadBool( runGui );
+	savefile->ReadInt( spawnTime ); //  int spawnTime
+	savefile->ReadBool( active ); //  bool active
+	savefile->ReadVec4( fadeFrom ); //  idVec4 fadeFrom
+	savefile->ReadVec4( fadeTo ); //  idVec4 fadeTo
+	savefile->ReadInt( fadeStart ); //  int fadeStart
+	savefile->ReadInt( fadeEnd ); //  int fadeEnd
+	savefile->ReadBool( runGui ); //  bool runGui
+	savefile->ReadBool( spin ); //  bool spin
 }
 
 /*
@@ -1969,7 +2016,9 @@ idFuncEmitter::Save
 ===============
 */
 void idFuncEmitter::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( hidden );
+	savefile->WriteBool( hidden ); //  bool hidden
+	savefile->WriteBool( airlessGravity ); //  bool airlessGravity
+	savefile->WriteBool( hasInfiniteStage ); //  bool hasInfiniteStage;
 }
 
 /*
@@ -1978,7 +2027,9 @@ idFuncEmitter::Restore
 ===============
 */
 void idFuncEmitter::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( hidden );
+	savefile->ReadBool( hidden ); //  bool hidden
+	savefile->ReadBool( airlessGravity ); //  bool airlessGravity
+	savefile->ReadBool( hasInfiniteStage ); //  bool hasInfiniteStage
 }
 
 /*
@@ -2146,9 +2197,9 @@ idFuncSmoke::Save
 ===============
 */
 void idFuncSmoke::Save(	idSaveGame *savefile ) const {
-	savefile->WriteInt( smokeTime );
-	savefile->WriteParticle( smoke );
-	savefile->WriteBool( restart );
+	savefile->WriteInt( smokeTime ); //  int smokeTime
+	savefile->WriteParticle( smoke ); // const  idDeclParticle * smoke
+	savefile->WriteBool( restart ); //  bool restart
 }
 
 /*
@@ -2157,9 +2208,9 @@ idFuncSmoke::Restore
 ===============
 */
 void idFuncSmoke::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( smokeTime );
-	savefile->ReadParticle( smoke );
-	savefile->ReadBool( restart );
+	savefile->ReadInt( smokeTime ); //  int smokeTime
+	savefile->ReadParticle( smoke ); // const  idDeclParticle * smoke
+	savefile->ReadBool( restart ); //  bool restart
 }
 
 /*
@@ -2269,8 +2320,12 @@ idTextEntity::Save
 ================
 */
 void idTextEntity::Save( idSaveGame *savefile ) const {
-	savefile->WriteString( text );
-	savefile->WriteBool( playerOriented );
+	savefile->WriteString( text ); //  idString text
+	savefile->WriteString( textFormatted ); //  idString textFormatted
+	savefile->WriteBool( playerOriented ); //  bool playerOriented
+	savefile->WriteFloat( textsize ); //  float textsize
+	savefile->WriteBool( depthTest ); //  bool depthTest
+	savefile->WriteVec4( textColor ); //  idVec4 textColor
 }
 
 /*
@@ -2279,11 +2334,12 @@ idTextEntity::Restore
 ================
 */
 void idTextEntity::Restore( idRestoreGame *savefile ) {
-	savefile->ReadString( text );
-	savefile->ReadBool( playerOriented );
-
-	textFormatted = text;
-	textFormatted.Replace("\\n", "\n");
+	savefile->ReadString( text ); //  idString text
+	savefile->ReadString( textFormatted ); //  idString textFormatted
+	savefile->ReadBool( playerOriented ); //  bool playerOriented
+	savefile->ReadFloat( textsize ); //  float textsize
+	savefile->ReadBool( depthTest ); //  bool depthTest
+	savefile->ReadVec4( textColor ); //  idVec4 textColor
 }
 
 /*
@@ -2719,8 +2775,8 @@ idBeam::Save
 ===============
 */
 void idBeam::Save( idSaveGame *savefile ) const {
-	target.Save( savefile );
-	master.Save( savefile );
+	target.Save( savefile ); //  idEntityPtr<idBeam> target
+	master.Save( savefile ); //  idEntityPtr<idBeam> master
 }
 
 /*
@@ -2729,8 +2785,8 @@ idBeam::Restore
 ===============
 */
 void idBeam::Restore( idRestoreGame *savefile ) {
-	target.Restore( savefile );
-	master.Restore( savefile );
+	target.Restore( savefile ); //  idEntityPtr<idBeam> target
+	master.Restore( savefile ); //  idEntityPtr<idBeam> master
 }
 
 /*
@@ -2982,8 +3038,11 @@ idShaking::Save
 ===============
 */
 void idShaking::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( active );
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteStaticObject( idShaking::physicsObj ); //  idPhysics_Parametric physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteBool( active ); //  bool active
 }
 
 /*
@@ -2992,9 +3051,15 @@ idShaking::Restore
 ===============
 */
 void idShaking::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( active );
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
+	savefile->ReadStaticObject( physicsObj ); //  idPhysics_Parametric physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadBool( active ); //  bool active
 }
 
 /*
@@ -3081,14 +3146,14 @@ idEarthQuake::Save
 ===============
 */
 void idEarthQuake::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( nextTriggerTime );
-	savefile->WriteInt( shakeStopTime );
-	savefile->WriteFloat( wait );
-	savefile->WriteFloat( random );
-	savefile->WriteBool( triggered );
-	savefile->WriteBool( playerOriented );
-	savefile->WriteBool( disabled );
-	savefile->WriteFloat( shakeTime );
+	savefile->WriteInt( nextTriggerTime ); //  int nextTriggerTime
+	savefile->WriteInt( shakeStopTime ); //  int shakeStopTime
+	savefile->WriteFloat( wait ); //  float wait
+	savefile->WriteFloat( random ); //  float random
+	savefile->WriteBool( triggered ); //  bool triggered
+	savefile->WriteBool( playerOriented ); //  bool playerOriented
+	savefile->WriteBool( disabled ); //  bool disabled
+	savefile->WriteFloat( shakeTime ); //  float shakeTime
 }
 
 /*
@@ -3097,14 +3162,14 @@ idEarthQuake::Restore
 ===============
 */
 void idEarthQuake::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( nextTriggerTime );
-	savefile->ReadInt( shakeStopTime );
-	savefile->ReadFloat( wait );
-	savefile->ReadFloat( random );
-	savefile->ReadBool( triggered );
-	savefile->ReadBool( playerOriented );
-	savefile->ReadBool( disabled );
-	savefile->ReadFloat( shakeTime );
+	savefile->ReadInt( nextTriggerTime ); //  int nextTriggerTime
+	savefile->ReadInt( shakeStopTime ); //  int shakeStopTime
+	savefile->ReadFloat( wait ); //  float wait
+	savefile->ReadFloat( random ); //  float random
+	savefile->ReadBool( triggered ); //  bool triggered
+	savefile->ReadBool( playerOriented ); //  bool playerOriented
+	savefile->ReadBool( disabled ); //  bool disabled
+	savefile->ReadFloat( shakeTime ); //  float shakeTime
 
 	if ( shakeStopTime > gameLocal.time ) {
 		BecomeActive( TH_THINK );
@@ -3238,8 +3303,8 @@ idFuncPortal::Save
 ===============
 */
 void idFuncPortal::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( (int)portal );
-	savefile->WriteBool( state );
+	savefile->WriteHandle( portal ); // qhandle_t portal;
+	savefile->WriteBool( state ); // bool state;
 }
 
 /*
@@ -3248,8 +3313,8 @@ idFuncPortal::Restore
 ===============
 */
 void idFuncPortal::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( (int &)portal );
-	savefile->ReadBool( state );
+	savefile->ReadHandle( portal );  // qhandle_t portal;
+	savefile->ReadBool( state );  // bool state;
 	gameLocal.SetPortalState( portal, state ? PS_BLOCK_ALL : PS_BLOCK_NONE );
 }
 
@@ -3308,7 +3373,7 @@ idFuncAASPortal::Save
 ===============
 */
 void idFuncAASPortal::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( state );
+	savefile->WriteBool( state ); // bool state
 }
 
 /*
@@ -3317,7 +3382,7 @@ idFuncAASPortal::Restore
 ===============
 */
 void idFuncAASPortal::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( state );
+	savefile->ReadBool( state ); // bool state
 	gameLocal.SetAASAreaState( GetPhysics()->GetAbsBounds(), AREACONTENTS_CLUSTERPORTAL, state );
 }
 
@@ -3377,7 +3442,7 @@ idFuncAASObstacle::Save
 ===============
 */
 void idFuncAASObstacle::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( state );
+	savefile->WriteBool( state ); // bool state
 }
 
 /*
@@ -3386,7 +3451,7 @@ idFuncAASObstacle::Restore
 ===============
 */
 void idFuncAASObstacle::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( state );
+	savefile->ReadBool( state ); // bool state
 	gameLocal.SetAASAreaState( GetPhysics()->GetAbsBounds(), AREACONTENTS_OBSTACLE, state );
 }
 
@@ -3450,7 +3515,7 @@ idFuncRadioChatter::Save
 ===============
 */
 void idFuncRadioChatter::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( time );
+	savefile->WriteFloat( time ); // float time
 }
 
 /*
@@ -3459,7 +3524,7 @@ idFuncRadioChatter::Restore
 ===============
 */
 void idFuncRadioChatter::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( time );
+	savefile->ReadFloat( time ); // float time
 }
 
 /*
@@ -3549,24 +3614,16 @@ idPhantomObjects::Save
 ===============
 */
 void idPhantomObjects::Save( idSaveGame *savefile ) const {
-	int i;
-
-	savefile->WriteInt( end_time );
-	savefile->WriteFloat( throw_time );
-	savefile->WriteFloat( shake_time );
-	savefile->WriteVec3( shake_ang );
-	savefile->WriteFloat( speed );
-	savefile->WriteInt( min_wait );
-	savefile->WriteInt( max_wait );
-	target.Save( savefile );
-
-	savefile->WriteInt( targetTime.Num() );
-	for( i = 0; i < targetTime.Num(); i++ ) {
-		savefile->WriteInt( targetTime[ i ] );
-	}
-	for( i = 0; i < lastTargetPos.Num(); i++ ) {
-		savefile->WriteVec3( lastTargetPos[ i ] );
-	}
+	savefile->WriteInt( end_time ); //  int end_time
+	savefile->WriteFloat( throw_time ); //  float throw_time
+	savefile->WriteFloat( shake_time ); //  float shake_time
+	savefile->WriteVec3( shake_ang ); //  idVec3 shake_ang
+	savefile->WriteFloat( speed ); //  float speed
+	savefile->WriteInt( min_wait ); //  int min_wait
+	savefile->WriteInt( max_wait ); //  int max_wait
+	target.Save( savefile ); //  idEntityPtr<idActor> target
+	SaveFileWriteArray( targetTime, targetTime.Num(), WriteInt ); //  idList<int> targetTime
+	SaveFileWriteArray( lastTargetPos, lastTargetPos.Num(), WriteVec3 ); //  idList<idVec3> lastTargetPos
 }
 
 /*
@@ -3575,30 +3632,16 @@ idPhantomObjects::Restore
 ===============
 */
 void idPhantomObjects::Restore( idRestoreGame *savefile ) {
-	int num;
-	int i;
-
-	savefile->ReadInt( end_time );
-	savefile->ReadFloat( throw_time );
-	savefile->ReadFloat( shake_time );
-	savefile->ReadVec3( shake_ang );
-	savefile->ReadFloat( speed );
-	savefile->ReadInt( min_wait );
-	savefile->ReadInt( max_wait );
-	target.Restore( savefile );
-
-	savefile->ReadInt( num );
-	targetTime.SetGranularity( 1 );
-	targetTime.SetNum( num );
-	lastTargetPos.SetGranularity( 1 );
-	lastTargetPos.SetNum( num );
-
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( targetTime[ i ] );
-	}
-	for( i = 0; i < num; i++ ) {
-		savefile->ReadVec3( lastTargetPos[ i ] );
-	}
+	savefile->ReadInt( end_time ); //  int end_time
+	savefile->ReadFloat( throw_time ); //  float throw_time
+	savefile->ReadFloat( shake_time ); //  float shake_time
+	savefile->ReadVec3( shake_ang ); //  idVec3 shake_ang
+	savefile->ReadFloat( speed ); //  float speed
+	savefile->ReadInt( min_wait ); //  int min_wait
+	savefile->ReadInt( max_wait ); //  int max_wait
+	target.Restore( savefile ); //  idEntityPtr<idActor> target
+	SaveFileReadList( targetTime, ReadInt ); //  idList<int> targetTime
+	SaveFileReadList( lastTargetPos,  ReadVec3 ); //  idList<idVec3> lastTargetPos
 }
 
 /*
@@ -3812,19 +3855,19 @@ idShockwave::Save
 ===============
 */
 void idShockwave::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( isActive );
-	savefile->WriteInt( startTime );
-	savefile->WriteInt( duration );
+	savefile->WriteBool( isActive ); //  bool isActive
+	savefile->WriteInt( startTime ); //  int startTime
+	savefile->WriteInt( duration ); //  int duration
 
-	savefile->WriteFloat( startSize );
-	savefile->WriteFloat( endSize );
-	savefile->WriteFloat( currentSize );
+	savefile->WriteFloat( startSize ); //  float startSize
+	savefile->WriteFloat( endSize ); //  float endSize
+	savefile->WriteFloat( currentSize ); //  float currentSize
 
-	savefile->WriteFloat( magnitude );
+	savefile->WriteFloat( magnitude ); //  float magnitude
 
-	savefile->WriteFloat( height );
-	savefile->WriteBool( playerDamaged );
-	savefile->WriteFloat( playerDamageSize );
+	savefile->WriteFloat( height ); //  float height
+	savefile->WriteBool( playerDamaged ); //  bool playerDamaged
+	savefile->WriteFloat( playerDamageSize ); //  float playerDamageSize
 }
 
 /*
@@ -3833,19 +3876,19 @@ idShockwave::Restore
 ===============
 */
 void idShockwave::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( isActive );
-	savefile->ReadInt( startTime );
-	savefile->ReadInt( duration );
+	savefile->ReadBool( isActive ); //  bool isActive
+	savefile->ReadInt( startTime ); //  int startTime
+	savefile->ReadInt( duration ); //  int duration
 
-	savefile->ReadFloat( startSize );
-	savefile->ReadFloat( endSize );
-	savefile->ReadFloat( currentSize );
+	savefile->ReadFloat( startSize ); //  float startSize
+	savefile->ReadFloat( endSize ); //  float endSize
+	savefile->ReadFloat( currentSize ); //  float currentSize
 
-	savefile->ReadFloat( magnitude );
+	savefile->ReadFloat( magnitude ); //  float magnitude
 
-	savefile->ReadFloat( height );
-	savefile->ReadBool( playerDamaged );
-	savefile->ReadFloat( playerDamageSize );
+	savefile->ReadFloat( height ); //  float height
+	savefile->ReadBool( playerDamaged ); //  bool playerDamaged
+	savefile->ReadFloat( playerDamageSize ); //  float playerDamageSize
 
 }
 
@@ -4064,6 +4107,36 @@ void idFuncMountedObject::Spawn( void ) {
 	BecomeActive( TH_THINK );
 }
 
+void idFuncMountedObject::Save(idSaveGame* savefile) const {
+	savefile->WriteInt( harc ); //  int harc
+	savefile->WriteInt( varc ); //  int varc
+	savefile->WriteBool( isMounted ); //  bool isMounted
+
+	savefile->WriteBool( scriptFunction == nullptr ); //  function_t* scriptFunction;
+	if (scriptFunction) {
+		savefile->WriteString(scriptFunction->Name());
+	}
+
+	savefile->WriteObject(mountedPlayer ); //  idPlayer * mountedPlayer
+}
+
+void idFuncMountedObject::Restore(idRestoreGame* savefile) {
+	savefile->ReadInt( harc ); //  int harc
+	savefile->ReadInt( varc ); //  int varc
+	savefile->ReadBool( isMounted ); //  bool isMounted
+
+	bool funcExists;
+	savefile->ReadBool( funcExists );  //  function_t* scriptFunction;
+	if ( funcExists ) {
+		idStr oName;
+		savefile->ReadString(oName);
+		scriptFunction = gameLocal.program.FindFunction(oName);
+		assert(scriptFunction);
+	}
+
+	savefile->ReadObject( CastClassPtrRef(mountedPlayer) ); //  idPlayer * mountedPlayer
+}
+
 /*
 ================
 idFuncMountedObject::Think
@@ -4186,6 +4259,35 @@ void idFuncMountedWeapon::Spawn( void ) {
 	soundFireWeapon = declManager->FindSound( fireSound );
 
 	PostEventMS( &EV_PostSpawn, 0 );
+}
+
+void idFuncMountedWeapon::Save(idSaveGame* savefile) const {
+	savefile->WriteObject( turret ); //  idEntity	*		 turret
+	savefile->WriteVec3( muzzleOrigin ); //  idVec3 muzzleOrigin
+	savefile->WriteMat3( muzzleAxis ); //  idMat3 muzzleAxis
+
+	savefile->WriteFloat( weaponLastFireTime ); //  float weaponLastFireTime
+	savefile->WriteFloat( weaponFireDelay ); //  float weaponFireDelay
+
+	// const  idDict * projectile // gened
+
+	savefile->WriteSoundShader( soundFireWeapon ); // const  idSoundShader	* soundFireWeapon
+}
+void idFuncMountedWeapon::Restore( idRestoreGame *savefile ){
+	savefile->ReadObject( turret ); //  idEntity	*		 turret
+	savefile->ReadVec3( muzzleOrigin ); //  idVec3 muzzleOrigin
+	savefile->ReadMat3( muzzleAxis ); //  idMat3 muzzleAxis
+
+	savefile->ReadFloat( weaponLastFireTime ); //  float weaponLastFireTime
+	savefile->ReadFloat( weaponFireDelay ); //  float weaponFireDelay
+
+	// Get projectile info
+	projectile = gameLocal.FindEntityDefDict( spawnArgs.GetString( "def_projectile" ), false );
+	if ( !projectile ) {
+		gameLocal.Warning( "Invalid projectile on func_mountedweapon." );
+	}
+
+	savefile->ReadSoundShader( soundFireWeapon ); // const  idSoundShader	* soundFireWeapon
 }
 
 void idFuncMountedWeapon::Think( void ) {

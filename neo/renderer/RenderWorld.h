@@ -92,7 +92,7 @@ typedef bool(*deferredEntityCallback_t)( renderEntity_s *, const renderView_s * 
 
 
 typedef struct renderEntity_s {
-	idRenderModel *			hModel;				// this can only be null if callback is set
+	idRenderModel *			hModel = nullptr;				// this can only be null if callback is set
 
 	int						entityNum;
 	int						bodyId;
@@ -109,7 +109,7 @@ typedef struct renderEntity_s {
 	idBounds				bounds;					// only needs to be set for deferred models and md5s
 	deferredEntityCallback_t	callback;
 
-	void *					callbackData;			// used for whatever the callback wants
+	void *					callbackData = nullptr;			// used for whatever the callback wants
 
 	// player bodies and possibly player shadows should be suppressed in views from
 	// that player's eyes, but will show up in mirrors and other subviews
@@ -134,21 +134,21 @@ typedef struct renderEntity_s {
 	idMat3					axis;
 
 	// texturing
-	const idMaterial *		customShader;			// if non-0, all surfaces will use this
-	const idMaterial *		referenceShader;		// used so flares can reference the proper light shader
-	const idDeclSkin *		customSkin;				// 0 for no remappings'
-	const idDeclSkin *		overrideSkinInSubview;	// SW: Should let us draw arms in mirrors. If NULL, no override should occur.
-	class idSoundEmitter *	referenceSound;			// for shader sound tables, allowing effects to vary with sounds
-	float					shaderParms[ MAX_ENTITY_SHADER_PARMS ];	// can be used in any way by shader or model generation
+	const idMaterial *		customShader = nullptr; // if non-0, all surfaces will use this
+	const idMaterial *		referenceShader = nullptr; // used so flares can reference the proper light shader
+	const idDeclSkin *		customSkin = nullptr; // 0 for no remappings'
+	const idDeclSkin *		overrideSkinInSubview = nullptr; // SW: Should let us draw arms in mirrors. If NULL, no override should occur.
+	class idSoundEmitter *	referenceSound =  nullptr; // for shader sound tables, allowing effects to vary with sounds
+	float					shaderParms[MAX_ENTITY_SHADER_PARMS] = {}; // can be used in any way by shader or model generation
 	idImage*				fragmentMapOverride;	// If non-null, overrides the image in fragmentMap 0
 
 	// networking: see WriteGUIToSnapshot / ReadGUIFromSnapshot
-	class idUserInterface * gui[ MAX_RENDERENTITY_GUI ];
+	class idUserInterface*  gui[MAX_RENDERENTITY_GUI] = {};
 
 	struct renderView_s	*	remoteRenderView;		// any remote camera surfaces will use this
 
 	int						numJoints;
-	idJointMat *			joints;					// array of joints that will modify vertices.
+	idJointMat *			joints = nullptr; // array of joints that will modify vertices.
 													// NULL if non-deformable model.  NOT freed by renderer
 
 	float					modelDepthHack;			// squash depth range so particle effects don't clip into walls
@@ -349,6 +349,7 @@ public:
 	virtual	void			UpdateEntityDef( qhandle_t entityHandle, const renderEntity_t *re ) = 0;
 	virtual	void			FreeEntityDef( qhandle_t entityHandle ) = 0;
 	virtual const renderEntity_t *GetRenderEntity( qhandle_t entityHandle ) const = 0;
+	virtual int				EntityDefNum() const = 0;
 
 	virtual void			AddGlobalRenderEnt(qhandle_t handle) = 0;
 	virtual void			RemoveGlobalRenderEnt(qhandle_t handle) = 0;
@@ -357,6 +358,7 @@ public:
 	virtual	void			UpdateLightDef( qhandle_t lightHandle, const renderLight_t *rlight ) = 0;
 	virtual	void			FreeLightDef( qhandle_t lightHandle ) = 0;
 	virtual const renderLight_t *GetRenderLight( qhandle_t lightHandle ) const = 0;
+	virtual int				LightDefNum() const = 0;
 	virtual const idMaterial* RemapShaderBySkin(const idMaterial* shader, const idDeclSkin* skin) = 0;
 
 	// Force the generation of all light / surface interactions at the start of a level
@@ -488,7 +490,7 @@ public:
 	virtual void			DebugWinding( const idVec4 &color, const idWinding &w, const idVec3 &origin, const idMat3 &axis, const int lifetime = 0, const bool depthTest = false ) = 0;
 	virtual void			DebugCircle( const idVec4 &color, const idVec3 &origin, const idVec3 &dir, const float radius, const int numSteps, const int lifetime = 0, const bool depthTest = false ) = 0;
 	virtual void			DebugSphere( const idVec4 &color, const idSphere &sphere, const int lifetime = 0, bool depthTest = false ) = 0;
-	virtual void			DebugBounds( const idVec4 &color, const idBounds &bounds, const idVec3 &org = vec3_origin, const int lifetime = 0 ) = 0;
+	virtual void			DebugBounds( const idVec4 &color, const idBounds &bounds, const idVec3 &org = vec3_origin, const int lifetime = 0, const idMat3 * axis = nullptr) = 0;
 	virtual void			DebugBox( const idVec4 &color, const idBox &box, const int lifetime = 0, const bool depthTest = false ) = 0;
 	virtual void			DebugFrustum( const idVec4 &color, const idFrustum &frustum, const bool showFromOrigin = false, const int lifetime = 0 ) = 0;
 	virtual void			DebugCone( const idVec4 &color, const idVec3 &apex, const idVec3 &dir, float radius1, float radius2, const int lifetime = 0 ) = 0;

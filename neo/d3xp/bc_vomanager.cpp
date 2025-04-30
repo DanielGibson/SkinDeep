@@ -75,16 +75,20 @@ int idVOManager::SayVO(idEntity *speaker, const char *soundname, int lineCategor
 			idStr speakParticle = speaker->spawnArgs.GetString("model_sound");
 			if (speakParticle.Length() > 0)
 			{
-				idVec3 headPos = static_cast<idActor*>(speaker)->GetEyePosition();
-				idEntity* particle = gameLocal.DoParticle(speakParticle, headPos);
-				if (particle)
+				idStr soundwavejoint = speaker->spawnArgs.GetString("soundwave_joint", "head");
+				jointHandle_t headJoint = static_cast<idActor*>(speaker)->GetAnimator()->GetJointHandle(soundwavejoint.c_str());
+				if (headJoint != INVALID_JOINT)
 				{
-					//find head joint.
-					jointHandle_t headJoint = static_cast<idActor*>(speaker)->GetAnimator()->GetJointHandle("head");
-					if (headJoint != INVALID_JOINT)
+					idVec3 headPos;
+					idMat3 headAxis;
+					speaker->GetAnimator()->GetJointTransform(headJoint, gameLocal.time, headPos, headAxis);
+					headPos = speaker->GetRenderEntity()->origin + headPos * speaker->GetRenderEntity()->axis;
+
+					idEntity* particle = gameLocal.DoParticle(speakParticle, headPos);					
+					if (particle)
 					{
 						particle->BindToJoint(speaker, headJoint, false);
-					}					
+					}
 				}
 			}
 		}

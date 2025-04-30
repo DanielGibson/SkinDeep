@@ -14,7 +14,7 @@
 
 const int PAYLOAD_TIMER = 90; //time between surface bounce + wire activation.
 const int WIRELENGTH = 256;
-const int WIRELENGTH_IMMEDIATEDEPLOY = 4096;
+const int WIRELENGTH_IMMEDIATEDEPLOY = 1024; // SW 3rd March 2025: Lowered this distance to something a bit less ridiculous
 
 const float JUMP_POWER = 256;
 const float WIREWIDTH = .3f;
@@ -111,10 +111,40 @@ void idWiregrenade::Spawn(void)
 
 void idWiregrenade::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( hasBounced ); // bool hasBounced
+
+	savefile->WriteInt( grenadeTimer ); // int grenadeTimer
+	savefile->WriteInt( grenadeState ); // int grenadeState
+
+	savefile->WriteObject( animatedEnt ); // idAnimated* animatedEnt
+
+	SaveFileWriteArray( wireOrigin, MAXWIRES, WriteObject ); // idBeam* wireOrigin[MAXWIRES]
+	SaveFileWriteArray( wireTarget, MAXWIRES, WriteObject ); // idBeam* wireTarget[MAXWIRES]
+
+	SaveFileWriteArray( wireTarget, MAXWIRES, WriteObject ); // idStaticEntity* wireHooks[MAXWIRES]
+
+	savefile->WriteInt( checkTimer ); // int checkTimer
+
+	savefile->WriteInt( playerLeniencyTime ); // int playerLeniencyTime
 }
 
 void idWiregrenade::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( hasBounced ); // bool hasBounced
+
+	savefile->ReadInt( grenadeTimer ); // int grenadeTimer
+	savefile->ReadInt( grenadeState ); // int grenadeState
+
+	savefile->ReadObject( CastClassPtrRef(animatedEnt) ); // idAnimated* animatedEnt
+
+	SaveFileReadArrayCast( wireOrigin, ReadObject, idClass*& ); // idBeam* wireOrigin[MAXWIRES]
+	SaveFileReadArrayCast( wireTarget, ReadObject, idClass*&  ); // idBeam* wireTarget[MAXWIRES]
+
+	SaveFileReadArrayCast( wireTarget, ReadObject, idClass*&  ); // idStaticEntity* wireHooks[MAXWIRES]
+
+	savefile->ReadInt( checkTimer ); // int checkTimer
+
+	savefile->ReadInt( playerLeniencyTime ); // int playerLeniencyTime
 }
 
 bool idWiregrenade::Collide(const trace_t &collision, const idVec3 &velocity)
@@ -125,6 +155,13 @@ bool idWiregrenade::Collide(const trace_t &collision, const idVec3 &velocity)
 
 	if (v < 1)
 		return false;
+
+	//BC 3-6-2025: ignore if I hit a sky brush.
+	if (collision.c.material)
+	{
+		if (collision.c.material->GetSurfaceFlags() >= 256)
+			return false; //It's sky. Exit here.
+	}
 
 	if (!hasBounced)
 	{
@@ -346,7 +383,9 @@ void idWiregrenade::Think(void)
 					continue;
 				}
 
-				if (trWire.fraction < 1.0f && trWire.fraction >= .1f) //Make sure wire hits a wall AND is not too short.
+				// Make sure wire hits a wall AND is not too short.
+				// SW 3rd March 2025: Tripwire can never be too short
+				if (trWire.fraction < 1.0f && (immediateDeployMode || trWire.fraction >= .1f))
 				{
 
 					//gameRenderWorld->DebugLine(colorRed, GetPhysics()->GetOrigin(), trWire.endpos, 10000);

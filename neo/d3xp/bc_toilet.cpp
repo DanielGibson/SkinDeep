@@ -25,6 +25,7 @@ END_CLASS
 
 idToilet::idToilet(void)
 {
+	handle = nullptr;
 	grabTimer = 0;
 }
 
@@ -61,10 +62,24 @@ void idToilet::Spawn(void)
 
 void idToilet::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( handle ); // idAnimated* handle
+	savefile->WriteInt( flushTimer ); // int flushTimer
+	savefile->WriteInt( flushMode ); // int flushMode
+	savefile->WriteInt( waterjetTimer ); // int waterjetTimer
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( grabTimer ); // int grabTimer
 }
 
 void idToilet::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( CastClassPtrRef(handle) ); // idAnimated* handle
+	savefile->ReadInt( flushTimer ); // int flushTimer
+	savefile->ReadInt( flushMode ); // int flushMode
+	savefile->ReadInt( waterjetTimer ); // int waterjetTimer
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( grabTimer ); // int grabTimer
 }
 
 void idToilet::Think(void)
@@ -140,6 +155,8 @@ void idToilet::Killed(idEntity *inflictor, idEntity *attacker, int damage, const
 	if (!(fl.takedamage || spawnArgs.GetBool("tutorialToilet", "0")))
 		return;	
 
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
+
 	fl.takedamage = false;
 	StopSound(SND_CHANNEL_ANY, false);
 
@@ -150,6 +167,7 @@ void idToilet::Killed(idEntity *inflictor, idEntity *attacker, int damage, const
 	SetModel(spawnArgs.GetString("brokenmodel"));
 	SetSkin(declManager->FindSkin(spawnArgs.GetString("brokenskin")));
 	handle->PostEventMS(&EV_Remove, 0);
+	handle = nullptr;
 	isFrobbable = false;
 
 	
@@ -293,7 +311,31 @@ void idToilet::GrabAndFlushObjects()
         idStr ejectFX = ent->spawnArgs.GetString("fx_eject");
         if (ejectFX.Length() > 0)
         {
-            idEntityFx::StartFx(ejectFX, GetPhysics()->GetOrigin(), mat3_identity);
+            //idEntityFx::StartFx(ejectFX, GetPhysics()->GetOrigin(), mat3_identity);
+			 
+			//BC 3-12-2025: Manually do the FX, so that we can give it a speakername.
+			idDict args;
+			args.SetBool("start", true);
+			args.Set("fx", ejectFX.c_str());
+			args.Set("speakername", "#str_speaker_pirate");
+			idEntityFx* nfx = static_cast<idEntityFx*>(gameLocal.SpawnEntityType(idEntityFx::Type, &args));
+			if (nfx)
+			{
+				nfx->SetOrigin(GetPhysics()->GetOrigin());
+
+				// SW 17th March 2025: Playing the VO here instead of inside the FX so that we can correctly assign its channel and use the VO manager
+				idStr ejectVO = ent->spawnArgs.GetString("snd_vo_eject");
+				if (ejectVO.Length() > 0)
+				{
+					gameLocal.voManager.SayVO(nfx, ejectVO.c_str(), VO_CATEGORY_BARK);
+				}
+			}
+
+
+
+
+			//BC 2-13-2025: player response.
+			gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay_msDelayed("snd_vo_flush_skull", 1200);
         }
 
 		//we now have an item.		

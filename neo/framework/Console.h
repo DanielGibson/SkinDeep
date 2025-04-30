@@ -73,7 +73,7 @@ public:
 	virtual void	LoadHistory() = 0;
 
 	virtual const char * GetHistoryLine(int line) = 0;
-	virtual idStr	GetLastLines( int numLines ) = 0;
+	virtual idStr	GetLastLines( int numLines, bool stripBlankLines = false ) = 0;
 };
 
 extern idConsole *	console;	// statically initialized to an idConsoleLocal

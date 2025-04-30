@@ -84,6 +84,24 @@ idTestModel::Save
 ================
 */
 void idTestModel::Save( idSaveGame *savefile ) {
+	savefile->WriteObject( head ); // idEntityPtr<idEntity> head
+	savefile->WriteAnimatorPtr( headAnimator ); // idAnimator * headAnimator
+	// idAnim customAnim // blendo eric: this isn't used?
+	savefile->WriteStaticObject( idTestModel::physicsObj ); // idPhysics_Parametric physicsObj
+	savefile->WriteString( animname ); // idString animname
+	savefile->WriteInt( anim ); // int anim
+	savefile->WriteInt( headAnim ); // int headAnim
+	savefile->WriteInt( mode ); // int mode
+	savefile->WriteInt( frame ); // int frame
+	savefile->WriteInt( starttime ); // int starttime
+	savefile->WriteInt( animtime ); // int animtime
+
+	savefile->WriteInt( copyJoints.Num() ); // // idList<copyJoints_t> copyJoints
+	for (int idx = 0; idx < copyJoints.Num(); idx++) {
+		savefile->WriteInt( copyJoints[idx].mod ); // jointModTransform_t mod
+		savefile->WriteInt( copyJoints[idx].from ); // saveJoint_t from
+		savefile->WriteInt( copyJoints[idx].to ); // saveJoint_t to
+	}
 }
 
 /*
@@ -92,8 +110,30 @@ idTestModel::Restore
 ================
 */
 void idTestModel::Restore( idRestoreGame *savefile ) {
+	savefile->ReadObject( head ); // idEntityPtr<idEntity> head
+	savefile->ReadAnimatorPtr( headAnimator ); // idAnimator * headAnimator
+	// idAnim customAnim // blendo eric: this isn't used?
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_Parametric physicsObj
+	savefile->ReadString( animname ); // idString animname
+	savefile->ReadInt( anim ); // int anim
+	savefile->ReadInt( headAnim ); // int headAnim
+	savefile->ReadInt( mode ); // int mode
+	savefile->ReadInt( frame ); // int frame
+	savefile->ReadInt( starttime ); // int starttime
+	savefile->ReadInt( animtime ); // int animtime
+
+	int num;
+	savefile->ReadInt( num ); // // idList<copyJoints_t> copyJoints
+	copyJoints.SetNum( num );
+	for (int idx = 0; idx < num; idx++) {
+		savefile->ReadInt( (int&)copyJoints[idx].mod ); // jointModTransform_t mod
+		savefile->ReadInt( (int&)copyJoints[idx].from ); // saveJoint_t from
+		savefile->ReadInt( (int&)copyJoints[idx].to ); // saveJoint_t to
+	}
+
+	// blendo eric: old code/note below:
 	// FIXME: one day we may actually want to save/restore test models, but for now we'll just delete them
-	delete this;
+	//delete this;
 }
 
 /*

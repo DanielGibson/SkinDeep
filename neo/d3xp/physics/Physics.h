@@ -88,7 +88,7 @@ public:
 	static int					SnapTimeToPhysicsFrame( int t );
 
 	// Must not be virtual
-	void						Save( idSaveGame *savefile ) const;
+	void						Save( idSaveGame *savefile ) const;  // blendo eric: abstract
 	void						Restore( idRestoreGame *savefile );
 
 public:	// common physics interface

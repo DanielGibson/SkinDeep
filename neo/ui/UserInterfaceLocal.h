@@ -27,6 +27,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "ui/UserInterface.h"
+#include "ui/DeviceContext.h"
 
 class idWindow;
 
@@ -66,22 +67,26 @@ public:
 	virtual void				Trigger( int time );
 	virtual void				ReadFromDemoFile( class idDemoFile *f );
 	virtual void				WriteToDemoFile( class idDemoFile *f );
-	virtual bool				WriteToSaveGame( idFile *savefile ) const;
-	virtual bool				ReadFromSaveGame( idFile *savefile );
+	virtual void				WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void				ReadFromSaveGame( idRestoreGame *savefile );
 	virtual void				SetKeyBindingNames( void );
 	virtual bool				IsUniqued() const { return uniqued; };
+	virtual bool				IsShared() const { return !IsUniqued(); }
 	virtual void				SetUniqued( bool b ) { uniqued = b; };
 	virtual void				SetCursor( float x, float y );
 
 	virtual float				CursorX() { return cursorX; }
 	virtual float				CursorY() { return cursorY; }
 
+	virtual	const char *		GetGroup() const { return groupName.c_str(); }
+	virtual	void				SetGroup(const char * newId) { groupName = newId; }
+
 	size_t						Size();
 
 	idDict *					GetStateDict() { return &state; }
 
 	const char *				GetSourceFile( void ) const { return source; }
-	ID_TIME_T						GetTimeStamp( void ) const { return timeStamp; }
+	ID_TIME_T					GetTimeStamp( void ) const { return timeStamp; }
 
 	idWindow *					GetDesktop() const { return desktop; }
 	void						SetBindHandler( idWindow *win ) { bindHandler = win; }
@@ -99,6 +104,7 @@ public:
 	idStr						&GetReturnCmd() { return returnCmd; };
 
 private:
+	idStr						groupName;
 	bool						active;
 	bool						loading;
 	bool						interactive;
@@ -112,7 +118,7 @@ private:
 	idStr						activateStr;
 	idStr						pendingCmd;
 	idStr						returnCmd;
-	ID_TIME_T						timeStamp;
+	ID_TIME_T					timeStamp;
 
 	float						cursorX;
 	float						cursorY;
@@ -138,16 +144,26 @@ public:
 	virtual bool				CheckGui( const char *qpath ) const;
 	virtual idUserInterface *	Alloc( void ) const;
 	virtual void				DeAlloc( idUserInterface *gui );
-	virtual idUserInterface *	FindGui( const char *qpath, bool autoLoad = false, bool needInteractive = false, bool forceNOTUnique = false );
+	virtual idUserInterface *	FindGui( const char *qpath, bool autoLoad = false, bool needUniqueInteractive = false, bool forceShared = false, bool * owner = nullptr );
 	virtual idUserInterface *	FindDemoGui( const char *qpath );
 	virtual	idListGUI *			AllocListGUI( void ) const;
 	virtual void				FreeListGUI( idListGUI *listgui );
 
+	virtual const idStr&		GetGroup() const;
+	virtual void				SetGroup( const char* group, bool persists );
+
+protected:
+	virtual idList<idUserInterface*>& GetGuis() { return reinterpret_cast< idList<idUserInterface*>& >(guis); }
+
 private:
-	idRectangle					screenRect;
-	idDeviceContext				dc;
+	idRectangle					  screenRect;
+	idDeviceContext				  dc;
 
 	idList<idUserInterfaceLocal*> guis;
 	idList<idUserInterfaceLocal*> demoGuis;
 
+	idList<idUserInterfaceLocal*> guisGroup;
+	idStr						  groupName;
+
+	idList<idStr>				  groupPersist;
 };

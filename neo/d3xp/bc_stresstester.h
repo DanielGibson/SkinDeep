@@ -8,7 +8,7 @@ class idStressTester : public idEntity
 public:
 	CLASS_PROTOTYPE(idStressTester);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -50,5 +50,12 @@ private:
 	idVec3					stuckLastPosition;
 	int						stuckCounter;
 
+
+	int						saveloadTimer;
+
+	void					LoadLatestSave();
+	void					LoadRandomSave();
+
+	enum					{STS_NONE, STS_RANDOMSAVELOAD, STS_RANDOMLOAD, STS_LOADHUBS, STS_LOADALLMAPS};
 };
 //#pragma once

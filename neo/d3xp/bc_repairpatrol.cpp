@@ -9,7 +9,7 @@ END_CLASS
 
 idRepairPatrolNode::idRepairPatrolNode(void)
 {
-	
+	gameLocal.repairpatrolEntities.Append(this);
 }
 
 idRepairPatrolNode::~idRepairPatrolNode(void)
@@ -19,13 +19,14 @@ idRepairPatrolNode::~idRepairPatrolNode(void)
 
 void idRepairPatrolNode::Save(idSaveGame *savefile) const
 {
+	// savefile no data
 }
 
 void idRepairPatrolNode::Restore(idRestoreGame *savefile)
 {
+	// savefile no data
 }
 
 void idRepairPatrolNode::Spawn(void)
 {
-	gameLocal.repairpatrolEntities.Append(this);
 }

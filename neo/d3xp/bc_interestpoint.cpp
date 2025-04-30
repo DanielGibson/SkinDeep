@@ -78,10 +78,66 @@ idInterestPoint::~idInterestPoint(void)
 
 void idInterestPoint::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( priority ); // int priority
+
+	savefile->WriteInt( noticeRadius ); // int noticeRadius
+	savefile->WriteInt( duplicateRadius ); // int duplicateRadius
+
+	savefile->WriteInt( interesttype ); // int interesttype
+	savefile->WriteInt( sensoryTimer ); // int sensoryTimer
+	savefile->WriteBool( isClaimed ); // bool isClaimed
+	claimant.Save( savefile ); // idEntityPtr<idAI> claimant
+
+	SaveFileWriteArray(observers, observers.Num(), WriteObject); // idList<idAI*> observers
+	savefile->WriteBool( cleanupWhenUnobserved ); // bool cleanupWhenUnobserved
+	savefile->WriteBool( forceCombat ); // bool forceCombat
+	savefile->WriteBool( onlyLocalPVS ); // bool onlyLocalPVS
+	savefile->WriteObject( interestOwner ); // idEntityPtr<idEntity> interestOwner
+
+
+	savefile->WriteBool( breaksConfinedStealth ); // bool breaksConfinedStealth
+
+
+	savefile->WriteInt( arrivalDistance ); // int arrivalDistance
+
+
+	savefile->WriteInt( expirationTime ); // int expirationTime
+
+	savefile->WriteString( ownerDisplayName ); // idString ownerDisplayName
+
+	savefile->WriteInt( creationTime ); // int creationTime
 }
 
 void idInterestPoint::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( priority ); // int priority
+
+	savefile->ReadInt( noticeRadius ); // int noticeRadius
+	savefile->ReadInt( duplicateRadius ); // int duplicateRadius
+
+	savefile->ReadInt( interesttype ); // int interesttype
+	savefile->ReadInt( sensoryTimer ); // int sensoryTimer
+	savefile->ReadBool( isClaimed ); // bool isClaimed
+	claimant.Restore( savefile ); // idEntityPtr<idAI> claimant
+
+	SaveFileReadListCast(observers, ReadObject, idClass*&); // idList<idAI*> observers
+	savefile->ReadBool( cleanupWhenUnobserved ); // bool cleanupWhenUnobserved
+	savefile->ReadBool( forceCombat ); // bool forceCombat
+	savefile->ReadBool( onlyLocalPVS ); // bool onlyLocalPVS
+	savefile->ReadObject( interestOwner ); // idEntityPtr<idEntity> interestOwner
+
+
+	savefile->ReadBool( breaksConfinedStealth ); // bool breaksConfinedStealth
+
+
+	savefile->ReadInt( arrivalDistance ); // int arrivalDistance
+
+
+	savefile->ReadInt( expirationTime ); // int expirationTime
+
+	savefile->ReadString( ownerDisplayName ); // idString ownerDisplayName
+
+	savefile->ReadInt( creationTime ); // int creationTime
 }
 
 void idInterestPoint::Think()

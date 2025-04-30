@@ -8,6 +8,8 @@ public:
 						idTrigger_moneypile();
 	virtual				~idTrigger_moneypile(void);
 	void				Spawn();
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				Restore( idRestoreGame *savefile );
 	virtual void		Think(void);
 
 	virtual void		Event_PostSpawn(void);

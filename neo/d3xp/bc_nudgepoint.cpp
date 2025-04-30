@@ -24,10 +24,12 @@ idNudgePoint::~idNudgePoint(void)
 
 void idNudgePoint::Save(idSaveGame *savefile) const
 {
+	// savegame no data
 }
 
 void idNudgePoint::Restore(idRestoreGame *savefile)
 {
+	// savegame no data
 }
 
 

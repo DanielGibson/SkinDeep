@@ -55,6 +55,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "bc_meta.h"
 #include "bc_pirateship.h"
 #include "bc_vrvisor.h"
+#include "renderer/tr_local.h"
 
 #include "SysCmds.h"
 
@@ -2966,6 +2967,16 @@ static void Cmd_ListByClassname(const idCmdArgs &args)
 		return;
 	}
 
+	bool doWildcardsearch = false;
+	idStr searchValue = args.Args();
+	if (searchValue.Find('*') >= 0)
+	{
+		searchValue.Strip('*'); //remove the wildcard.
+		searchValue.StripTrailingWhitespace();
+		searchValue.StripLeading(" ");
+		doWildcardsearch = true;
+	}
+
 	int counter = 0;
 
 	idEntity *ent;
@@ -2974,11 +2985,26 @@ static void Cmd_ListByClassname(const idCmdArgs &args)
 		if (!ent)
 			return;
 
-		const char *classname = ent->spawnArgs.GetString("classname");
-		if (classname[0] == '\0')
-			continue;
+		idStr classname = ent->spawnArgs.GetString("classname");
+		
+		bool isMatch  = false;
 
-		if (idStr::Icmp(classname, args.Args()) == 0)
+		if (doWildcardsearch)
+		{
+			if (classname.Find(searchValue.c_str()) >= 0 && classname.Length() > 0)
+			{
+				isMatch = true;
+			}
+		}
+		else
+		{
+			if (idStr::Icmp(classname, searchValue) == 0)
+			{
+				isMatch = true;
+			}
+		}
+
+		if (isMatch )
 		{
 			gameRenderWorld->DebugBounds(colorGreen, ent->GetPhysics()->GetAbsBounds(), vec3_origin, 900000);
 			gameRenderWorld->DrawText(va("#%d %s", counter, ent->GetName()), ent->GetPhysics()->GetOrigin(), .1f, colorGreen, gameLocal.GetLocalPlayer()->viewAngles.ToMat3(), 1, 900000);
@@ -2987,7 +3013,7 @@ static void Cmd_ListByClassname(const idCmdArgs &args)
 		}
 	}
 
-	gameLocal.Printf("Found %d instances of '%s'\n", counter, args.Args());
+	gameLocal.Printf("Found %d instances of '%s'\n", counter, searchValue.c_str());
 }
 
 static void Cmd_Debugarrow_f(const idCmdArgs &args)
@@ -3205,6 +3231,22 @@ void Cmd_DebugFuseboxUnlockAll(const idCmdArgs& args)
 	}
 }
 
+void Cmd_DebugLocationCheck_f(const idCmdArgs& args)
+{
+	int count = 0;
+	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+	{
+		idLocationEntity* locEnt = gameLocal.LocationForEntity(ent);
+
+		if (locEnt == nullptr)
+		{
+			gameLocal.Warning("no location for: '%s' (%.1f %.1f %.1f)", ent->GetName(), ent->GetPhysics()->GetOrigin().x, ent->GetName(), ent->GetPhysics()->GetOrigin().y, ent->GetName(), ent->GetPhysics()->GetOrigin().z);
+			count++;
+		}				
+	}
+	common->Printf("Found %d entities with no location.\n", count);
+}
+
 void Cmd_DebugSetCombatState(const idCmdArgs& args)
 {
 	if (args.Argc() <= 1)
@@ -3244,7 +3286,20 @@ void Cmd_DebugButtons(const idCmdArgs& args)
 	}
 }
 
+//BC 3-11-2025: this is just a wrapper to make it easier for players to reset settings.
+void Cmd_ResetSettings(const idCmdArgs& args)
+{
+	common->Printf("Settings have been reset to default settings.\n");
+	cmdSystem->BufferCommandText(CMD_EXEC_NOW, "exec default.cfg");
+}
 
+void Cmd_DebugClearAchievements(const idCmdArgs& args)
+{
+	if (common->g_SteamUtilities && common->g_SteamUtilities->IsSteamInitialized())
+	{
+		common->g_SteamUtilities->ResetAchievements();
+	}
+}
 
 void Cmd_TestSubtitle(const idCmdArgs& args)
 {
@@ -3604,6 +3659,216 @@ void Cmd_DebugEventLog_f(const idCmdArgs& args)
 	common->Printf("Created %d event log entries.\n", ENTRIES_TO_MAKE);
 }
 
+//BC 4-21-2025: debug to "unstuck" a player who may be stuck in geometry
+void Cmd_UnstuckPlayer(const idCmdArgs& args)
+{
+
+	//#1: First, attempt to just find a nearby spot that has clearance.
+	common->Printf("Attempting to unstuck player...\n");
+
+	idVec3 originalPos = gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin();
+	#define UNSTUCK_CANDIDATESPOT_COUNT 37
+	idVec3 candidateSpots[] =
+	{
+		originalPos + idVec3(0,0,1),
+
+		originalPos + idVec3(32,0,0),
+		originalPos + idVec3(-32,0,0),
+		originalPos + idVec3(0,32,0),
+		originalPos + idVec3(0,-32,0),
+
+		originalPos + idVec3(32,0,32),
+		originalPos + idVec3(-32,0,32),
+		originalPos + idVec3(0,32,32),
+		originalPos + idVec3(0,-32,32),
+
+		originalPos + idVec3(32,0,-32),
+		originalPos + idVec3(-32,0,-32),
+		originalPos + idVec3(0,32,-32),
+		originalPos + idVec3(0,-32,-32),
+
+		originalPos + idVec3(48,0,0),
+		originalPos + idVec3(-48,0,0),
+		originalPos + idVec3(0,48,0),
+		originalPos + idVec3(0,-48,0),
+
+		originalPos + idVec3(48,0,48),
+		originalPos + idVec3(-48,0,48),
+		originalPos + idVec3(0,48,48),
+		originalPos + idVec3(0,-48,48),
+
+		originalPos + idVec3(48,0,-48),
+		originalPos + idVec3(-48,0,-48),
+		originalPos + idVec3(0,48,-48),
+		originalPos + idVec3(0,-48,-48),
+
+		originalPos + idVec3(96,0,0),
+		originalPos + idVec3(-96,0,0),
+		originalPos + idVec3(0,96,0),
+		originalPos + idVec3(0,-96,0),
+
+		originalPos + idVec3(96,0,96),
+		originalPos + idVec3(-96,0,96),
+		originalPos + idVec3(0,96,96),
+		originalPos + idVec3(0,-96,96),
+
+		originalPos + idVec3(96,0,-96),
+		originalPos + idVec3(-96,0,-96),
+		originalPos + idVec3(0,96,-96),
+		originalPos + idVec3(0,-96,-96),
+	};
+
+	idBounds playerbounds;
+	playerbounds = gameLocal.GetLocalPlayer()->GetPhysics()->GetBounds();
+	playerbounds.ExpandSelf(1.0f); //expand a little for safety sake.
+
+	int bestCandidateIndex = -1;
+	for (int i = 0; i < UNSTUCK_CANDIDATESPOT_COUNT; i++)
+	{
+		gameRenderWorld->DebugArrowSimple(candidateSpots[i]);
+
+		//check if starting point is inside geometry.
+		int penetrationContents = gameLocal.clip.Contents(candidateSpots[i], NULL, mat3_identity, CONTENTS_SOLID, NULL);
+		if (penetrationContents & MASK_SOLID)
+		{
+			continue; //If it starts in solid, then exit.
+		}
+
+		//check bounds clearance.
+		trace_t spawnTr;
+		gameLocal.clip.TraceBounds(spawnTr, candidateSpots[i], candidateSpots[i], playerbounds, MASK_SOLID, NULL);
+		if (spawnTr.fraction < 1)
+		{
+			continue;
+		}
+
+		//check if spot has a Location. We do this because we don't want to move the player into any empty pocket/crevice that is
+		//not considered part of the playable area.
+		idLocationEntity* locEnt = gameLocal.LocationForPoint(candidateSpots[i]);
+		if (locEnt == nullptr)
+		{
+			continue;
+		}
+
+		//area is clear.
+		bestCandidateIndex = i;
+		break;
+	}
+
+	if (bestCandidateIndex >= 0)
+	{
+		//Found a valid spot.
+		common->Printf("Found valid unstuck spot (nearby).\n");
+		gameLocal.GetLocalPlayer()->GetPhysics()->SetOrigin(candidateSpots[bestCandidateIndex]);
+		return;
+	}
+
+
+	//#2: fallback to using the level's location entities. Find the nearest one, as the crow flies.
+	//This only applies to non-vignette levels.
+	int closestLocDistance = 99999999;
+	idEntity* closestLocation = nullptr;
+	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+	{
+		if (!ent)
+			continue;
+
+		if (!ent->IsType(idLocationEntity::Type))
+			continue;
+
+		float currentDist = (ent->GetPhysics()->GetOrigin() - gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin()).LengthFast();
+		if (currentDist < closestLocDistance)
+		{
+			trace_t spawnTr;
+			gameLocal.clip.TraceBounds(spawnTr, ent->GetPhysics()->GetOrigin(), ent->GetPhysics()->GetOrigin(), playerbounds, MASK_SOLID, NULL);
+			if (spawnTr.fraction >= 1)
+			{
+				//area is clear.
+				closestLocDistance = currentDist;
+				closestLocation = ent;
+			}			
+		}
+	}
+
+	if (closestLocation != nullptr)
+	{
+		//Found a valid spot.
+		common->Printf("Found valid unstuck spot (at location).\n");
+		gameLocal.GetLocalPlayer()->GetPhysics()->SetOrigin(closestLocation->GetPhysics()->GetOrigin());
+		return;
+	}
+
+
+	//#3: fallback to using the path corner
+	int closestPathDistance = 99999999;
+	idEntity* closestPath = nullptr;
+	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+	{
+		if (!ent)
+			continue;
+
+		if (!ent->IsType(idPathCorner::Type))
+			continue;
+
+		float currentDist = (ent->GetPhysics()->GetOrigin() - gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin()).LengthFast();
+		if (currentDist < closestPathDistance)
+		{
+			trace_t spawnTr;
+			gameLocal.clip.TraceBounds(spawnTr, ent->GetPhysics()->GetOrigin(), ent->GetPhysics()->GetOrigin(), playerbounds, MASK_SOLID, NULL);
+			if (spawnTr.fraction >= 1)
+			{
+				//area is clear.
+				closestPathDistance = currentDist;
+				closestPath = ent;
+			}			
+		}
+	}
+
+	if (closestPath != nullptr)
+	{
+		//Found a valid spot.
+		common->Printf("Found valid unstuck spot (at path_corner).\n");
+		gameLocal.GetLocalPlayer()->GetPhysics()->SetOrigin(closestPath->GetPhysics()->GetOrigin());
+		return;
+	}
+
+	//#4: fallback to using lights (desperation time)
+	int closestLightDistance = 99999999;
+	idEntity* closestLight = nullptr;
+	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+	{
+		if (!ent)
+			continue;
+
+		if (!ent->IsType(idPathCorner::Type))
+			continue;
+
+		float currentDist = (ent->GetPhysics()->GetOrigin() - gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin()).LengthFast();
+		if (currentDist < closestLightDistance)
+		{
+			trace_t spawnTr;
+			gameLocal.clip.TraceBounds(spawnTr, ent->GetPhysics()->GetOrigin(), ent->GetPhysics()->GetOrigin(), playerbounds, MASK_SOLID, NULL);
+			if (spawnTr.fraction >= 1)
+			{
+				//area is clear.
+				closestLightDistance = currentDist;
+				closestLight = ent;
+			}
+		}
+	}
+
+	if (closestLight != nullptr)
+	{
+		//Found a valid spot.
+		common->Printf("Found valid unstuck spot (at light).\n");
+		gameLocal.GetLocalPlayer()->GetPhysics()->SetOrigin(closestLight->GetPhysics()->GetOrigin());
+		return;
+	}
+
+
+	common->Printf("Failed to unstuck player. Please load a savegame or restart the level.\n");
+}
+
 int SortTypeInfoByLocID(const int* a, const int* b)
 {
 	return idStr::Icmp(gameLocal.entities[*a]->locID, gameLocal.entities[*b]->locID);
@@ -3914,6 +4179,117 @@ void Cmd_DebugReadAllNotes_f(const idCmdArgs& args)
 	common->Printf("Notes found: %d\n", count);
 }
 
+extern bool UnicodeCharacterZeroSpace(uint32 ch);
+extern idCVar sys_lang;
+
+//BC 3-25-2025: iterate over every string in the game. Print a warning if a given string has invalid characters.
+//Can use https://www.cogsci.ed.ac.uk/~richard/utf-8.cgi?input=845&mode=decimal to identify glyphs.
+void Cmd_LocalizeValidateFont_f(const idCmdArgs& args)
+{
+	bool isVerbose = false;
+	if (args.Argc() >= 2)
+	{
+		idStr verbose = args.Argv(1);
+		if (verbose == "verbose")
+		{
+			isVerbose = true;
+		}
+	}
+
+	// Try to register each font (this is hardcoded, can change if we really want to)
+	// This will automatically do the language font substitutions
+	tr.RegisterFont("inocua");
+	tr.RegisterFont("octin");
+	tr.RegisterFont("octinbk");
+	tr.RegisterFont("petme");
+	tr.RegisterFont("roboto_condensed");
+	tr.RegisterFont("sofia");
+	tr.RegisterFont("teko");
+
+	const idLangDict* strTable = common->GetLanguageDict();
+	idHashTable<idList<int>> missingCodeTable;
+
+	if (isVerbose)
+	{
+		common->Printf("-----------------------------------------------\n");
+		common->Printf("Finding missing glyphs for sys_lang '%s'\n", sys_lang.GetString());
+		common->Printf("-----------------------------------------------\n");
+		common->Printf("font,key,index,decimal code point\n");
+	}
+
+	int totalKeys = strTable->GetNumKeyVals();
+	for (int i = 0; i < tr.fonts.Num(); i++)
+	{
+		class idFont* font = tr.fonts[i];
+
+		// Skip aliases because these don't actually have the font info
+		if (!font || font->GetAlias())
+			continue;
+
+		idList<int> missingCodes;
+
+		for (int j = 0; j < totalKeys; j++)
+		{
+			//Get the STRING value.
+			idStr currentStr = strTable->GetKeyVal(j)->value;
+			int charIndex = 0;
+			while (charIndex < currentStr.Length()) {
+				uint32 textChar = currentStr.UTF8Char(charIndex);
+
+				// See if we need to start a new line.
+				if (textChar == '\n' || textChar == '\r' || charIndex == currentStr.Length()) {
+					if (charIndex < currentStr.Length()) {
+						// New line character and we still have more text to read.
+						char nextChar = currentStr[charIndex + 1];
+						if ((textChar == '\n' && nextChar == '\r') || (textChar == '\r' && nextChar == '\n')) {
+							// Just absorb extra newlines.
+							textChar = currentStr.UTF8Char(charIndex);
+						}
+					}
+				}
+
+				// Check for escape colors
+				if (textChar == C_COLOR_ESCAPE && charIndex < currentStr.Length()) {
+					textChar = currentStr.UTF8Char(charIndex);
+					textChar = currentStr.UTF8Char(charIndex);
+				}
+
+				// If the character isn't a new line then add it to the text buffer.
+				if (textChar != '\n' && textChar != '\r' && !UnicodeCharacterZeroSpace(textChar)) {
+					// If the glyph index is -1, that means it's not found in the font
+					if (font->GetGlyphIndex(textChar) == -1)
+					{
+						if (isVerbose)
+							common->Printf("%s,%s,%d,%d\n", font->GetName(), strTable->GetKeyVal(j)->key.c_str(), charIndex, textChar);
+						
+						missingCodes.AddUnique(textChar);
+					}
+				}
+			}
+		}
+
+		if (missingCodes.Num() > 0)
+			missingCodeTable.Set(font->GetName(), missingCodes);
+	}
+
+	common->Printf("-----------------------------------------------\n");
+	common->Printf("Summary of missing glyphs for sys_lang '%s'\n", sys_lang.GetString());
+	common->Printf("-----------------------------------------------\n");
+	common->Printf("font,decimal code point\n");
+
+	for (int i = 0; i < missingCodeTable.Num(); i++)
+	{
+		idStr key;
+		idList<int> value;
+		missingCodeTable.GetIndex(i, &key, &value);
+		for (int j = 0; j < value.Num(); j++)
+		{
+			common->Printf("%s,%d\n", key.c_str(), value[j]);
+		}
+	}
+
+}
+
 void Cmd_LocalizeNotes_f(const idCmdArgs& args)
 {
 	int totalNotes = 0;
@@ -4055,10 +4431,13 @@ void Cmd_DebugStressTest_f(const idCmdArgs& args)
 		if (ent->name.Find("idStressTester_target_stresstester", false) >= 0)
 		{
 			//Found it.
+			//ent->PostEventMS(&EV_Remove, 0);
+			//cvarSystem->SetCVarBool("aas_randomPullPlayer", false);
+			//common->Printf("Stresstest deactivated.");
+			//return;
+
+			//BC 4-5-2025: to simplify stresstest's interactions with save/load, have it just always delete pre-existing stresstest and re-create it.
 			ent->PostEventMS(&EV_Remove, 0);
-			cvarSystem->SetCVarBool("aas_randomPullPlayer", false);
-			common->Printf("Stresstest deactivated.");
-			return;
 		}
 	}
 
@@ -4122,7 +4501,7 @@ void Cmd_DebugEmailClear(const idCmdArgs& args)
 	for (int i = 0; i < count; i++)
 	{
 		const idDeclPDA* pda = static_cast<const idDeclPDA*>(declManager->DeclByIndex(DECL_PDA, i));
-		pda->DebugReset();
+		pda->ResetEmails();
 	}
 }
 
@@ -4342,6 +4721,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("debugNotesNext",			Cmd_DebugNotesNext_f, CMD_FL_GAME | CMD_FL_CHEAT, "Teleports player to next note.");
 	cmdSystem->AddCommand("debugNotesPrev",			Cmd_DebugNotesPrev_f, CMD_FL_GAME | CMD_FL_CHEAT, "Teleports player to previous note.");
 	cmdSystem->AddCommand("localizeNotes",			Cmd_LocalizeNotes_f, CMD_FL_GAME | CMD_FL_CHEAT, "Localize notes in level.");
+	cmdSystem->AddCommand("localizeValidateFont",	Cmd_LocalizeValidateFont_f, CMD_FL_GAME | CMD_FL_CHEAT, "Validate the font has all needed characters for strings.");
 	cmdSystem->AddCommand("debugEventLog",			Cmd_DebugEventLog_f, CMD_FL_GAME, "Creates random eventlog events.");
 	cmdSystem->AddCommand("debugRepairRoom",		Cmd_DebugRepairRoom_f, CMD_FL_GAME, "Summons repairbot to repair things in room.");
 	cmdSystem->AddCommand("debugItemPlacement",		Cmd_DebugItemPlacement_f, CMD_FL_GAME | CMD_FL_CHEAT, "Prints item placement metrics.");
@@ -4366,11 +4746,15 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("debugCryoExit",			Cmd_DebugCryoExit, CMD_FL_GAME | CMD_FL_CHEAT, "Force exit of cryo pod.");
 
 	cmdSystem->AddCommand("locateEntityViaName",	Cmd_LocateEntityViaName, CMD_FL_GAME | CMD_FL_CHEAT, "Locate entity via its name.");
+	cmdSystem->AddCommand("locateEntityViaDef",		Cmd_ListByClassname, CMD_FL_GAME | CMD_FL_CHEAT, "Locate entity via its def name.", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF>);
 	cmdSystem->AddCommand("testSubtitle",			Cmd_TestSubtitle, CMD_FL_GAME | CMD_FL_CHEAT, "test subtitle", idCmdSystem::ArgCompletion_SoundName);
 
+	cmdSystem->AddCommand("debugLocationCheck",		Cmd_DebugLocationCheck_f, CMD_FL_GAME, "Validates room location info for all entities.");
 
+	cmdSystem->AddCommand("debugClearAchievements",	Cmd_DebugClearAchievements, CMD_FL_GAME | CMD_FL_CHEAT, "Reset steam achievements.");
 
-
+	cmdSystem->AddCommand("resetSettings",			Cmd_ResetSettings, CMD_FL_GAME , "Reset your settings to default.");
+	cmdSystem->AddCommand("unstuck",				Cmd_UnstuckPlayer, CMD_FL_GAME, "Debug to un-stuck player if they're trapped in geometry.");
 
 
 	//Hotreload from DARKMOD

@@ -56,10 +56,14 @@ void idFireball::Spawn(void)
 
 void idFireball::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( timer ); //  int timer
 }
 
 void idFireball::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( timer ); //  int timer
 }
 
 void idFireball::Think(void)

@@ -45,6 +45,37 @@ void idRadioCheckin::Spawn()
 	BecomeActive(TH_THINK);
 }
 
+void idRadioCheckin::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteInt( timer ); // int timer
+	SaveFileWriteArray(aliveKnowledge, RADIOCHECK_MAX, WriteBool); // bool aliveKnowledge[RADIOCHECK_MAX]
+	savefile->WriteInt( unitMaxCount ); // int unitMaxCount
+
+	SaveFileWriteArray(unitEntityNumbers, RADIOCHECK_MAX, WriteInt); // int unitEntityNumbers[RADIOCHECK_MAX];
+	savefile->WriteInt( checkinIndex ); // int checkinIndex
+
+	savefile->WriteBool( isPlayingStatic ); // bool isPlayingStatic
+
+	savefile->WriteInt( cooldownTimer ); // int cooldownTimer
+}
+void idRadioCheckin::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadInt( timer ); // int timer
+	SaveFileReadArray(aliveKnowledge, ReadBool); // bool aliveKnowledge[RADIOCHECK_MAX]
+	savefile->ReadInt( unitMaxCount ); // int unitMaxCount
+
+	SaveFileReadArray(unitEntityNumbers, ReadInt); // int unitEntityNumbers[RADIOCHECK_MAX];
+	savefile->ReadInt( checkinIndex ); // int checkinIndex
+
+	savefile->ReadBool( isPlayingStatic ); // bool isPlayingStatic
+
+	savefile->ReadInt( cooldownTimer ); // int cooldownTimer
+}
+
 //Tell this system how many bad guys total in level. This is called via idMeta.
 void idRadioCheckin::InitializeEnemyCount()
 {
@@ -105,7 +136,7 @@ void idRadioCheckin::StartCheckin(idVec3 _pos)
 	//Start the sequence.
 	state = RDC_STARTCHECK;
 	int len;
-	StartSound("snd_start", SND_CHANNEL_ANY, 0, false, &len);
+	StartSound("snd_start", SND_CHANNEL_VOICE, 0, false, &len);
 	timer = gameLocal.time + len; //make the state last as long as the sound file length.
 
 	gameLocal.AddEventLog("#str_def_gameplay_checkin_start", _pos);
@@ -145,7 +176,7 @@ void idRadioCheckin::Think(void)
 				}
 
 				int len;
-				StartSound("snd_fail", SND_CHANNEL_ANY, 0, false, &len);
+				StartSound("snd_fail", SND_CHANNEL_VOICE, 0, false, &len);
 				timer = gameLocal.time + len; //make the state last as long as the sound file length.
 
 				//Update our 'knowledge' of who the system knows/believes is alive and dead.
@@ -165,7 +196,7 @@ void idRadioCheckin::Think(void)
 			{
 				//There is no one else to check in to.
 				int len;
-				StartSound("snd_allclear", SND_CHANNEL_ANY, 0, false, &len);
+				StartSound("snd_allclear", SND_CHANNEL_VOICE, 0, false, &len);
 				timer = gameLocal.time + len;
 				state = RDC_ALLCLEAR;
 
@@ -179,7 +210,7 @@ void idRadioCheckin::Think(void)
 			int voiceprint;
 			bool unitIsAlive = IsUnitActuallyAlive(checkinIndex, &voiceprint);
 
-			const char *soundCue = "";
+			idStr soundCue;
 
 			if (unitIsAlive)
 			{
@@ -202,10 +233,16 @@ void idRadioCheckin::Think(void)
 					default:			{ common->Warning("idRadioCheckin: invalid checkin index '%d'\n", checkinIndex); break; }
 				}
 
-				//assign the voiceprint.
-				//voiceprint
+				//BC 3-17-2025: added support for heavy monster.
+				idStr voiceprintPrefix = "";
+				if (voiceprint == 2)
+					voiceprintPrefix = "snd_c";
+				else if (voiceprint == 1)
+					voiceprintPrefix = "snd_b";
+				else
+					voiceprintPrefix = "snd_a"; //voiceprint 0, or any other number. This is the fallback default.
 
-				soundCue = va("%s_%s", (voiceprint <= 0) ? "snd_a" : "snd_b", soundCue);
+				soundCue = idStr::Format("%s_%s", voiceprintPrefix.c_str(), soundCue.c_str());
 			}
 			else
 			{
@@ -216,7 +253,7 @@ void idRadioCheckin::Think(void)
 
 			//Play the sound.
 			int len;
-			StartSound(soundCue, SND_CHANNEL_ANY, 0, false, &len);
+			StartSound(soundCue, SND_CHANNEL_VOICE, 0, false, &len);
 			timer = gameLocal.time + len + CHECKIN_GAPTIME;
 
 			
@@ -228,7 +265,7 @@ void idRadioCheckin::Think(void)
 		if (checkinIndex >= unitMaxCount)
 		{
 			int len;
-			StartSound("snd_allclear", SND_CHANNEL_ANY, 0, false, &len);
+			StartSound("snd_allclear", SND_CHANNEL_VOICE, 0, false, &len);
 			timer = gameLocal.time + len;
 			state = RDC_ALLCLEAR;
 
@@ -315,11 +352,8 @@ bool idRadioCheckin::IsUnitActuallyAlive(int unitDesignation, int *voiceprint)
 	if (!ent->IsType(idActor::Type))
 		return false;
 
-	idStr entClassname = ent->spawnArgs.GetString("classname");
-	if (idStr::FindText(entClassname.c_str(), "thug_b") >= 0) //bc ugh hardcoded, yikes, bad, no good, sorry
-	{
-		*voiceprint = 1;
-	}
+	//BC 3-17-2025: simplified setup of voiceprint. Now uses spawnarg instead of checking monster classname.
+	*voiceprint = ent->spawnArgs.GetInt("voiceprint", "0");
 
 	return (ent->health > 0);
 }

@@ -45,11 +45,12 @@ idForce_Grab::Save
 ================
 */
 void idForce_Grab::Save( idSaveGame *savefile ) const {
+	savefile->WriteFloat( damping ); // float damping
+	savefile->WriteVec3( goalPosition ); // idVec3 goalPosition
 
-	savefile->WriteFloat( damping );
-	savefile->WriteVec3( goalPosition );
-	savefile->WriteFloat( distanceToGoal );
-	savefile->WriteInt( id );
+	savefile->WriteFloat( distanceToGoal ); // float distanceToGoal
+	savefile->WriteObject( physics ); // idPhysics * physics
+	savefile->WriteInt( id ); // int id
 }
 
 /*
@@ -59,11 +60,14 @@ idForce_Grab::Restore
 */
 void idForce_Grab::Restore( idRestoreGame *savefile ) {
 
-	//Note: Owner needs to call set physics
-	savefile->ReadFloat( damping );
-	savefile->ReadVec3( goalPosition );
-	savefile->ReadFloat( distanceToGoal );
-	savefile->ReadInt( id );
+	savefile->ReadFloat( damping ); // float damping
+	savefile->ReadVec3( goalPosition ); // idVec3 goalPosition
+
+	savefile->ReadFloat( distanceToGoal ); // float distanceToGoal
+	savefile->ReadObject( CastClassPtrRef(physics) ); // idPhysics * physics
+	savefile->ReadInt( id ); // int id
+
+	//Note: Owner needs to call set physics // blendo eric: saving physics anyways, i don't think this is true
 }
 
 /*

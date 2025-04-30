@@ -69,6 +69,7 @@ extern idCVar	g_healthTakeTime;
 extern idCVar	g_healthTakeAmt;
 extern idCVar	g_healthTakeLimit;
 extern idCVar	g_locbox;
+extern idCVar	g_locbox_minscreensize;
 extern idCVar	g_onehitkill;
 
 extern idCVar	g_showPVS;
@@ -377,6 +378,9 @@ extern idCVar g_showInterestPoints;
 extern idCVar g_newSecurityCamLights;
 extern idCVar g_eventhighlighter;
 extern idCVar g_froboutline;
+extern idCVar g_impactslowmo;
+
+extern idCVar g_showIntro;
 
 // SM
 extern idCVar g_blur_testEnable;
@@ -410,6 +414,11 @@ extern idCVar gamepad_rumble_enable;
 
 extern idCVar s_aiMuffleDoor;
 extern idCVar s_aiMuffleCorner;
+
+extern idCVar g_pauseOnFocusLost;
+
+//BC 3-14-2025
+extern idCVar g_showtimer;
 
 
 #endif /* !__SYS_CVAR_H__ */

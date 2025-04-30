@@ -26,10 +26,12 @@ void idTrashcube::Spawn(void)
 
 void idTrashcube::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( isDead ); // bool isDead
 }
 
 void idTrashcube::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( isDead ); // bool isDead
 }
 	
 void idTrashcube::Killed(idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location)

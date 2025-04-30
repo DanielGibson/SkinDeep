@@ -39,6 +39,24 @@ void idTrigger_gascloud::Spawn()
 	touchedBySomeone = false;
 }
 
+void idTrigger_gascloud::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( lastUpdatetime ); // int lastUpdatetime
+	savefile->WriteObject( particleEmitter ); // idFuncEmitter * particleEmitter
+	savefile->WriteInt( maxlifetime ); // int maxlifetime
+
+	savefile->WriteBool( active ); // bool active
+	savefile->WriteBool( touchedBySomeone ); // bool touchedBySomeone
+}
+void idTrigger_gascloud::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( lastUpdatetime ); // int lastUpdatetime
+	savefile->ReadObject( CastClassPtrRef(particleEmitter) ); // idFuncEmitter * particleEmitter
+	savefile->ReadInt( maxlifetime ); // int maxlifetime
+
+	savefile->ReadBool( active ); // bool active
+	savefile->ReadBool( touchedBySomeone ); // bool touchedBySomeone
+}
 
 
 void idTrigger_gascloud::Event_Touch(idEntity* other, trace_t* trace)
@@ -104,5 +122,6 @@ void idTrigger_gascloud::Despawn()
 	active = false;
 	particleEmitter->SetActive(false);
 	particleEmitter->PostEventMS(&EV_Remove, DESPAWN_PARTICLETIME);
+	particleEmitter = nullptr;
 	this->PostEventMS(&EV_Remove, 0);
 }

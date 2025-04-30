@@ -41,10 +41,18 @@ void idNoteWall::Spawn(void)
 
 void idNoteWall::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( isRead ); // bool isRead
+	savefile->WriteBool( isMemorypalaceClone ); // bool isMemorypalaceClone
+
+	savefile->WriteBool( markedDone ); // bool markedDone
 }
 
 void idNoteWall::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( isRead ); // bool isRead
+	savefile->ReadBool( isMemorypalaceClone ); // bool isMemorypalaceClone
+
+	savefile->ReadBool( markedDone ); // bool markedDone
 }
 
 
@@ -83,6 +91,15 @@ void idNoteWall::SetRead()
 				args.SetFloat("gui_parm1", spawnArgs.GetFloat("gui_parm1"));
 				args.Set("gui_parm2", spawnArgs.GetString("gui_parm2"));
 				args.Set("model", spawnArgs.GetString("model"));
+
+				// SW 3rd April 2025: To avoid the camera clipping into the wall, 
+				// zoom-inspecting memory palace notes is done exclusively via FOV reduction.
+				// Please ensure that the below `zoominspect_campos` offset is equivalent to 
+				// the FORWARD_DISTANCE defined in idPlayer::DoMemoryPalace().
+				// The goal is to prevent the camera from physically moving in space.
+				args.SetVector("zoominspect_campos", idVec3(30, 0, 0));
+				args.SetFloat("zoominspect_fov", spawnArgs.GetFloat("zoominspect_memory_fov", "70"));
+
 				gameLocal.SpawnEntityDef(args, &noteClone);
 				if (noteClone)
 				{
@@ -151,6 +168,10 @@ void idNoteWall::SetMarkDoneToggle()
 	StartSound("snd_markdone", SND_CHANNEL_ANY);
 	
 	SetSkin(declManager->FindSkin(spawnArgs.GetString(markedDone ? "skin_memory_done" : "skin_memory")));
+
+	// SW 3rd April 2025: darkens gui for self-illuminated notes (e.g. pirate/crew tablets)
+	Event_GuiNamedEvent(1, markedDone ? "lowerShade" : "raiseShade");
+
 	UpdateVisuals();
 	Think(); //since we're in gamelocal menupause, we force it to think in order to update the skin change.
 }

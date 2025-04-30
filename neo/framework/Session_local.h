@@ -72,6 +72,23 @@ struct fileTIME_T {
 					operator int() const { return timeStamp; }
 };
 
+struct LoadGameInfo_t
+{
+	LoadGameInfo_t() {}
+	LoadGameInfo_t(LoadGameInfo_t& other) {
+		file = other.file;
+		name = other.file;
+		description = other.file;
+		screenshot = other.file;
+		time = other.time;
+	};
+	idStr file = "";
+	idStr name = "";
+	idStr description = "";
+	idStr screenshot = "";
+	ID_TIME_T time = 0;
+};
+
 typedef struct {
 	idDict			serverInfo;
 	idDict			syncedCVars;
@@ -88,7 +105,12 @@ typedef enum {
 
 const int USERCMD_PER_DEMO_FRAME	= 2;
 const int CONNECT_TRANSMIT_TIME		= 1000;
-const int MAX_LOGGED_USERCMDS		= 60*60*60;	// one hour of single player, 15 minutes of four player
+const int MAX_LOGGED_USERCMDS		= 60*60;	// one hour of single player, 15 minutes of four player // blendo eric: changed to 1 min due to excessive obj/exe mem, make loggedUsercmds an idList later to increase this without increasing filesize.
+
+static const char * SG_AUTOSAVE_PREFIX = "autosave_"; // blendo eric
+static const char * SG_QUICKSAVE_PREFIX = "quick_"; // blendo eric
+static const char * SG_SESSION_PREFIX = "game_"; // blendo eric
+static const char * SG_BACKUP_EXT = ".bak"; // blendo eric
 
 class idSessionLocal : public idSession {
 public:
@@ -114,6 +136,7 @@ public:
 
 	virtual void		StartMenu( bool playIntro = false );
 	virtual void		ExitMenu();
+	virtual void		LoadGameMenu();
 	virtual void		GuiFrameEvents();
 	virtual void		SetGUI( idUserInterface *gui, HandleGuiCommand_t handle );
 
@@ -148,9 +171,6 @@ public:
 	void				StartNewGame( const char *mapName, bool devmap = false );
 	void				PlayIntroGui();
 
-	void				LoadSession( const char *name );
-	void				SaveSession( const char *name );
-
 	// called by Draw when the scene to scene wipe is still running
 	void				DrawWipeModel();
 	void				StartWipe( const char *materialName, bool hold = false);
@@ -159,8 +179,16 @@ public:
 
 	void				ShowLoadingGui();
 
-	void				ScrubSaveGameFileName( idStr &saveFileName ) const;
-	idStr				GetAutoSaveName( const char *mapName ) const;
+	static void			ScrubSaveGameFileName( idStr &saveFileName );
+
+	// blendo eric: can get map name automatically when null, will attempt to use session as standard
+	idStr				GetAutoSaveName(const char* mapName = nullptr, const char * suffix = nullptr) const; 
+	idStr				GetQuickSaveName(const char* mapName = nullptr ) const;
+	idStr				GetSessionSaveName(const char* mapName = nullptr ) const;
+
+	static idStr		GenerateSaveGameUniqueId(); // blendo eric, generate new save id
+	static idStr		ExtractSaveGameUniqueId(const char* sessionName = nullptr); // parse id from save name, or return empty if none
+	static ID_TIME_T	ExtractTimeFromSaveGameUniqueID(const idStr & sessionId);
 
 	bool				LoadGame(const char *saveName);
 	bool				SaveGame(const char *saveName, bool autosave = false);
@@ -181,6 +209,7 @@ public:
 	static idCVar		com_aviDemoTics;
 	static idCVar		com_wipeSeconds;
 	static idCVar		com_guid;
+	static idCVar		com_savegame_sessionid;
 
 	static idCVar		gui_configServerRate;
 
@@ -318,6 +347,7 @@ public:
 	//------------------
 	// Session_menu.cpp
 
+	//idList<LoadGameInfo_t>	loadGameList;
 	idStrList			loadGameList;
 	idStrList			modsList;
 
@@ -334,6 +364,7 @@ public:
 	void				HandleMsgCommands( const char *menuCommand );
 	void				HandleNoteCommands( const char *menuCommand );
 	void				GetSaveGameList( idStrList &fileList, idList<fileTIME_T> &fileTimes );
+	void				GetSaveGameList( idList<LoadGameInfo_t> &fileList );
 	void				TakeNotes( const char * p, bool extended = false );
 	void				UpdateMPLevelShot( void );
 
@@ -342,6 +373,7 @@ public:
 	void				SetModsMenuGuiVars( void );
 	void				SetMainMenuSkin( void );
 	void				SetPbMenuGuiVars( void );
+	void				SetResumeButton();
 
 private:
 	bool				BoxDialogSanityCheck( void );
@@ -368,7 +400,22 @@ private:
 	idStr				authMsg;
 
 	//bc
+public:
 	idStr				GetSanitizedURLArgument(idStr _text);
+	idStr				GetPlayerLocationString();
+
+
+	void				StoreSaveGameSessionName( const char * name );
+	static void			SaveGameAuto( const idCmdArgs &args );
+	static void			SaveGameSession( const idCmdArgs &args );
+	static void			LoadGameSession( const idCmdArgs &args );
+
+	static idStr		GetMapNameForSaveFile(const char *mapName);
+
+private:
+	void				DisplayGamepadBind(idStr key);
+
+	void				ShowSavegameInfo();
 };
 
 extern idSessionLocal	sessLocal;

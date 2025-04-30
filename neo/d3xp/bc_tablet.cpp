@@ -38,10 +38,23 @@ void idTablet::Spawn(void)
 
 void idTablet::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
 }
 
 void idTablet::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
 }
 
 void idTablet::Think(void)
@@ -151,6 +164,15 @@ void idTablet::CreateMemorypalaceClone()
 	args.Set("gui_parm0", spawnArgs.GetString("gui_parm0"));
 	args.SetFloat("gui_parm1", spawnArgs.GetFloat("gui_parm1"));
 	args.Set("gui", spawnArgs.GetString("gui_memory"));
+
+	// SW 3rd April 2025: To avoid the camera clipping into the wall, 
+	// zoom-inspecting memory palace notes is done exclusively via FOV reduction.
+	// Please ensure that the below `zoominspect_campos` offset is equivalent to 
+	// the FORWARD_DISTANCE defined in idPlayer::DoMemoryPalace().
+	// The goal is to prevent the camera from physically moving in space.
+	args.SetVector("zoominspect_campos", idVec3(30, 0, 0));
+	args.SetFloat("zoominspect_fov", spawnArgs.GetFloat("zoominspect_memory_fov", "70"));
+
 	gameLocal.SpawnEntityDef(args, &noteClone);
 	if (noteClone)
 	{

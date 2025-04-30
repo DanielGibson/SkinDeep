@@ -12,7 +12,7 @@ public:
 							idAlgaeball(void);
 	virtual					~idAlgaeball(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -35,7 +35,7 @@ private:
 	int						state;
 	int						stateTimer;
 
-	idAnimated*				displayModel;
+	idAnimated*				displayModel = nullptr;
 
 	idVec3					wallNormal;
 

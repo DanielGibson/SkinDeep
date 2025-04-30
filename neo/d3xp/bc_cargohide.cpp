@@ -35,10 +35,12 @@ void idCargohide::Spawn(void)
 
 void idCargohide::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( maxhealth ); //  int maxhealth
 }
 
 void idCargohide::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( maxhealth ); //  int maxhealth
 }
 
 void idCargohide::Think(void)

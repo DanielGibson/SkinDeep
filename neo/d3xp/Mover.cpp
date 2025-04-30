@@ -195,64 +195,62 @@ idMover::Save
 ================
 */
 void idMover::Save( idSaveGame *savefile ) const {
-	int i;
+	savefile->WriteStaticObject( idMover::physicsObj ); // idPhysics_Parametric physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
 
-	savefile->WriteStaticObject( physicsObj );
+	// moveState_t move
+	savefile->WriteInt( move.stage ); // moveStage_t stage
+	savefile->WriteInt( move.acceleration ); // int acceleration
+	savefile->WriteInt( move.movetime ); // int movetime
+	savefile->WriteInt( move.deceleration ); // int deceleration
+	savefile->WriteVec3( move.dir ); // idVec3 dir
 
-	savefile->WriteInt( move.stage );
-	savefile->WriteInt( move.acceleration );
-	savefile->WriteInt( move.movetime );
-	savefile->WriteInt( move.deceleration );
-	savefile->WriteVec3( move.dir );
+	// rotationState_t rot
+	savefile->WriteInt( rot.stage ); // moveStage_t stage
+	savefile->WriteInt( rot.acceleration ); // int acceleration
+	savefile->WriteInt( rot.movetime ); // int movetime
+	savefile->WriteInt( rot.deceleration ); // int deceleration
+	savefile->WriteAngles( rot.rot ); // idAngles rot
 
-	savefile->WriteInt( rot.stage );
-	savefile->WriteInt( rot.acceleration );
-	savefile->WriteInt( rot.movetime );
-	savefile->WriteInt( rot.deceleration );
-	savefile->WriteFloat( rot.rot.pitch );
-	savefile->WriteFloat( rot.rot.yaw );
-	savefile->WriteFloat( rot.rot.roll );
+	savefile->WriteInt( move_thread ); // int move_thread
+	savefile->WriteInt( rotate_thread ); // int rotate_thread
+	savefile->WriteAngles( dest_angles ); // idAngles dest_angles
+	savefile->WriteAngles( angle_delta ); // idAngles angle_delta
+	savefile->WriteVec3( dest_position ); // idVec3 dest_position
+	savefile->WriteVec3( move_delta ); // idVec3 move_delta
+	savefile->WriteFloat( move_speed ); // float move_speed
+	savefile->WriteInt( move_time ); // int move_time
+	savefile->WriteInt( deceltime ); // int deceltime
+	savefile->WriteInt( acceltime ); // int acceltime
+	savefile->WriteBool( stopRotation ); // bool stopRotation
+	savefile->WriteBool( useSplineAngles ); // bool useSplineAngles
+	savefile->WriteObject( splineEnt ); // idEntityPtr<idEntity> splineEnt
 
-	savefile->WriteInt( move_thread );
-	savefile->WriteInt( rotate_thread );
+	savefile->WriteInt( lastCommand ); // moverCommand_t lastCommand
+	savefile->WriteFloat( damage ); // float damage
 
-	savefile->WriteAngles( dest_angles );
-	savefile->WriteAngles( angle_delta );
-	savefile->WriteVec3( dest_position );
-	savefile->WriteVec3( move_delta );
-
-	savefile->WriteFloat( move_speed );
-	savefile->WriteInt( move_time );
-	savefile->WriteInt( deceltime );
-	savefile->WriteInt( acceltime );
-	savefile->WriteBool( stopRotation );
-	savefile->WriteBool( useSplineAngles );
-	savefile->WriteInt( lastCommand );
-	savefile->WriteFloat( damage );
-
-	savefile->WriteInt( areaPortal );
+	savefile->WriteInt( areaPortal ); // int areaPortal
 	if ( areaPortal > 0 ) {
 		savefile->WriteInt( gameRenderWorld->GetPortalState( areaPortal ) );
 	}
 
-	savefile->WriteInt( guiTargets.Num() );
-	for( i = 0; i < guiTargets.Num(); i++ ) {
-		guiTargets[ i ].Save( savefile );
+	SaveFileWriteArray(guiTargets, guiTargets.Num(), WriteObject ); // idList< idEntityPtr<idEntity> > guiTargets
+
+	// SM: Spline stuff from original Doom 3 code
+	// https://github.com/id-Software/DOOM-3/blob/a9c49da5afb18201d31e3f0a429a037e56ce2b9a/neo/d3xp/Mover.cpp#L213-L226
+	if (splineEnt.GetEntity() && splineEnt.GetEntity()->GetSpline()) {
+		idCurve_Spline<idVec3>* spline = physicsObj.GetSpline();
+
+		savefile->WriteBool(true);
+		savefile->WriteInt(spline->GetTime(0));
+		savefile->WriteInt(spline->GetTime(spline->GetNumValues() - 1) - spline->GetTime(0));
+		savefile->WriteInt(physicsObj.GetSplineAcceleration());
+		savefile->WriteInt(physicsObj.GetSplineDeceleration());
+		savefile->WriteInt((int)physicsObj.UsingSplineAngles());
 	}
-
-	if ( splineEnt.GetEntity() && splineEnt.GetEntity()->GetSpline() ) {
-		idCurve_Spline<idVec3> *spline = physicsObj.GetSpline();
-
-		savefile->WriteBool( true );
-		splineEnt.Save( savefile );
-		savefile->WriteInt( spline->GetTime( 0 ) );
-		savefile->WriteInt( spline->GetTime( spline->GetNumValues() - 1 ) - spline->GetTime( 0 ) );
-		savefile->WriteInt( physicsObj.GetSplineAcceleration() );
-		savefile->WriteInt( physicsObj.GetSplineDeceleration() );
-		savefile->WriteInt( (int)physicsObj.UsingSplineAngles() );
-
-	} else {
-		savefile->WriteBool( false );
+	else {
+		savefile->WriteBool(false);
 	}
 }
 
@@ -262,73 +260,72 @@ idMover::Restore
 ================
 */
 void idMover::Restore( idRestoreGame *savefile ) {
-	int i, num;
-	bool hasSpline = false;
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_Parametric physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
 
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
+	// moveState_t move
+	savefile->ReadInt( (int&)move.stage ); // moveStage_t stage
+	savefile->ReadInt( move.acceleration ); // int acceleration
+	savefile->ReadInt( move.movetime ); // int movetime
+	savefile->ReadInt( move.deceleration ); // int deceleration
+	savefile->ReadVec3( move.dir ); // idVec3 dir
 
-	savefile->ReadInt( (int&)move.stage );
-	savefile->ReadInt( move.acceleration );
-	savefile->ReadInt( move.movetime );
-	savefile->ReadInt( move.deceleration );
-	savefile->ReadVec3( move.dir );
+	// rotationState_t rot
+	savefile->ReadInt( (int&)rot.stage ); // moveStage_t stage
+	savefile->ReadInt( rot.acceleration ); // int acceleration
+	savefile->ReadInt( rot.movetime ); // int movetime
+	savefile->ReadInt( rot.deceleration ); // int deceleration
+	savefile->ReadAngles( rot.rot ); // idAngles rot
 
-	savefile->ReadInt( (int&)rot.stage );
-	savefile->ReadInt( rot.acceleration );
-	savefile->ReadInt( rot.movetime );
-	savefile->ReadInt( rot.deceleration );
-	savefile->ReadFloat( rot.rot.pitch );
-	savefile->ReadFloat( rot.rot.yaw );
-	savefile->ReadFloat( rot.rot.roll );
+	savefile->ReadInt( move_thread ); // int move_thread
+	savefile->ReadInt( rotate_thread ); // int rotate_thread
+	savefile->ReadAngles( dest_angles ); // idAngles dest_angles
+	savefile->ReadAngles( angle_delta ); // idAngles angle_delta
+	savefile->ReadVec3( dest_position ); // idVec3 dest_position
+	savefile->ReadVec3( move_delta ); // idVec3 move_delta
+	savefile->ReadFloat( move_speed ); // float move_speed
+	savefile->ReadInt( move_time ); // int move_time
+	savefile->ReadInt( deceltime ); // int deceltime
+	savefile->ReadInt( acceltime ); // int acceltime
+	savefile->ReadBool( stopRotation ); // bool stopRotation
+	savefile->ReadBool( useSplineAngles ); // bool useSplineAngles
+	savefile->ReadObject( splineEnt ); // idEntityPtr<idEntity> splineEnt
 
-	savefile->ReadInt( move_thread );
-	savefile->ReadInt( rotate_thread );
+	savefile->ReadInt( (int&)lastCommand ); // moverCommand_t lastCommand
+	savefile->ReadFloat( damage ); // float damage
 
-	savefile->ReadAngles( dest_angles );
-	savefile->ReadAngles( angle_delta );
-	savefile->ReadVec3( dest_position );
-	savefile->ReadVec3( move_delta );
-
-	savefile->ReadFloat( move_speed );
-	savefile->ReadInt( move_time );
-	savefile->ReadInt( deceltime );
-	savefile->ReadInt( acceltime );
-	savefile->ReadBool( stopRotation );
-	savefile->ReadBool( useSplineAngles );
-	savefile->ReadInt( (int &)lastCommand );
-	savefile->ReadFloat( damage );
-
-	savefile->ReadInt( areaPortal );
+	savefile->ReadInt( areaPortal ); // int areaPortal
 	if ( areaPortal > 0 ) {
 		int portalState = 0;
 		savefile->ReadInt( portalState );
 		gameLocal.SetPortalState( areaPortal, portalState );
 	}
 
-	guiTargets.Clear();
-	savefile->ReadInt( num );
-	guiTargets.SetNum( num );
-	for( i = 0; i < num; i++ ) {
-		guiTargets[ i ].Restore( savefile );
-	}
+	SaveFileReadArray(guiTargets, ReadObject ); // idList< idEntityPtr<idEntity> > guiTargets
 
-	savefile->ReadBool( hasSpline );
-	if ( hasSpline ) {
+	// SM: Spline stuff from original Doom 3 code
+	// https://github.com/id-Software/DOOM-3/blob/a9c49da5afb18201d31e3f0a429a037e56ce2b9a/neo/d3xp/Mover.cpp#L286-L302
+	bool hasSpline = false;
+	savefile->ReadBool(hasSpline);
+	if (hasSpline) {
 		int starttime;
 		int totaltime;
 		int accel;
 		int decel;
 		int useAngles;
 
-		splineEnt.Restore( savefile );
-		savefile->ReadInt( starttime );
-		savefile->ReadInt( totaltime );
-		savefile->ReadInt( accel );
-		savefile->ReadInt( decel );
-		savefile->ReadInt( useAngles );
+		savefile->ReadInt(starttime);
+		savefile->ReadInt(totaltime);
+		savefile->ReadInt(accel);
+		savefile->ReadInt(decel);
+		savefile->ReadInt(useAngles);
 
-		PostEventMS( &EV_PostRestore, 0, starttime, totaltime, accel, decel, useAngles );
+		PostEventMS(&EV_PostRestore, 0, starttime, totaltime, accel, decel, useAngles);
 	}
 }
 
@@ -1684,24 +1681,21 @@ idElevator::Save
 ================
 */
 void idElevator::Save( idSaveGame *savefile ) const {
-	int i;
-
-	savefile->WriteInt( (int)state );
-
-	savefile->WriteInt( floorInfo.Num() );
-	for ( i = 0; i < floorInfo.Num(); i++ ) {
-		savefile->WriteVec3( floorInfo[ i ].pos );
-		savefile->WriteString( floorInfo[ i ].door );
-		savefile->WriteInt( floorInfo[ i ].floor );
+	savefile->WriteInt( state ); // elevatorState_t state
+	savefile->WriteInt(floorInfo.Num()); // idList<floorInfo_s>		floorInfo
+	for (int idx = 0; idx < floorInfo.Num(); idx++)
+	{
+		savefile->WriteVec3( floorInfo[idx].pos ); // idVec3 pos
+		savefile->WriteString( floorInfo[idx].door ); // idString door
+		savefile->WriteInt( floorInfo[idx].floor ); // int floor
 	}
-
-	savefile->WriteInt( currentFloor );
-	savefile->WriteInt( pendingFloor );
-	savefile->WriteInt( lastFloor );
-	savefile->WriteBool( controlsDisabled );
-	savefile->WriteFloat( returnTime );
-	savefile->WriteInt( returnFloor );
-	savefile->WriteInt( lastTouchTime );
+	savefile->WriteInt( currentFloor ); // int currentFloor
+	savefile->WriteInt( pendingFloor ); // int pendingFloor
+	savefile->WriteInt( lastFloor ); // int lastFloor
+	savefile->WriteBool( controlsDisabled ); // bool controlsDisabled
+	savefile->WriteFloat( returnTime ); // float returnTime
+	savefile->WriteInt( returnFloor ); // int returnFloor
+	savefile->WriteInt( lastTouchTime ); // int lastTouchTime
 }
 
 /*
@@ -1710,28 +1704,22 @@ idElevator::Restore
 ================
 */
 void idElevator::Restore( idRestoreGame *savefile ) {
-	int i, num;
-
-	savefile->ReadInt( (int &)state );
-
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
-		floorInfo_s floor;
-
-		savefile->ReadVec3( floor.pos );
-		savefile->ReadString( floor.door );
-		savefile->ReadInt( floor.floor );
-
-		floorInfo.Append( floor );
+	savefile->ReadInt( (int&)state ); // elevatorState_t state
+	int num;
+	savefile->ReadInt(num); // idList<floorInfo_s> floorInfo
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadVec3( floorInfo[idx].pos ); // idVec3 pos
+		savefile->ReadString( floorInfo[idx].door ); // idString door
+		savefile->ReadInt( floorInfo[idx].floor ); // int floor
 	}
-
-	savefile->ReadInt( currentFloor );
-	savefile->ReadInt( pendingFloor );
-	savefile->ReadInt( lastFloor );
-	savefile->ReadBool( controlsDisabled );
-	savefile->ReadFloat( returnTime );
-	savefile->ReadInt( returnFloor );
-	savefile->ReadInt( lastTouchTime );
+	savefile->ReadInt( currentFloor ); // int currentFloor
+	savefile->ReadInt( pendingFloor ); // int pendingFloor
+	savefile->ReadInt( lastFloor ); // int lastFloor
+	savefile->ReadBool( controlsDisabled ); // bool controlsDisabled
+	savefile->ReadFloat( returnTime ); // float returnTime
+	savefile->ReadInt( returnFloor ); // int returnFloor
+	savefile->ReadInt( lastTouchTime ); // int lastTouchTime
 }
 
 /*
@@ -2243,60 +2231,50 @@ idMover_Binary::Save
 ================
 */
 void idMover_Binary::Save( idSaveGame *savefile ) const {
-	int i;
+	savefile->WriteFloat( wait ); // float wait
 
-	savefile->WriteVec3( pos1 );
-	savefile->WriteVec3( pos2 );
-	savefile->WriteInt( (moverState_t)moverState );
+	savefile->WriteVec3( pos1 ); // idVec3 pos1
+	savefile->WriteVec3( pos2 ); // idVec3 pos2
 
-	savefile->WriteObject( moveMaster );
-	savefile->WriteObject( activateChain );
+	savefile->WriteInt( (int)moverState ); // moveState_t moverState
 
-	savefile->WriteInt( soundPos1 );
-	savefile->WriteInt( sound1to2 );
-	savefile->WriteInt( sound2to1 );
-	savefile->WriteInt( soundPos2 );
-	savefile->WriteInt( soundLoop );
+	savefile->WriteObject( moveMaster ); // idMover_Binary * moveMaster
+	savefile->WriteObject( activateChain ); // idMover_Binary * activateChain
+	savefile->WriteInt( soundPos1 ); // int soundPos1
+	savefile->WriteInt( sound1to2 ); // int sound1to2
+	savefile->WriteInt( sound2to1 ); // int sound2to1
+	savefile->WriteInt( soundPos2 ); // int soundPos2
+	savefile->WriteInt( soundLoop ); // int soundLoop
+	savefile->WriteFloat( damage ); // float damage
+	savefile->WriteInt( duration ); // int duration
+	savefile->WriteInt( accelTime ); // int accelTime
+	savefile->WriteInt( decelTime ); // int decelTime
+	savefile->WriteObject( activatedBy ); // idEntityPtr<idEntity> activatedBy
+	savefile->WriteInt( stateStartTime ); // int stateStartTime
+	savefile->WriteString( team ); // idString team
+	savefile->WriteBool( enabled ); // bool enabled
+	savefile->WriteInt( move_thread ); // int move_thread
+	savefile->WriteInt( updateStatus ); // int updateStatus
 
-	savefile->WriteFloat( wait );
-	savefile->WriteFloat( damage );
+	SaveFileWriteArray( buddies, buddies.Num(), WriteString ); // idStrList buddies
 
-	savefile->WriteInt( duration );
-	savefile->WriteInt( accelTime );
-	savefile->WriteInt( decelTime );
+	savefile->WriteStaticObject( idMover_Binary::physicsObj ); // idPhysics_Parametric physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
 
-	activatedBy.Save( savefile );
-
-	savefile->WriteInt( stateStartTime );
-	savefile->WriteString( team );
-	savefile->WriteBool( enabled );
-
-	savefile->WriteInt( move_thread );
-	savefile->WriteInt( updateStatus );
-
-	savefile->WriteInt( buddies.Num() );
-	for ( i = 0; i < buddies.Num(); i++ ) {
-		savefile->WriteString( buddies[ i ] );
-	}
-
-	savefile->WriteStaticObject( physicsObj );
-
-	savefile->WriteInt( areaPortal );
+	savefile->WriteInt( areaPortal ); // int areaPortal
 	if ( areaPortal ) {
 		savefile->WriteInt( gameRenderWorld->GetPortalState( areaPortal ) );
 	}
-	savefile->WriteBool( blocked );
-#ifdef _D3XP
-	savefile->WriteBool( playerOnly );
-#endif
 
-	savefile->WriteInt( guiTargets.Num() );
-	for( i = 0; i < guiTargets.Num(); i++ ) {
-		guiTargets[ i ].Save( savefile );
-	}
+	savefile->WriteBool( blocked ); // bool blocked
+	savefile->WriteBool( playerOnly ); // bool playerOnly
+	SaveFileWriteArray( guiTargets, guiTargets.Num(), WriteObject ); // idList< idEntityPtr<idEntity> > guiTargets
 
 	// SM
-	savefile->WriteBool( sparksEnabled );
+	savefile->WriteBool( sparksEnabled ); // bool sparksEnabled
+	savefile->WriteFloat( sparksZOffset ); // float sparksZOffset
+	SaveFileWriteArray( FXSparks, FXSparks.Num(), WriteObject ); // idList<idEntityPtr> FXSparks
 }
 
 /*
@@ -2305,67 +2283,56 @@ idMover_Binary::Restore
 ================
 */
 void idMover_Binary::Restore( idRestoreGame *savefile ) {
-	int		i, num, portalState;
-	idStr	temp;
+	savefile->ReadFloat( wait ); // float wait
 
-	savefile->ReadVec3( pos1 );
-	savefile->ReadVec3( pos2 );
-	savefile->ReadInt( (int &)moverState );
+	savefile->ReadVec3( pos1 ); // idVec3 pos1
+	savefile->ReadVec3( pos2 ); // idVec3 pos2
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( moveMaster ) );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( activateChain ) );
+	savefile->ReadInt( (int&)moverState ); // moveState_t moverState
 
-	savefile->ReadInt( soundPos1 );
-	savefile->ReadInt( sound1to2 );
-	savefile->ReadInt( sound2to1 );
-	savefile->ReadInt( soundPos2 );
-	savefile->ReadInt( soundLoop );
+	savefile->ReadObject( CastClassPtrRef(moveMaster) ); // idMover_Binary * moveMaster
+	savefile->ReadObject( CastClassPtrRef(activateChain) ); // idMover_Binary * activateChain
+	savefile->ReadInt( soundPos1 ); // int soundPos1
+	savefile->ReadInt( sound1to2 ); // int sound1to2
+	savefile->ReadInt( sound2to1 ); // int sound2to1
+	savefile->ReadInt( soundPos2 ); // int soundPos2
+	savefile->ReadInt( soundLoop ); // int soundLoop
+	savefile->ReadFloat( damage ); // float damage
+	savefile->ReadInt( duration ); // int duration
+	savefile->ReadInt( accelTime ); // int accelTime
+	savefile->ReadInt( decelTime ); // int decelTime
+	savefile->ReadObject( activatedBy ); // idEntityPtr<idEntity> activatedBy
+	savefile->ReadInt( stateStartTime ); // int stateStartTime
+	savefile->ReadString( team ); // idString team
+	savefile->ReadBool( enabled ); // bool enabled
+	savefile->ReadInt( move_thread ); // int move_thread
+	savefile->ReadInt( updateStatus ); // int updateStatus
 
-	savefile->ReadFloat( wait );
-	savefile->ReadFloat( damage );
+	SaveFileReadArray( buddies, ReadString ); // idStrList buddies
 
-	savefile->ReadInt( duration );
-	savefile->ReadInt( accelTime );
-	savefile->ReadInt( decelTime );
-
-	activatedBy.Restore( savefile );
-
-	savefile->ReadInt( stateStartTime );
-
-	savefile->ReadString( team );
-	savefile->ReadBool( enabled );
-
-	savefile->ReadInt( move_thread );
-	savefile->ReadInt( updateStatus );
-
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
-		savefile->ReadString( temp );
-		buddies.Append( temp );
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_Parametric physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
 	}
 
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
-
-	savefile->ReadInt( areaPortal );
+	savefile->ReadInt( areaPortal ); // int areaPortal
 	if ( areaPortal ) {
+		int portalState;
 		savefile->ReadInt( portalState );
 		gameLocal.SetPortalState( areaPortal, portalState );
 	}
-	savefile->ReadBool( blocked );
-#ifdef _D3XP
-	savefile->ReadBool( playerOnly );
-#endif
 
-	guiTargets.Clear();
-	savefile->ReadInt( num );
-	guiTargets.SetNum( num );
-	for( i = 0; i < num; i++ ) {
-		guiTargets[ i ].Restore( savefile );
-	}
+	savefile->ReadBool( blocked ); // bool blocked
+	savefile->ReadBool( playerOnly ); // bool playerOnly
+	SaveFileReadArray( guiTargets, ReadObject ); // idList< idEntityPtr<idEntity> > guiTargets
 
 	// SM
-	savefile->ReadBool( sparksEnabled );
+	savefile->ReadBool( sparksEnabled ); // bool sparksEnabled
+	savefile->ReadFloat( sparksZOffset ); // float sparksZOffset
+	SaveFileReadListCast( FXSparks, ReadObject, idEntityPtr<idEntity>& ); // idList<idEntityPtr> FXSparks
 }
 
 /*
@@ -2890,19 +2857,23 @@ void idMover_Binary::DoParticleFX_Sparks()
 	idEntityFx* fx = idEntityFx::StartFx("fx/doorsparks", NULL, NULL, this, true);
 	fx->SetOrigin(idVec3(0.0f, yPos, myBounds.zMin()));
 	fx->SetAngles(idAngles(0.0f, 0.0f, -90.0f * doorDir.y));
-	FXSparks.Append(fx);
+	FXSparks.Append(idEntityPtr<idEntity>());
+	FXSparks[ FXSparks.Num() - 1 ] = fx;
 	
 	// Top sparks
 	fx = idEntityFx::StartFx("fx/doorsparks", NULL, NULL, this, true);
 	fx->SetOrigin(idVec3(0.0f, yPos, myBounds.zMax()));
 	fx->SetAngles(idAngles(0.0f, 0.0f, -90.0f * doorDir.y));
-	FXSparks.Append(fx);
+	FXSparks.Append(idEntityPtr<idEntity>());
+	FXSparks[ FXSparks.Num() - 1 ] = fx;
 }
 
 void idMover_Binary::ClearParticleFX_Sparks()
 {
 	for (int i = 0; i < FXSparks.Num(); ++i) {
-		FXSparks[i]->PostEventMS(&EV_Fx_KillFx, 0);
+		if (FXSparks[i].IsValid()) {
+			FXSparks[i].GetEntity()->PostEventMS(&EV_Fx_KillFx, 0);
+		}
 	}
 	FXSparks.Clear();
 }
@@ -3510,29 +3481,45 @@ idDoor::Save
 ================
 */
 void idDoor::Save( idSaveGame *savefile ) const {
+	savefile->WriteObject( peekEnt ); // class idVentpeek * peekEnt
 
-	savefile->WriteFloat( triggersize );
-	savefile->WriteBool( crusher );
-	savefile->WriteBool( noTouch );
-	savefile->WriteBool( aas_area_closed );
-	savefile->WriteString( buddyStr );
-	savefile->WriteInt( nextSndTriggerTime );
+	savefile->WriteFloat( triggersize ); // float triggersize
+	savefile->WriteBool( crusher ); // bool crusher
+	savefile->WriteBool( noTouch ); // bool noTouch
+	savefile->WriteBool( aas_area_closed ); // bool aas_area_closed
+	savefile->WriteString( buddyStr ); // idString buddyStr
+	savefile->WriteClipModel( trigger ); // idClipModel * trigger
+	savefile->WriteClipModel( sndTrigger ); // idClipModel * sndTrigger
+	savefile->WriteClipModel( displaceTrigger ); // idClipModel * displaceTrigger
+	savefile->WriteInt( nextSndTriggerTime ); // int nextSndTriggerTime
+	savefile->WriteVec3( localTriggerOrigin ); // idVec3 localTriggerOrigin
+	savefile->WriteMat3( localTriggerAxis ); // idMat3 localTriggerAxis
+	savefile->WriteString( _requires ); // idString _requires
+	savefile->WriteInt( removeItem ); // int removeItem
+	savefile->WriteString( syncLock ); // idString syncLock
+	savefile->WriteInt( normalAxisIndex ); // int normalAxisIndex
+	savefile->WriteObject( companionDoor ); // idDoor * companionDoor
+	savefile->WriteVec3( shoveDir ); // idVec3 shoveDir
 
-	savefile->WriteVec3( localTriggerOrigin );
-	savefile->WriteMat3( localTriggerAxis );
+	savefile->WriteBool( monster_trigger ); // bool monster_trigger
+	savefile->WriteBool( damage_only_objects ); // bool damage_only_objects
+	savefile->WriteBool( blocked_stayopen ); // bool blocked_stayopen
+	savefile->WriteInt( triggerDelaytime ); // int triggerDelaytime
+	savefile->WriteBool( playerBlock ); // bool playerBlock
+	savefile->WriteBool( blocked_pushaway ); // bool blocked_pushaway
 
-	savefile->WriteString( _requires );
-	savefile->WriteInt( removeItem );
-	savefile->WriteString( syncLock );
-	savefile->WriteInt( normalAxisIndex );
+	savefile->WriteBool( doorLocked ); // bool doorLocked
+	savefile->WriteBool( unlockdelayActive ); // bool unlockdelayActive
+	savefile->WriteInt( unlockdelayTime ); // int unlockdelayTime
+	savefile->WriteBool( vacuumlock ); // bool vacuumlock
 
-	savefile->WriteClipModel( trigger );
-	savefile->WriteClipModel( sndTrigger );
-	savefile->WriteClipModel(displaceTrigger);
+	savefile->WriteInt( airlessCheckTimer ); // int airlessCheckTimer
+	savefile->WriteVec3( originalPosition ); // idVec3 originalPosition
+	savefile->WriteVec3( originalCenterMass ); // idVec3 originalCenterMass
 
-	savefile->WriteObject( companionDoor );
+	SaveFileWriteArray( gateProps, 2, WriteObject ); // idAnimatedEntity* gateProps[2]
 
-	savefile->WriteVec3( shoveDir );
+	barricade.Save( savefile ); // idEntityPtr<class idDoorBarricade> barricade
 }
 
 /*
@@ -3541,30 +3528,45 @@ idDoor::Restore
 ================
 */
 void idDoor::Restore( idRestoreGame *savefile ) {
+	savefile->ReadObject( CastClassPtrRef(peekEnt) ); // class idVentpeek * peekEnt
 
-	savefile->ReadFloat( triggersize );
-	savefile->ReadBool( crusher );
-	savefile->ReadBool( noTouch );
-	savefile->ReadBool( aas_area_closed );
-	SetAASAreaState( aas_area_closed );
-	savefile->ReadString( buddyStr );
-	savefile->ReadInt( nextSndTriggerTime );
+	savefile->ReadFloat( triggersize ); // float triggersize
+	savefile->ReadBool( crusher ); // bool crusher
+	savefile->ReadBool( noTouch ); // bool noTouch
+	savefile->ReadBool( aas_area_closed ); // bool aas_area_closed
+	savefile->ReadString( buddyStr ); // idString buddyStr
+	savefile->ReadClipModel( trigger ); // idClipModel * trigger
+	savefile->ReadClipModel( sndTrigger ); // idClipModel * sndTrigger
+	savefile->ReadClipModel( displaceTrigger ); // idClipModel * displaceTrigger
+	savefile->ReadInt( nextSndTriggerTime ); // int nextSndTriggerTime
+	savefile->ReadVec3( localTriggerOrigin ); // idVec3 localTriggerOrigin
+	savefile->ReadMat3( localTriggerAxis ); // idMat3 localTriggerAxis
+	savefile->ReadString( _requires ); // idString _requires
+	savefile->ReadInt( removeItem ); // int removeItem
+	savefile->ReadString( syncLock ); // idString syncLock
+	savefile->ReadInt( normalAxisIndex ); // int normalAxisIndex
+	savefile->ReadObject( CastClassPtrRef(companionDoor) ); // idDoor * companionDoor
+	savefile->ReadVec3( shoveDir ); // idVec3 shoveDir
 
-	savefile->ReadVec3( localTriggerOrigin );
-	savefile->ReadMat3( localTriggerAxis );
+	savefile->ReadBool( monster_trigger ); // bool monster_trigger
+	savefile->ReadBool( damage_only_objects ); // bool damage_only_objects
+	savefile->ReadBool( blocked_stayopen ); // bool blocked_stayopen
+	savefile->ReadInt( triggerDelaytime ); // int triggerDelaytime
+	savefile->ReadBool( playerBlock ); // bool playerBlock
+	savefile->ReadBool( blocked_pushaway ); // bool blocked_pushaway
 
-	savefile->ReadString( _requires );
-	savefile->ReadInt( removeItem );
-	savefile->ReadString( syncLock );
-	savefile->ReadInt( normalAxisIndex );
+	savefile->ReadBool( doorLocked ); // bool doorLocked
+	savefile->ReadBool( unlockdelayActive ); // bool unlockdelayActive
+	savefile->ReadInt( unlockdelayTime ); // int unlockdelayTime
+	savefile->ReadBool( vacuumlock ); // bool vacuumlock
 
-	savefile->ReadClipModel( trigger );
-	savefile->ReadClipModel( sndTrigger );
-	savefile->ReadClipModel(displaceTrigger);
+	savefile->ReadInt( airlessCheckTimer ); // int airlessCheckTimer
+	savefile->ReadVec3( originalPosition ); // idVec3 originalPosition
+	savefile->ReadVec3( originalCenterMass ); // idVec3 originalCenterMass
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( companionDoor ) );
+	SaveFileReadArrayCast( gateProps, ReadObject, idClass*& ); // idAnimatedEntity* gateProps[2]
 
-	savefile->ReadVec3(shoveDir);
+	barricade.Restore( savefile ); // idEntityPtr<class idDoorBarricade> barricade
 }
 
 /*
@@ -3698,7 +3700,9 @@ void idDoor::Spawn( void ) {
 
 	// Create displace trigger regardless of whether the interaction trigger is created
 	// (automatic doors should still push things aside!)
-	PostEventMS(&EV_Door_SpawnDisplaceTrigger, 0);
+	// SW 26th Feb 2025: adding spawnarg control for certain tricky scenarios where this trigger doesn't really work
+	if (spawnArgs.GetBool("displaceTrigger", "1"))
+		PostEventMS(&EV_Door_SpawnDisplaceTrigger, 0);
 
 	// see if we are on an areaportal
 	areaPortal = gameRenderWorld->FindPortal( GetPhysics()->GetAbsBounds() );
@@ -3832,6 +3836,7 @@ void idDoor::Spawn( void ) {
 			args.SetVector("zoominspect_angle", idVec3(0, 179, 0));
 			args.SetVector("zoominspect_campos", idVec3(20, 0, 75));
 			args.SetVector("zoominspect_selpos", idVec3( GATEOFFSET, 0, 75));
+			args.Set("loc_inspectiontext", "#str_label_doorgate");
 
             gateProps[i] = (idAnimatedEntity *)gameLocal.SpawnEntityType(idAnimatedEntity::Type, &args);
             gateProps[i]->Event_PlayAnim("opened", 0);
@@ -4036,7 +4041,7 @@ void idDoor::Think( void ) {
 	}
 
 	
-	if (moverState == MOVER_2TO1)
+	if (moverState == MOVER_2TO1 && displaceTrigger != NULL)
 	{
 		displaceTrigger->Link(gameLocal.clip, this, 253, GetPhysics()->GetOrigin(), mat3_identity);
 	}
@@ -5332,9 +5337,9 @@ idPlat::Save
 ===============
 */
 void idPlat::Save( idSaveGame *savefile ) const {
-	savefile->WriteClipModel( trigger );
-	savefile->WriteVec3( localTriggerOrigin );
-	savefile->WriteMat3( localTriggerAxis );
+	savefile->WriteClipModel( trigger ); // idClipModel * trigger
+	savefile->WriteVec3( localTriggerOrigin ); // idVec3 localTriggerOrigin
+	savefile->WriteMat3( localTriggerAxis ); // idMat3 localTriggerAxis
 }
 
 /*
@@ -5343,9 +5348,9 @@ idPlat::Restore
 ===============
 */
 void idPlat::Restore( idRestoreGame *savefile ) {
-	savefile->ReadClipModel( trigger );
-	savefile->ReadVec3( localTriggerOrigin );
-	savefile->ReadMat3( localTriggerAxis );
+	savefile->ReadClipModel( trigger ); // idClipModel * trigger
+	savefile->ReadVec3( localTriggerOrigin ); // idVec3 localTriggerOrigin
+	savefile->ReadMat3( localTriggerAxis ); // idMat3 localTriggerAxis
 }
 
 /*
@@ -5570,8 +5575,11 @@ idMover_Periodic::Save
 ===============
 */
 void idMover_Periodic::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( damage );
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteStaticObject( idMover_Periodic::physicsObj ); // idPhysics_Parametric physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteFloat( damage ); // float damage
 }
 
 /*
@@ -5580,9 +5588,15 @@ idMover_Periodic::Restore
 ===============
 */
 void idMover_Periodic::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( damage );
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_Parametric physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadFloat( damage );// float damage
 }
 
 /*
@@ -5694,7 +5708,7 @@ idRotater::Save
 ===============
 */
 void idRotater::Save( idSaveGame *savefile ) const {
-	activatedBy.Save( savefile );
+	savefile->WriteObject( activatedBy ); // idEntityPtr<idEntity> activatedBy
 }
 
 /*
@@ -5703,7 +5717,7 @@ idRotater::Restore
 ===============
 */
 void idRotater::Restore( idRestoreGame *savefile ) {
-	activatedBy.Restore( savefile );
+	savefile->ReadObject( activatedBy ); // idEntityPtr<idEntity> activatedBy
 }
 
 /*

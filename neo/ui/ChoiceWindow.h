@@ -39,6 +39,9 @@ public:
 						idChoiceWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	virtual				~idChoiceWindow();
 
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile );
+
 	virtual const char	*HandleEvent(const sysEvent_t *event, bool *updateVisuals);
 	virtual void		PostParse();
 	virtual void		Draw(int time, float x, float y);

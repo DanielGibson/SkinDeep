@@ -114,6 +114,9 @@ public:
 	void			AssureSize( int newSize);							// assure list has given number of elements, but leave them uninitialized
 	void			AssureSize( int newSize, const type &initValue );	// assure list has given number of elements and initialize any new elements
 	void			AssureSizeAlloc( int newSize, new_t *allocator );	// assure the pointer list has the given number of elements and allocate any new elements
+	
+	// blendo eric: assuresize with init seems to have confusing logic, might want to replace it with this one?
+	void			AssureNum( int newNum, const type &initValue );		// blendo eric: resize to at least newNum, and make sure all items from num to newNum are inited
 
 	type *			Ptr( void );										// returns a pointer to the list
 	const type *	Ptr( void ) const;									// returns a pointer to the list
@@ -497,6 +500,38 @@ ID_INLINE void idList<type>::AssureSize( int newSize, const type &initValue ) {
 		for ( int i = num; i < newSize; i++ ) {
 			list[i] = initValue;
 		}
+	}
+
+	num = newNum;
+}
+
+
+/*
+================
+idList<type>::AssureNum
+
+================
+*/
+// blendo eric: alt logic for assure with init value
+template< class type >
+ID_INLINE void idList<type>::AssureNum( int newNum, const type &initValue ) {
+	int oldNum = num;
+	newNum = Max(newNum,num);
+	int newSize = newNum;
+
+	if ( newSize > size ) {
+		if ( granularity == 0 ) {	// this is a hack to fix our memset classes
+			granularity = 16;
+		}
+		newSize += granularity - 1;
+		newSize -= newSize % granularity;
+		assert( newSize >= size );
+		Resize( newSize );
+	}
+
+	// fill in the new active data
+	for ( int i = oldNum; i < newNum; i++ ) {
+		list[i] = initValue;
 	}
 
 	num = newNum;

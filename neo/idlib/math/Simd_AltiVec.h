@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MATH_SIMD_ALTIVEC_H__
 #define __MATH_SIMD_ALTIVEC_H__
 
+#if !defined(__BLENDO_SIMD_INLINE__)
 #include "idlib/math/Simd_Generic.h"
 
 /*
@@ -251,4 +252,5 @@ public:
 
 };
 
-#endif /* !__MATH_SIMD_ALTIVEC_H__ */
+#endif
+#endif

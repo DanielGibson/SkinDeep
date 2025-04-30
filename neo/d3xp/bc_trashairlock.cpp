@@ -173,10 +173,36 @@ void idTrashAirlock::Spawn(void)
 
 void idTrashAirlock::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( airlockState ); // int airlockState
+	SaveFileWriteArray( innerDoor, 3, WriteObject ); // idDoor * innerDoor[3]
+	SaveFileWriteArray( outerDoor, 3, WriteObject ); // idDoor * outerDoor[3]
+
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+
+	savefile->WriteObject( trashcubeEnt ); // idEntityPtr<idEntity> trashcubeEnt
+
+	savefile->WriteObject( sirenLight ); // idLight * sirenLight
+
+	savefile->WriteBool( cubeIsSpinning ); // bool cubeIsSpinning
+
+	SaveFileWriteArray( vacuumSeparators, 2, WriteObject ); // idVacuumSeparatorEntity * vacuumSeparators[2]
 }
 
 void idTrashAirlock::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( airlockState ); // int airlockState
+	SaveFileReadArrayCast( innerDoor, ReadObject, idClass*& ); // idDoor * innerDoor[3]
+	SaveFileReadArrayCast( outerDoor, ReadObject, idClass*& ); // idDoor * outerDoor[3]
+
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+
+	savefile->ReadObject( trashcubeEnt ); // idEntityPtr<idEntity> trashcubeEnt
+
+	savefile->ReadObject( CastClassPtrRef(sirenLight) ); // idLight * sirenLight
+
+	savefile->ReadBool( cubeIsSpinning ); // bool cubeIsSpinning
+
+	SaveFileReadArrayCast( vacuumSeparators, ReadObject, idClass*&  ); // idVacuumSeparatorEntity * vacuumSeparators[2]
 }
 
 void idTrashAirlock::Think(void)

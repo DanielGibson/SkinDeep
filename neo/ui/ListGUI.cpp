@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "framework/Common.h"
 #include "ui/UserInterface.h"
 #include "ui/ListGUILocal.h"
+#include "gamesys/SaveGame.h"
+
 
 /*
 ====================
@@ -182,3 +184,43 @@ void idListGUILocal::Shutdown( void ) {
 	m_name.Clear();
 	Clear();
 }
+
+
+/*
+====================
+idListGUILocal::Save
+====================
+*/
+void idListGUILocal::Save(idSaveGame* savefile) const {
+	SaveFileWriteArray( (*this), Num(), WriteString ); // inherited list string
+
+	//savefile->WriteUserInterface( m_pGUI, m_pGUI->IsUniqued(), !m_pGUI->IsUniqued() ); // idUserInterface * m_pGUI
+	savefile->WriteSGPtr( m_pGUI ); // idUserInterface * m_pGUI
+
+	savefile->WriteString( m_name ); // idStr m_name
+	savefile->WriteInt( m_water ); // int m_water
+
+	SaveFileWriteArray( m_ids, m_ids.Num(), WriteInt ); // idList<int> m_ids
+
+	savefile->WriteBool( m_stateUpdates ); // bool m_stateUpdates
+}
+
+/*
+====================
+idListGUILocal::Restore
+====================
+*/
+void idListGUILocal::Restore(idRestoreGame* savefile) {
+	SaveFileReadList( (*this), ReadString ); // inherited list string
+
+	// savefile->ReadUserInterface( m_pGUI ); // idUserInterface * m_pGUI
+	savefile->ReadSGPtr( CastReadSGPtrPtr( m_pGUI ) ); // idUserInterface * m_pGUI
+
+	savefile->ReadString( m_name ); // idStr m_name
+	savefile->ReadInt( m_water ); // int m_water
+
+	SaveFileReadList( m_ids, ReadInt ); // idList<int> m_ids
+
+	savefile->ReadBool( m_stateUpdates ); // bool m_stateUpdates
+}
+

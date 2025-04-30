@@ -1104,6 +1104,15 @@ bool idRenderSystemLocal::PrimaryViewExists() {
 	return tr.primaryView != NULL;
 }
 
+void idRenderSystemLocal::UpdateScreenWidth()
+{
+	renderCrops[0].x = 0;
+	renderCrops[0].y = 0;
+	renderCrops[0].width = glConfig.vidWidth;
+	renderCrops[0].height = glConfig.vidHeight;
+	currentRenderCrop = 0;
+}
+
 /*
 =============
 R_AddSetFrameBufferCmd

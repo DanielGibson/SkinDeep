@@ -36,6 +36,9 @@ public:
 	idFieldWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	virtual ~idFieldWindow();
 
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void ReadFromSaveGame( idRestoreGame *savefile );
+
 	virtual void Draw(int time, float x, float y);
 
 private:

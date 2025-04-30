@@ -598,29 +598,37 @@ idPhysics_RigidBody::Save
 ================
 */
 void idPhysics_RigidBody::Save( idSaveGame *savefile ) const {
+	idPhysics_RigidBody_SavePState( savefile, current ); // rigidBodyPState_t current
+	idPhysics_RigidBody_SavePState( savefile, saved ); // rigidBodyPState_t saved
 
-	idPhysics_RigidBody_SavePState( savefile, current );
-	idPhysics_RigidBody_SavePState( savefile, saved );
+	idPhysics_RigidBody_SavePState( savefile, lastValidPreCollision ); // rigidBodyPState_t lastValidPreCollision
+	idPhysics_RigidBody_SavePState( savefile, lastValid ); // rigidBodyPState_t lastValid
 
-	savefile->WriteFloat( linearFriction );
-	savefile->WriteFloat( angularFriction );
-	savefile->WriteFloat( contactFriction );
-	savefile->WriteFloat( bouncyness );
-	savefile->WriteClipModel( clipModel );
+	savefile->WriteBool( lastValidActivated ); // bool lastValidActivated
+	savefile->WriteBool( lastValidActivatedPreCollision ); // bool lastValidActivatedPreCollision
+	savefile->WriteFloat( linearFriction ); // float linearFriction
+	savefile->WriteFloat( angularFriction ); // float angularFriction
+	savefile->WriteFloat( contactFriction ); // float contactFriction
+	savefile->WriteFloat( bouncyness ); // float bouncyness
+	savefile->WriteClipModel( clipModel ); // idClipModel * clipModel
+	savefile->WriteBool( lastThinkCollision ); // bool lastThinkCollision
+	savefile->WriteVec3( lastThinkCollisionPoint ); // idVec3 lastThinkCollisionPoint
+	savefile->WriteVec3( lastThinkCollisionNormal ); // idVec3 lastThinkCollisionNormal
+	savefile->WriteFloat( mass ); // float mass
+	savefile->WriteFloat( inverseMass ); // float inverseMass
+	savefile->WriteVec3( centerOfMass ); // idVec3 centerOfMass
+	savefile->WriteMat3( inertiaTensor ); // idMat3 inertiaTensor
+	savefile->WriteMat3( inverseInertiaTensor ); // idMat3 inverseInertiaTensor
 
-	savefile->WriteFloat( mass );
-	savefile->WriteFloat( inverseMass );
-	savefile->WriteVec3( centerOfMass );
-	savefile->WriteMat3( inertiaTensor );
-	savefile->WriteMat3( inverseInertiaTensor );
+	// idODE * integrator
+	// integrator = new idODE_Euler( sizeof(rigidBodyIState_t) / sizeof(float), RigidBodyDerivatives, this );
 
-	savefile->WriteBool( dropToFloor );
-	savefile->WriteBool( testSolid );
-	savefile->WriteBool( noImpact );
-	savefile->WriteBool( noContact );
-
-	savefile->WriteBool( hasMaster );
-	savefile->WriteBool( isOrientated );
+	savefile->WriteBool( dropToFloor ); // bool dropToFloor
+	savefile->WriteBool( testSolid ); // bool testSolid
+	savefile->WriteBool( noImpact ); // bool noImpact
+	savefile->WriteBool( noContact ); // bool noContact
+	savefile->WriteBool( hasMaster ); // bool hasMaster
+	savefile->WriteBool( isOrientated ); // bool isOrientated
 }
 
 /*
@@ -629,29 +637,37 @@ idPhysics_RigidBody::Restore
 ================
 */
 void idPhysics_RigidBody::Restore( idRestoreGame *savefile ) {
+	idPhysics_RigidBody_RestorePState( savefile, current ); // rigidBodyPState_t current
+	idPhysics_RigidBody_RestorePState( savefile, saved ); // rigidBodyPState_t saved
 
-	idPhysics_RigidBody_RestorePState( savefile, current );
-	idPhysics_RigidBody_RestorePState( savefile, saved );
+	idPhysics_RigidBody_RestorePState( savefile, lastValidPreCollision ); // rigidBodyPState_t lastValidPreCollision
+	idPhysics_RigidBody_RestorePState( savefile, lastValid ); // rigidBodyPState_t lastValid
 
-	savefile->ReadFloat( linearFriction );
-	savefile->ReadFloat( angularFriction );
-	savefile->ReadFloat( contactFriction );
-	savefile->ReadFloat( bouncyness );
-	savefile->ReadClipModel( clipModel );
+	savefile->ReadBool( lastValidActivated ); // bool lastValidActivated
+	savefile->ReadBool( lastValidActivatedPreCollision ); // bool lastValidActivatedPreCollision
+	savefile->ReadFloat( linearFriction ); // float linearFriction
+	savefile->ReadFloat( angularFriction ); // float angularFriction
+	savefile->ReadFloat( contactFriction ); // float contactFriction
+	savefile->ReadFloat( bouncyness ); // float bouncyness
+	savefile->ReadClipModel( clipModel ); // idClipModel * clipModel
+	savefile->ReadBool( lastThinkCollision ); // bool lastThinkCollision
+	savefile->ReadVec3( lastThinkCollisionPoint ); // idVec3 lastThinkCollisionPoint
+	savefile->ReadVec3( lastThinkCollisionNormal ); // idVec3 lastThinkCollisionNormal
+	savefile->ReadFloat( mass ); // float mass
+	savefile->ReadFloat( inverseMass ); // float inverseMass
+	savefile->ReadVec3( centerOfMass ); // idVec3 centerOfMass
+	savefile->ReadMat3( inertiaTensor ); // idMat3 inertiaTensor
+	savefile->ReadMat3( inverseInertiaTensor ); // idMat3 inverseInertiaTensor
 
-	savefile->ReadFloat( mass );
-	savefile->ReadFloat( inverseMass );
-	savefile->ReadVec3( centerOfMass );
-	savefile->ReadMat3( inertiaTensor );
-	savefile->ReadMat3( inverseInertiaTensor );
+	// idODE * integrator
+	integrator = new idODE_Euler( sizeof(rigidBodyIState_t) / sizeof(float), RigidBodyDerivatives, this );
 
-	savefile->ReadBool( dropToFloor );
-	savefile->ReadBool( testSolid );
-	savefile->ReadBool( noImpact );
-	savefile->ReadBool( noContact );
-
-	savefile->ReadBool( hasMaster );
-	savefile->ReadBool( isOrientated );
+	savefile->ReadBool( dropToFloor ); // bool dropToFloor
+	savefile->ReadBool( testSolid ); // bool testSolid
+	savefile->ReadBool( noImpact ); // bool noImpact
+	savefile->ReadBool( noContact ); // bool noContact
+	savefile->ReadBool( hasMaster ); // bool hasMaster
+	savefile->ReadBool( isOrientated ); // bool isOrientated
 }
 
 /*

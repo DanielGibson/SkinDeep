@@ -53,8 +53,13 @@ public:
 	void					Spawn( void );
 							~idMultiModelAF( void );
 
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
+
 	virtual void			Think( void );
 	virtual void			Present( void );
+
+	virtual bool			RequiresPresentOnRestore() const { return true; }
 
 protected:
 	idPhysics_AF			physicsObj;
@@ -105,7 +110,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					SetBody( idEntity *bodyEnt, const char *headModel, jointHandle_t attachJoint );
@@ -156,7 +161,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -225,7 +230,7 @@ public:
 							~idAFEntity_Gibbable( void );
 
 	void					Spawn( void );
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	virtual void			Present( void );
 	virtual	void			Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType = SURFTYPE_NONE);
@@ -252,6 +257,8 @@ protected:
 	void					InitSkeletonModel( void );
 
 	void					Event_Gib( const char *damageDefName );
+
+	virtual bool			RequiresPresentOnRestore() const override { return skeletonModelDefHandle != -1; }
 };
 
 /*
@@ -271,7 +278,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -301,7 +308,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					SetupHead( void );
@@ -345,6 +352,10 @@ public:
 							idAFEntity_Vehicle( void );
 
 	void					Spawn( void );
+
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
+
 	void					Use( idPlayer *player );
 
 protected:
@@ -376,13 +387,16 @@ public:
 							~idAFEntity_VehicleSimple( void );
 
 	void					Spawn( void );
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
+
 	virtual void			Think( void );
 
 protected:
-	idClipModel *			wheelModel;
-	idAFConstraint_Suspension *	suspension[4];
-	jointHandle_t			wheelJoints[4];
-	float					wheelAngles[4];
+	idClipModel *			wheelModel = 0;
+	idAFConstraint_Suspension* suspension[4] = {};
+	jointHandle_t			wheelJoints[4] = {};
+	float					wheelAngles[4] = {};
 };
 
 
@@ -401,13 +415,16 @@ public:
 							idAFEntity_VehicleFourWheels( void );
 
 	void					Spawn( void );
+	//void					Save( idSaveGame *savefile ) const;  // blendo eric: unused
+	//void					Restore( idRestoreGame *savefile );
+
 	virtual void			Think( void );
 
 protected:
-	idAFBody *				wheels[4];
-	idAFConstraint_Hinge *	steering[2];
-	jointHandle_t			wheelJoints[4];
-	float					wheelAngles[4];
+	idAFBody *				wheels[4] = {};
+	idAFConstraint_Hinge *	steering[2] = {};
+	jointHandle_t			wheelJoints[4] = {};
+	float					wheelAngles[4] = {};
 };
 
 
@@ -426,6 +443,8 @@ public:
 							idAFEntity_VehicleSixWheels( void );
 
 	void					Spawn( void );
+	//void					Save( idSaveGame *savefile ) const;  // blendo eric: unused
+	//void					Restore( idRestoreGame *savefile );
 	virtual void			Think( void );
 
 #ifdef _D3XP
@@ -435,10 +454,10 @@ public:
 #endif
 
 private:
-	idAFBody *				wheels[6];
-	idAFConstraint_Hinge *	steering[4];
-	jointHandle_t			wheelJoints[6];
-	float					wheelAngles[6];
+	idAFBody *				wheels[6] = {};
+	idAFConstraint_Hinge *	steering[4] = {};
+	jointHandle_t			wheelJoints[6] = {};
+	float					wheelAngles[6] = {};
 };
 
 #ifdef _D3XP
@@ -456,6 +475,9 @@ public:
 
 	void					Spawn( void );
 	void					PostSpawn( void );
+	//void					Save( idSaveGame *savefile ) const;  // blendo eric: unused?
+	//void					Restore( idRestoreGame *savefile );
+
 	virtual void			Think( void );
 
 private:
@@ -489,7 +511,7 @@ public:
 							~idAFEntity_SteamPipe( void );
 
 	void					Spawn( void );
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -521,11 +543,11 @@ public:
 							idAFEntity_ClawFourFingers( void );
 
 	void					Spawn( void );
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 private:
-	idAFConstraint_Hinge *	fingers[4];
+	idAFConstraint_Hinge *	fingers[4] = {};
 
 	void					Event_SetFingerAngle( float angle );
 	void					Event_StopFingers( void );
@@ -547,7 +569,7 @@ public:
 
 	void				Spawn();
 	void				Init(idEntity* parent);
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				SetParent(idEntity* parent);
@@ -601,7 +623,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );

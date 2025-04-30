@@ -49,18 +49,49 @@ void idLighter::Spawn(void)
     args.SetVector("origin", GetPhysics()->GetOrigin());
     args.SetMatrix("rotation", GetPhysics()->GetAxis());
     args.Set("model", spawnArgs.GetString("model_display"));
-    args.Set("bind", GetName());
+    //args.Set("bind", GetName()); //BC 3-6-2025: removed this, see note a few lines below...
     args.Set("anim", "idle_off");
     animatedEnt = (idAnimatedEntity*)gameLocal.SpawnEntityType(idAnimatedEntity::Type, &args);    
+    if (animatedEnt)
+    {
+        animatedEnt->Bind(this, true); //BC 3-6-2025: bind the object via bind() instead of using the spawnarg, as the lost and found makes object invisible if we don't do this.
+    }
     
 }
 
 void idLighter::Save(idSaveGame *savefile) const
 {
+    savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+    savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+    savefile->WriteParticle( trailParticles ); // const idDeclParticle * trailParticles
+    savefile->WriteInt( trailParticlesFlyTime ); // int trailParticlesFlyTime
+
+    savefile->WriteInt( thinkTimer ); // int thinkTimer
+
+    savefile->WriteInt( lighterState ); // int lighterState
+
+    savefile->WriteObject( animatedEnt ); // idAnimatedEntity* animatedEnt
+    savefile->WriteVec3( lastPosition ); // idVec3 lastPosition
 }
 
 void idLighter::Restore(idRestoreGame *savefile)
 {
+    savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+    savefile->ReadInt( headlightHandle ); // int headlightHandle
+    if ( headlightHandle != - 1 ) {
+        gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+    }
+
+    savefile->ReadParticle( trailParticles ); // const idDeclParticle * trailParticles
+    savefile->ReadInt( trailParticlesFlyTime ); // int trailParticlesFlyTime
+
+    savefile->ReadInt( thinkTimer ); // int thinkTimer
+
+    savefile->ReadInt( lighterState ); // int lighterState
+
+    savefile->ReadObject( CastClassPtrRef(animatedEnt) ); // idAnimatedEntity* animatedEnt
+    savefile->ReadVec3( lastPosition ); // idVec3 lastPosition
 }
 
 void idLighter::Think(void)

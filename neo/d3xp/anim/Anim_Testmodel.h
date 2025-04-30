@@ -48,7 +48,7 @@ public:
 							idTestModel();
 							~idTestModel();
 
-	void					Save( idSaveGame *savefile );
+	void					Save( idSaveGame *savefile ); // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );

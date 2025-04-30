@@ -37,6 +37,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "ui/MarkerWindow.h"
 
 class idImage;
+
+const int MARKER_BUFF_SIZE = 512*64*4;
+
 void idMarkerWindow::CommonInit() {
 	numStats = 0;
 	currentTime = -1;
@@ -59,6 +62,73 @@ idMarkerWindow::idMarkerWindow(idUserInterfaceLocal *g) : idWindow(g) {
 }
 
 idMarkerWindow::~idMarkerWindow() {
+}
+
+
+void operator+=( idSaveGame* savefile, const markerData_t& data )
+{
+	savefile->WriteInt( data.time ); // int time
+	savefile->WriteMaterial( data.mat ); // const idMaterial * mat
+	savefile->WriteRect( data.rect ); // idRectangle rect
+}
+
+void operator+=( idRestoreGame* savefile, markerData_t& data )
+{
+	savefile->ReadInt( data.time ); // int time
+	savefile->ReadMaterial( data.mat ); // const idMaterial * mat
+	savefile->ReadRect( data.rect ); // idRectangle rect
+}
+
+void operator+=( idSaveGame* savefile, const logStats_t& data )
+{
+	savefile->WriteShort( data.health ); // short health
+	savefile->WriteShort( data.heartRate ); // short heartRate
+	savefile->WriteShort( data.stamina ); // short stamina
+	savefile->WriteShort( data.combat ); // short combat
+}
+
+void operator+=( idRestoreGame* savefile, logStats_t& data )
+{
+	savefile->ReadShort( data.health ); // short health
+	savefile->ReadShort( data.heartRate ); // short heartRate
+	savefile->ReadShort( data.stamina ); // short stamina
+	savefile->ReadShort( data.combat ); // short combat
+}
+
+void idMarkerWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	SaveFileWriteArrayConcat(loggedStats, MAX_LOGGED_STATS);
+	SaveFileWriteArrayConcat(markerTimes, markerTimes.Num());
+
+	savefile->WriteString( statData ); // idString statData
+	savefile->WriteInt( numStats ); // int numStats
+	// dword *imageBuff // temp alloc?
+	savefile->WriteMaterial( markerMat ); // const idMaterial * markerMat
+	savefile->WriteMaterial( markerStop ); // const idMaterial * markerStop
+	savefile->WriteVec4( markerColor ); // idVec4 markerColor
+	savefile->WriteInt( currentMarker ); // int currentMarker
+	savefile->WriteInt( currentTime ); // int currentTime
+	savefile->WriteInt( stopTime ); // int stopTime
+}
+
+void idMarkerWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	SaveFileReadArrayConcat(loggedStats);
+	SaveFileReadListConcat(markerTimes);
+
+	savefile->ReadString( statData ); // idString statData
+	savefile->ReadInt( numStats ); // int numStats
+	// dword *imageBuff // temp alloc?
+	savefile->ReadMaterial( markerMat ); // const idMaterial * markerMat
+	savefile->ReadMaterial( markerStop ); // const idMaterial * markerStop
+	savefile->ReadVec4( markerColor ); // idVec4 markerColor
+	savefile->ReadInt( currentMarker ); // int currentMarker
+	savefile->ReadInt( currentTime ); // int currentTime
+	savefile->ReadInt( stopTime ); // int stopTime
 }
 
 bool idMarkerWindow::ParseInternalVar(const char *_name, idParser *src) {
@@ -267,7 +337,7 @@ void idMarkerWindow::Activate(bool activate, idStr &act) {
 	if (activate) {
 		int i;
 		gui->GetDesktop()->SetChildWinVarVal("markerText", "text", "");
-		imageBuff = (dword*)Mem_Alloc(512*64*4);
+		imageBuff = (dword*)Mem_Alloc(MARKER_BUFF_SIZE);
 		markerTimes.Clear();
 		currentMarker = -1;
 		currentTime = -1;
@@ -314,7 +384,7 @@ void idMarkerWindow::Activate(bool activate, idStr &act) {
 				markerTimes.Append(md);
 			}
 			fileSystem->FreeFileList( markers );
-			memset(imageBuff, 0, 512*64*4);
+			memset(imageBuff, 0, MARKER_BUFF_SIZE);
 			float step = 511.0f / (numStats - 1);
 			float x1, y1, x2, y2;
 			x1 = 0 - step;

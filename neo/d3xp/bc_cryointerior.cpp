@@ -33,6 +33,15 @@ END_CLASS
 
 idCryointerior::idCryointerior(void)
 {
+	ceilingLight = nullptr;
+	doorProp = nullptr;
+	frobBar = nullptr;
+	ventpeekEnt = nullptr;
+
+	iceMeltTimer = 0;
+	iceMeltState = 0;
+
+	dripEmitter = nullptr;
 }
 
 idCryointerior::~idCryointerior(void)
@@ -93,10 +102,45 @@ void idCryointerior::Spawn(void)
 
 void idCryointerior::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteObject( ceilingLight ); //  idLight * ceilingLight
+	savefile->WriteObject( doorProp ); //  idAnimated* doorProp
+
+	savefile->WriteObject( frobBar ); //  idEntity* frobBar
+
+	savefile->WriteObject( cryospawn ); //  idEntityPtr<idEntity> cryospawn
+
+	savefile->WriteObject( ventpeekEnt ); //  idEntity * ventpeekEnt
+
+	savefile->WriteInt( iceMeltTimer ); //  int iceMeltTimer
+
+	savefile->WriteInt( iceMeltState ); //  int iceMeltState
+
+	savefile->WriteObject( dripEmitter ); //  idFuncEmitter * dripEmitter
+
 }
 
 void idCryointerior::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadObject( CastClassPtrRef(ceilingLight) ); //  idLight * ceilingLight
+	savefile->ReadObject( CastClassPtrRef(doorProp) ); //  idAnimated* doorProp
+
+	savefile->ReadObject( frobBar ); //  idEntity* frobBar
+
+	savefile->ReadObject( cryospawn ); //  idEntityPtr<idEntity> cryospawn
+
+	savefile->ReadObject( ventpeekEnt ); //  idEntity * ventpeekEnt
+
+	savefile->ReadInt( iceMeltTimer ); //  int iceMeltTimer
+
+	savefile->ReadInt( iceMeltState ); //  int iceMeltState
+
+	savefile->ReadObject( CastClassPtrRef(dripEmitter) ); //  idFuncEmitter * dripEmitter
 }
 
 void idCryointerior::Think(void)
@@ -177,6 +221,9 @@ void idCryointerior::Think(void)
 			{
 				gameLocal.RunMapScript(exitCryoScript.c_str());
 			}
+
+
+			common->g_SteamUtilities->SetSteamTimelineEvent("steam_transfer");
 		}
 	}
 
@@ -280,6 +327,8 @@ void idCryointerior::SetExitPoint(idEntity *ent)
 	//Ok, we now have an exit point.
 	cryospawn = ent;
 
+	#define PEEK_FORWARD_DISTANCE 5
+	#define PEEK_UP_OFFSET 20
 
 	//Set up the peek stuff.
 
@@ -289,7 +338,7 @@ void idCryointerior::SetExitPoint(idEntity *ent)
 	idEntity *nullEnt;
 	idDict args;
 	args.Clear();
-	args.SetVector("origin", ent->GetPhysics()->GetOrigin() + exitForward * 5 + idVec3(0,0,20));
+	args.SetVector("origin", ent->GetPhysics()->GetOrigin() + (exitForward * PEEK_FORWARD_DISTANCE) + idVec3(0,0, PEEK_UP_OFFSET));
 	args.SetFloat("angle", ent->GetPhysics()->GetAxis().ToAngles().yaw);
 	nullEnt = (idTarget *)gameLocal.SpawnEntityType(idTarget::Type, &args);
 
@@ -302,7 +351,7 @@ void idCryointerior::SetExitPoint(idEntity *ent)
 	args.SetVector("origin", this->GetPhysics()->GetOrigin() + interiorForward * 28 + interiorUp * 67);
 	args.SetFloat("angle", this->GetPhysics()->GetAxis().ToAngles().yaw + 180);
 	args.Set("target", nullEnt->GetName());
-	args.Set("displayname", "Peek");
+	args.Set("displayname", "#str_def_gameplay_peek");
 	args.SetInt("yaw_arc", 70);
 	args.SetInt("pitch_arc", 70);
 	args.Set("snd_activate", "shuffle");
@@ -329,7 +378,7 @@ void idCryointerior::SetExitPoint(idEntity *ent)
 	this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forwardDir, NULL, &upDir);
 	args.Clear();
 	args.Set("model", "models/objects/frobcube/cube4x4.ase");
-	args.Set("displayname", "Deploy");
+	args.Set("displayname", "#str_def_gameplay_deploy");
 	frobBar = gameLocal.SpawnEntityType(idFrobcube::Type, &args);
 	frobBar->SetOrigin(GetPhysics()->GetOrigin() + (upDir * 51) + (forwardDir * 24));
 	frobBar->GetPhysics()->GetClipModel()->SetOwner(this);
@@ -387,7 +436,7 @@ void idCryointerior::SetExitPoint(idEntity *ent)
 		args.SetVector("origin", pos);
 		args.SetFloat("angle", GetPhysics()->GetAxis().ToAngles().yaw + 180);
 		args.SetVector("zoominspect_campos", idVec3(4.5f, 0, 0));
-		args.Set("displayname", "Certificate");
+		args.Set("displayname", "#str_def_gameplay_certificate");
 		args.Set("loc_inspectiontext", "#str_label_certificate");
 		gameLocal.SpawnEntityDef(args, &inspectpoint);
 	}

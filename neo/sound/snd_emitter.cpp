@@ -700,7 +700,7 @@ returns the length of the started sound in msec
 =====================
 */
 int idSoundEmitterLocal::StartSound(const idSoundShader *shader, const s_channelType channel, float diversity, int soundShaderFlags, bool allowSlow, int gameTime
-	/*blendo eric: debug sound info*/ ) {
+	/*blendo eric: debug sound info*/, idStr* outSampleName /*= nullptr*/) {
 	int i;
 
 	if ( !shader ) {
@@ -878,6 +878,11 @@ int idSoundEmitterLocal::StartSound(const idSoundShader *shader, const s_channel
 		if ( !soundWorld->fpa[0] ) {
 			start44kHz = soundSystemLocal.GetCurrent44kHzTime() + MIXBUFFER_SAMPLES;
 		}
+	}
+
+	if (outSampleName)
+	{
+		*outSampleName = chan->leadinSample->name;
 	}
 
 	if ( idSoundSystemLocal::s_showStartSound.GetInteger() >= 2) {
@@ -1144,7 +1149,7 @@ idSoundEmitterLocal::OverallIntensity
 get [0,1] estimated intensity of complete sound factoring in distance attenuation
 ===================
 */
-float idSoundEmitterLocal::OverallIntensity() {
+float idSoundEmitterLocal::OverallIntensity(s_channelType channel) {
 	if (idSoundSystemLocal::s_constantAmplitude.GetFloat() >= 0.0f) {
 		return idSoundSystemLocal::s_constantAmplitude.GetFloat();
 	}
@@ -1154,7 +1159,7 @@ float idSoundEmitterLocal::OverallIntensity() {
 	}
 
 	idVec3* pos = &soundWorld->listenerQU;
-	amplitude = soundWorld->FindIntensityArtificial(this, pos, SCHANNEL_ANY);
+	amplitude = soundWorld->FindIntensityArtificial(this, pos, channel);
 
 	return amplitude;
 }

@@ -912,6 +912,8 @@ set(src_d3xp
 	d3xp/physics/Force_Grab.cpp
 
 	d3xp/sw_skycontroller.cpp
+	d3xp/epicutilities.cpp
+	d3xp/nullutilities.cpp
 )
 
 # add all those new d3xp/bc_*.cpp from skindeep

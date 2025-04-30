@@ -41,6 +41,31 @@ void idTrigger_sneeze::Spawn()
 }
 
 
+void idTrigger_sneeze::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( lastUpdatetime ); // int lastUpdatetime
+	savefile->WriteFloat( multiplier ); // float multiplier
+
+	savefile->WriteObject( particleEmitter ); // idFuncEmitter * particleEmitter
+
+	savefile->WriteInt( maxlifetime ); // int maxlifetime
+
+	savefile->WriteBool( active ); // bool active
+	savefile->WriteBool( touchedByAI ); // bool touchedByAI
+}
+void idTrigger_sneeze::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( lastUpdatetime ); // int lastUpdatetime
+	savefile->ReadFloat( multiplier ); // float multiplier
+
+	savefile->ReadObject( CastClassPtrRef(particleEmitter) ); // idFuncEmitter * particleEmitter
+
+	savefile->ReadInt( maxlifetime ); // int maxlifetime
+
+	savefile->ReadBool( active ); // bool active
+	savefile->ReadBool( touchedByAI ); // bool touchedByAI
+}
+
 
 void idTrigger_sneeze::Event_Touch(idEntity* other, trace_t* trace)
 {
@@ -83,5 +108,6 @@ void idTrigger_sneeze::Despawn()
 	active = false;
 	particleEmitter->SetActive(false);
 	particleEmitter->PostEventMS(&EV_Remove, DESPAWN_PARTICLETIME);
+	particleEmitter = nullptr;
 	this->PostEventMS(&EV_Remove, 0);	
 }

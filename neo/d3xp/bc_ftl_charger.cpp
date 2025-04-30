@@ -50,10 +50,16 @@ void idFTLCharger::Spawn(void)
 
 void idFTLCharger::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteObject( particleEmitter ); // idFuncEmitter* particleEmitter
 }
 
 void idFTLCharger::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadObject( CastClassPtrRef(particleEmitter) ); // idFuncEmitter* particleEmitter
 }
 
 void idFTLCharger::Think(void)

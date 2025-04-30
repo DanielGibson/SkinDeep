@@ -14,7 +14,7 @@ public:
 							idToilet(void);
 	virtual					~idToilet(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -26,7 +26,7 @@ public:
 
 private:
 
-	idAnimated*				handle;
+	idAnimated*				handle = nullptr;
 	int						flushTimer;
 
 	int						flushMode;

@@ -17,7 +17,7 @@ public:
 							idAsteroid(void);
 	virtual					~idAsteroid(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 	virtual void			Think( void );
@@ -49,7 +49,7 @@ private:
 	int						angularSpeed;
 	int						moveSpeed;
 
-	const idDeclParticle *	trailParticles;
+	const idDeclParticle *	trailParticles = nullptr;
 	int						trailParticlesFlyTime;
 
 	int						despawnThreshold; // if an asteroid's coordinates pass this value on the Y-axis, it despawns

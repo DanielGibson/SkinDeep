@@ -13,7 +13,7 @@ public:
 							idMushroom(void);
 	virtual					~idMushroom(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -25,7 +25,7 @@ public:
 
 private:
 
-	idFuncEmitter			*splashEnt;
+	idFuncEmitter			*splashEnt = nullptr;
 
 	enum					{DRIP_64, DRIP_128, DRIP_192};
 	int						dripType;

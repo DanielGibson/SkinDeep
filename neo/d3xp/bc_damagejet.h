@@ -13,7 +13,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -32,14 +32,14 @@ private:
     float                   range;
 	float                   enemyRange;
 
-    const char *            damageDefname;
+    idStr					damageDefname;
 
     idVec3                  direction;
 	bool					allowLerpRotate; // SW: jet won't rotate to face targets if this is disabled (again, for vignette work)
 
     int                     ownerIndex;
 
-	idFuncEmitter			*emitterParticles;
+	idFuncEmitter			*emitterParticles = nullptr;
 
 	renderLight_t			headlight;
 	qhandle_t				headlightHandle;
@@ -61,7 +61,7 @@ private:
 	bool					hasCloud;
 	bool					hasSpark;
 	//idStr					cloudName;
-	const idDeclEntityDef	*cloudDef;
+	const idDeclEntityDef	*cloudDef = nullptr;
 	int						cloudTimer;
 
 	idAngles				FindSafeInitialAngle();

@@ -6,6 +6,7 @@
 //#include "Fx.h"
 //#include "framework/DeclEntityDef.h"
 //#include "bc_ftl.h"
+#include "idlib/LangDict.h"
 
 #include "bc_meta.h"
 #include "bc_notewall.h"
@@ -45,14 +46,20 @@ idCameraSplice::idCameraSplice(void)
 
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
+
+	soundParticle = nullptr;
+	beamStart = nullptr;
+	beamEnd = nullptr;
 }
 
 idCameraSplice::~idCameraSplice(void)
 {
 	StopSound(SND_CHANNEL_BODY3);
 
-	if (state == CS_CLOSED && soundParticle != NULL)
+	if (state == CS_CLOSED && soundParticle != NULL) {
 		soundParticle->PostEventMS(&EV_Remove, 0);
+		soundParticle = nullptr;
+	}
 
 	if (headlightHandle != -1)
 		gameRenderWorld->FreeLightDef(headlightHandle);
@@ -67,8 +74,8 @@ void idCameraSplice::Spawn(void)
 	GetPhysics()->SetClipMask(MASK_SOLID | CONTENTS_MOVEABLECLIP);
 
 
-	idVec3 forward;
-	GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, NULL);
+	idVec3 forward, right, up;
+	GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, &right, &up);
 	headlight.shader = declManager->FindMaterial("lights/pulse05", false);
 	headlight.pointLight = true;
 	headlight.lightRadius[0] = headlight.lightRadius[1] = headlight.lightRadius[2] = 24.0f;
@@ -104,20 +111,24 @@ void idCameraSplice::Spawn(void)
 	for (int i = 0; i < CAMERASPLICE_BUTTONCOUNT; i++)
 	{
 		idVec3 buttonPos;
+		idStr displayStr;
 		if (i == CSB_OVERRIDE)
 		{
 			//CSB_OVERRIDE
 			buttonPos = GetPhysics()->GetOrigin() + (forwardDir * 1) + (rightDir * -5) + (upDir * 1);
+			displayStr = "#str_def_camerasplice_override";
 		}
 		else if (i == CSB_LEFT)
 		{
 			//CSB_LEFT
 			buttonPos = GetPhysics()->GetOrigin() + (forwardDir * 1) + (rightDir * 4) + (upDir * -4);
+			displayStr = "#str_def_camerasplice_previous";
 		}
 		else
 		{
 			//CSB_RIGHT
 			buttonPos = GetPhysics()->GetOrigin() + (forwardDir * 1) + (rightDir * -1) + (upDir * -4);
+			displayStr = "#str_def_camerasplice_next";
 		}
 
 		idDict args;
@@ -125,7 +136,7 @@ void idCameraSplice::Spawn(void)
 		args.Set("model", "models/objects/frobcube/cube2x2.ase");
 		args.SetVector("cursoroffset", idVec3(1, 0, 0));
 		args.SetInt("health", 1);
-		args.Set("displayname", " ");
+		args.Set("displayname", displayStr);
 
 		if (i == CSB_OVERRIDE)
 		{
@@ -151,6 +162,20 @@ void idCameraSplice::Spawn(void)
 	}
 
 	this->GetRenderEntity()->gui[0] = uiManager->FindGui(spawnArgs.GetString("gui"), true, true); //Create a UNIQUE gui so that it doesn't auto sync with other guis.
+
+
+	//3-26-2025: locbox
+	#define LOCBOXRADIUS 1
+	idDict args;
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_def_camerasplice_name"));
+	args.SetVector("origin", GetPhysics()->GetOrigin() + (forward * 1) + (up * -4) + (right  * 1.5f));
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+
+	BecomeInactive(TH_THINK);
 }
 
 //This is called at game start.
@@ -193,10 +218,74 @@ void idCameraSplice::AssignCamera(idEntity *cameraEnt)
 
 void idCameraSplice::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( assignedCamera ); //  idEntityPtr<idEntity> assignedCamera
+
+	savefile->WriteInt( currentCamIdx ); //  int currentCamIdx
+
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
+	savefile->WriteObject( soundParticle ); //  idFuncEmitter			* soundParticle
+
+
+	savefile->WriteInt( fanfareState ); //  int fanfareState
+
+	savefile->WriteObject( fanfareIcon ); //  idEntity				* fanfareIcon
+	savefile->WriteObject( beamStart ); //  idBeam*					 beamStart
+	savefile->WriteObject( beamEnd ); //  idBeam*					 beamEnd
+	savefile->WriteInt( fanfareTimer ); //  int fanfareTimer
+
+	SaveFileWriteArray(buttons, CAMERASPLICE_BUTTONCOUNT, WriteObject);  // idEntity* buttons[CAMERASPLICE_BUTTONCOUNT];
+
+	savefile->WriteObject( transcriptNote ); //  idEntityPtr<idEntity> transcriptNote
+	savefile->WriteVec3( transcriptStartPos ); //  idVec3 transcriptStartPos
+	savefile->WriteVec3( transcriptEndPos ); //  idVec3 transcriptEndPos
+	savefile->WriteBool( transcriptLerping ); //  bool transcriptLerping
+	savefile->WriteInt( transcriptTimer ); //  int transcriptTimer
+
+	savefile->WriteBool( waitingForTranscriptRead ); //  bool waitingForTranscriptRead
+	savefile->WriteInt( waitingForTranscriptReadTimer ); //  int waitingForTranscriptReadTimer
+
 }
 
 void idCameraSplice::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( assignedCamera ); //  idEntityPtr<idEntity> assignedCamera
+
+	savefile->ReadInt( currentCamIdx ); //  int currentCamIdx
+
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadObject( CastClassPtrRef(soundParticle) ); //  idFuncEmitter			* soundParticle
+
+
+	savefile->ReadInt( fanfareState ); //  int fanfareState
+
+	savefile->ReadObject( fanfareIcon ); //  idEntity				* fanfareIcon
+	savefile->ReadObject( CastClassPtrRef(beamStart) ); //  idBeam*					 beamStart
+	savefile->ReadObject( CastClassPtrRef(beamEnd) ); //  idBeam*					 beamEnd
+	savefile->ReadInt( fanfareTimer ); //  int fanfareTimer
+
+	SaveFileReadArray(buttons, ReadObject);  // idEntity* buttons[CAMERASPLICE_BUTTONCOUNT];
+
+	savefile->ReadObject( transcriptNote ); //  idEntityPtr<idEntity> transcriptNote
+	savefile->ReadVec3( transcriptStartPos ); //  idVec3 transcriptStartPos
+	savefile->ReadVec3( transcriptEndPos ); //  idVec3 transcriptEndPos
+	savefile->ReadBool( transcriptLerping ); //  bool transcriptLerping
+	savefile->ReadInt( transcriptTimer ); //  int transcriptTimer
+
+	savefile->ReadBool( waitingForTranscriptRead ); //  bool waitingForTranscriptRead
+	savefile->ReadInt( waitingForTranscriptReadTimer ); //  int waitingForTranscriptReadTimer
 }
 
 void idCameraSplice::Think(void)
@@ -327,6 +416,7 @@ bool idCameraSplice::DoFrob(int index, idEntity * frobber)
 		StopSound(SND_CHANNEL_BODY3);
 
 		soundParticle->PostEventMS(&EV_Remove, 0);
+		soundParticle = nullptr;
 
 		SetColor(0, 1, 0);
 		//SetSkin(declManager->FindSkin("skins/camerasplice_noblink"));

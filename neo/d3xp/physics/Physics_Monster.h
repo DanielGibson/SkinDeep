@@ -68,7 +68,7 @@ public:
 
 							idPhysics_Monster( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 							// maximum step up the monster can take, default 18 units

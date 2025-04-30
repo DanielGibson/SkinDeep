@@ -33,6 +33,19 @@ void idEngineerMonster::Spawn(void)
 	mineplaceStatus = MINEPLACE_COOLDOWN;
 }
 
+void idEngineerMonster::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( mineplaceStatus ); //  int mineplaceStatus
+	savefile->WriteInt( placedMines ); //  int placedMines
+	savefile->WriteInt( minecheckTimer ); //  int minecheckTimer
+}
+void idEngineerMonster::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( mineplaceStatus ); //  int mineplaceStatus
+	savefile->ReadInt( placedMines ); //  int placedMines
+	savefile->ReadInt( minecheckTimer ); //  int minecheckTimer
+}
+
 void idEngineerMonster::State_Idle()
 {
 	idGunnerMonster::State_Idle();

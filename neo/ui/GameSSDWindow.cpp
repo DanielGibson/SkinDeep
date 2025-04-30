@@ -57,7 +57,7 @@ SSDCrossHair::SSDCrossHair() {
 SSDCrossHair::~SSDCrossHair() {
 }
 
-void SSDCrossHair::WriteToSaveGame( idFile *savefile ) {
+void SSDCrossHair::WriteToSaveGame( idSaveGame *savefile ) const {
 
 	savefile->Write(&currentCrosshair, sizeof(currentCrosshair));
 	savefile->Write(&crosshairWidth, sizeof(crosshairWidth));
@@ -65,7 +65,7 @@ void SSDCrossHair::WriteToSaveGame( idFile *savefile ) {
 
 }
 
-void SSDCrossHair::ReadFromSaveGame( idFile *savefile ) {
+void SSDCrossHair::ReadFromSaveGame( idRestoreGame *savefile ) {
 
 	InitCrosshairs();
 
@@ -109,10 +109,11 @@ SSDEntity::SSDEntity() {
 SSDEntity::~SSDEntity() {
 }
 
-void SSDEntity::WriteToSaveGame( idFile *savefile ) {
+void SSDEntity::WriteToSaveGame( idSaveGame *savefile ) const {
 
 	savefile->Write(&type, sizeof(type));
-	game->WriteSaveGameString(materialName, savefile);
+	savefile->WriteString( materialName );
+
 	savefile->Write(&position, sizeof(position));
 	savefile->Write(&size, sizeof(size));
 	savefile->Write(&radius, sizeof(radius));
@@ -121,9 +122,11 @@ void SSDEntity::WriteToSaveGame( idFile *savefile ) {
 
 	savefile->Write(&matColor, sizeof(matColor));
 
-	game->WriteSaveGameString(text, savefile);
+	savefile->WriteString( text );
 	savefile->Write(&textScale, sizeof(textScale));
 	savefile->Write(&foreColor, sizeof(foreColor));
+
+	savefile->WriteSGPtr( game );
 
 	savefile->Write(&currentTime, sizeof(currentTime));
 	savefile->Write(&lastUpdate, sizeof(lastUpdate));
@@ -137,11 +140,12 @@ void SSDEntity::WriteToSaveGame( idFile *savefile ) {
 
 }
 
-void SSDEntity::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game ) {
+void SSDEntity::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game ) {
 
 	savefile->Read(&type, sizeof(type));
-	game->ReadSaveGameString(materialName, savefile);
+	savefile->ReadString( materialName );
 	SetMaterial(materialName);
+
 	savefile->Read(&position, sizeof(position));
 	savefile->Read(&size, sizeof(size));
 	savefile->Read(&radius, sizeof(radius));
@@ -150,11 +154,13 @@ void SSDEntity::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game ) {
 
 	savefile->Read(&matColor, sizeof(matColor));
 
-	game->ReadSaveGameString(text, savefile);
+	savefile->ReadString( text );
 	savefile->Read(&textScale, sizeof(textScale));
 	savefile->Read(&foreColor, sizeof(foreColor));
 
+	savefile->ReadSGPtr( (idSaveGamePtr**)game );
 	game = _game;
+
 	savefile->Read(&currentTime, sizeof(currentTime));
 	savefile->Read(&lastUpdate, sizeof(lastUpdate));
 	savefile->Read(&elapsed, sizeof(elapsed));
@@ -344,14 +350,14 @@ SSDMover::SSDMover() {
 SSDMover::~SSDMover() {
 }
 
-void SSDMover::WriteToSaveGame( idFile *savefile ) {
+void SSDMover::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDEntity::WriteToSaveGame(savefile);
 
 	savefile->Write(&speed, sizeof(speed));
 	savefile->Write(&rotationSpeed, sizeof(rotationSpeed));
 }
 
-void SSDMover::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDMover::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDEntity::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&speed, sizeof(speed));
@@ -399,13 +405,13 @@ SSDAsteroid::SSDAsteroid() {
 SSDAsteroid::~SSDAsteroid() {
 }
 
-void SSDAsteroid::WriteToSaveGame( idFile *savefile ) {
+void SSDAsteroid::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDMover::WriteToSaveGame(savefile);
 
 	savefile->Write(&health, sizeof(health));
 }
 
-void SSDAsteroid::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDAsteroid::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDMover::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&health, sizeof(health));
@@ -453,7 +459,7 @@ SSDAsteroid* SSDAsteroid::GetSpecificAsteroid(int id) {
 	return &asteroidPool[id];
 }
 
-void SSDAsteroid::WriteAsteroids(idFile* savefile) {
+void SSDAsteroid::WriteAsteroids( idSaveGame *savefile ) {
 	int count = 0;
 	for(int i = 0; i < MAX_ASTEROIDS; i++) {
 		if(asteroidPool[i].inUse) {
@@ -469,7 +475,7 @@ void SSDAsteroid::WriteAsteroids(idFile* savefile) {
 	}
 }
 
-void SSDAsteroid::ReadAsteroids(idFile* savefile, idGameSSDWindow* _game) {
+void SSDAsteroid::ReadAsteroids( idRestoreGame *savefile, idGameSSDWindow* _game ) {
 
 	int count;
 	savefile->Read(&count, sizeof(count));
@@ -497,13 +503,13 @@ SSDAstronaut::SSDAstronaut() {
 SSDAstronaut::~SSDAstronaut() {
 }
 
-void SSDAstronaut::WriteToSaveGame( idFile *savefile ) {
+void SSDAstronaut::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDMover::WriteToSaveGame(savefile);
 
 	savefile->Write(&health, sizeof(health));
 }
 
-void SSDAstronaut::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDAstronaut::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDMover::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&health, sizeof(health));
@@ -544,7 +550,7 @@ SSDAstronaut* SSDAstronaut::GetSpecificAstronaut(int id) {
 
 }
 
-void SSDAstronaut::WriteAstronauts(idFile* savefile) {
+void SSDAstronaut::WriteAstronauts( idSaveGame *savefile ) {
 	int count = 0;
 	for(int i = 0; i < MAX_ASTRONAUT; i++) {
 		if(astronautPool[i].inUse) {
@@ -560,7 +566,7 @@ void SSDAstronaut::WriteAstronauts(idFile* savefile) {
 	}
 }
 
-void SSDAstronaut::ReadAstronauts(idFile* savefile, idGameSSDWindow* _game) {
+void SSDAstronaut::ReadAstronauts( idRestoreGame *savefile, idGameSSDWindow* _game) {
 
 	int count;
 	savefile->Read(&count, sizeof(count));
@@ -598,7 +604,7 @@ SSDExplosion::SSDExplosion() {
 SSDExplosion::~SSDExplosion() {
 }
 
-void SSDExplosion::WriteToSaveGame( idFile *savefile ) {
+void SSDExplosion::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDEntity::WriteToSaveGame(savefile);
 
 	savefile->Write(&finalSize, sizeof(finalSize));
@@ -615,7 +621,7 @@ void SSDExplosion::WriteToSaveGame( idFile *savefile ) {
 	savefile->Write(&followBuddy, sizeof(followBuddy));
 }
 
-void SSDExplosion::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDExplosion::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDEntity::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&finalSize, sizeof(finalSize));
@@ -706,7 +712,7 @@ SSDExplosion* SSDExplosion::GetSpecificExplosion(int id) {
 	return &explosionPool[id];
 }
 
-void SSDExplosion::WriteExplosions(idFile* savefile) {
+void SSDExplosion::WriteExplosions( idSaveGame *savefile ) {
 	int count = 0;
 	for(int i = 0; i < MAX_EXPLOSIONS; i++) {
 		if(explosionPool[i].inUse) {
@@ -722,7 +728,7 @@ void SSDExplosion::WriteExplosions(idFile* savefile) {
 	}
 }
 
-void SSDExplosion::ReadExplosions(idFile* savefile, idGameSSDWindow* _game) {
+void SSDExplosion::ReadExplosions( idRestoreGame *savefile, idGameSSDWindow* _game) {
 
 	int count;
 	savefile->Read(&count, sizeof(count));
@@ -749,7 +755,7 @@ SSDPoints::SSDPoints() {
 SSDPoints::~SSDPoints() {
 }
 
-void SSDPoints::WriteToSaveGame( idFile *savefile ) {
+void SSDPoints::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDEntity::WriteToSaveGame(savefile);
 
 	savefile->Write(&length, sizeof(length));
@@ -765,7 +771,7 @@ void SSDPoints::WriteToSaveGame( idFile *savefile ) {
 
 }
 
-void SSDPoints::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDPoints::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDEntity::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&length, sizeof(length));
@@ -853,7 +859,7 @@ SSDPoints* SSDPoints::GetSpecificPoints(int id) {
 	return &pointsPool[id];
 }
 
-void SSDPoints::WritePoints(idFile* savefile) {
+void SSDPoints::WritePoints( idSaveGame *savefile ) {
 	int count = 0;
 	for(int i = 0; i < MAX_POINTS; i++) {
 		if(pointsPool[i].inUse) {
@@ -869,7 +875,7 @@ void SSDPoints::WritePoints(idFile* savefile) {
 	}
 }
 
-void SSDPoints::ReadPoints(idFile* savefile, idGameSSDWindow* _game) {
+void SSDPoints::ReadPoints( idRestoreGame *savefile, idGameSSDWindow* _game) {
 
 	int count;
 	savefile->Read(&count, sizeof(count));
@@ -898,7 +904,7 @@ SSDProjectile::SSDProjectile() {
 SSDProjectile::~SSDProjectile() {
 }
 
-void SSDProjectile::WriteToSaveGame( idFile *savefile ) {
+void SSDProjectile::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDEntity::WriteToSaveGame(savefile);
 
 	savefile->Write(&dir, sizeof(dir));
@@ -909,7 +915,7 @@ void SSDProjectile::WriteToSaveGame( idFile *savefile ) {
 	savefile->Write(&endPosition, sizeof(endPosition));
 }
 
-void SSDProjectile::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDProjectile::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDEntity::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&dir, sizeof(dir));
@@ -970,7 +976,7 @@ SSDProjectile* SSDProjectile::GetSpecificProjectile(int id) {
 	return &projectilePool[id];
 }
 
-void SSDProjectile::WriteProjectiles(idFile* savefile) {
+void SSDProjectile::WriteProjectiles( idSaveGame *savefile ) {
 	int count = 0;
 	for(int i = 0; i < MAX_PROJECTILES; i++) {
 		if(projectilePool[i].inUse) {
@@ -986,7 +992,7 @@ void SSDProjectile::WriteProjectiles(idFile* savefile) {
 	}
 }
 
-void SSDProjectile::ReadProjectiles(idFile* savefile, idGameSSDWindow* _game) {
+void SSDProjectile::ReadProjectiles( idRestoreGame *savefile, idGameSSDWindow* _game) {
 
 	int count;
 	savefile->Read(&count, sizeof(count));
@@ -1024,14 +1030,14 @@ SSDPowerup::SSDPowerup() {
 SSDPowerup::~SSDPowerup() {
 }
 
-void SSDPowerup::WriteToSaveGame( idFile *savefile ) {
+void SSDPowerup::WriteToSaveGame( idSaveGame *savefile ) const {
 	SSDMover::WriteToSaveGame(savefile);
 
 	savefile->Write(&powerupState, sizeof(powerupState));
 	savefile->Write(&powerupType, sizeof(powerupType));
 }
 
-void SSDPowerup::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
+void SSDPowerup::ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  ) {
 	SSDMover::ReadFromSaveGame(savefile, _game);
 
 	savefile->Read(&powerupState, sizeof(powerupState));
@@ -1162,7 +1168,7 @@ SSDPowerup* SSDPowerup::GetSpecificPowerup(int id) {
 	return &powerupPool[id];
 }
 
-void SSDPowerup::WritePowerups(idFile* savefile) {
+void SSDPowerup::WritePowerups( idSaveGame *savefile ) {
 	int count = 0;
 	for(int i = 0; i < MAX_POWERUPS; i++) {
 		if(powerupPool[i].inUse) {
@@ -1178,7 +1184,7 @@ void SSDPowerup::WritePowerups(idFile* savefile) {
 	}
 }
 
-void SSDPowerup::ReadPowerups(idFile* savefile, idGameSSDWindow* _game) {
+void SSDPowerup::ReadPowerups( idRestoreGame *savefile, idGameSSDWindow* _game) {
 
 	int count;
 	savefile->Read(&count, sizeof(count));
@@ -1213,7 +1219,7 @@ idGameSSDWindow::~idGameSSDWindow() {
 	ResetGameStats();
 }
 
-void idGameSSDWindow::WriteToSaveGame( idFile *savefile ) {
+void idGameSSDWindow::WriteToSaveGame( idSaveGame *savefile ) const {
 	idWindow::WriteToSaveGame(savefile);
 
 	savefile->Write(&ssdTime, sizeof(ssdTime));
@@ -1258,7 +1264,7 @@ void idGameSSDWindow::WriteToSaveGame( idFile *savefile ) {
 	}
 }
 
-void idGameSSDWindow::ReadFromSaveGame( idFile *savefile ) {
+void idGameSSDWindow::ReadFromSaveGame( idRestoreGame *savefile ) {
 	idWindow::ReadFromSaveGame(savefile);
 
 

@@ -24,10 +24,14 @@ END_CLASS
 
 void idWrench::Save(idSaveGame *savefile) const
 {
+	savefile->WriteVec3( lastBashPos ); // idVec3 lastBashPos
+	savefile->WriteInt( damageCooldownTimer ); // int damageCooldownTimer
 }
 
 void idWrench::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadVec3( lastBashPos ); // idVec3 lastBashPos
+	savefile->ReadInt( damageCooldownTimer ); // int damageCooldownTimer
 }
 
 void idWrench::Spawn(void)
@@ -56,7 +60,7 @@ bool idWrench::Collide(const trace_t &collision, const idVec3 &velocity)
 	v = -(velocity * collision.c.normal);
 	if (v > THROW_REPAIRVELOCITY )
 	{
-		if (JustBashed(collision))
+		if (DoRepairHitLogic(collision, false))
 		{
 			//successful repair.
 			BecomeActive(TH_THINK);
@@ -70,6 +74,11 @@ bool idWrench::Collide(const trace_t &collision, const idVec3 &velocity)
 
 bool idWrench::JustBashed(trace_t tr)
 {
+	return DoRepairHitLogic(tr, true);
+}
+
+bool idWrench::DoRepairHitLogic(trace_t tr, bool isBash)
+{
 	if (gameLocal.time < 1000)
 		return false;
 
@@ -79,18 +88,18 @@ bool idWrench::JustBashed(trace_t tr)
 	{
 		if (gameLocal.entities[tr.c.entityNum] != NULL)
 		{
-			if (DoRepairOnEnt(gameLocal.entities[tr.c.entityNum]))
+			if (DoRepairOnEnt(gameLocal.entities[tr.c.entityNum], isBash))
 			{
 				//successful repair.
 				return true;
 			}
 		}
-	}		
+	}
 
 	//failed to find object that needs repairing.
 	//Try to find nearby object.
 	float closestDist = 99999;
-	idEntity *entToRepair = NULL;
+	idEntity* entToRepair = NULL;
 	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
 	{
 		if (!ent)
@@ -109,13 +118,13 @@ bool idWrench::JustBashed(trace_t tr)
 
 	if (entToRepair != NULL)
 	{
-		return DoRepairOnEnt(entToRepair);
+		return DoRepairOnEnt(entToRepair, isBash);
 	}
 
 	return false;
 }
 
-bool idWrench::DoRepairOnEnt(idEntity *targetEnt)
+bool idWrench::DoRepairOnEnt(idEntity *targetEnt, bool isBash)
 {
 	if (targetEnt == NULL)
 		return false;
@@ -125,7 +134,7 @@ bool idWrench::DoRepairOnEnt(idEntity *targetEnt)
 
 	//don't repair something that just got damaged recently.
 	//This is to handle the case where throwing the wrench damages and repairs the object on the same frame.
-	if (targetEnt->lastDamageTime + 300 > gameLocal.time)
+	if (targetEnt->lastDamageTime + 300 > gameLocal.time && !isBash)
 		return false;
 
 	StartSound("snd_repair", SND_CHANNEL_ITEM);

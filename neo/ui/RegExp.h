@@ -53,8 +53,8 @@ public:
 	void				Enable( bool b ) { enabled = b; }
 	void				ReadFromDemoFile( idDemoFile *f );
 	void				WriteToDemoFile( idDemoFile *f );
-	void				WriteToSaveGame( idFile *savefile );
-	void				ReadFromSaveGame( idFile *savefile );
+	void				WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				ReadFromSaveGame( idRestoreGame *savefile );
 };
 
 ID_INLINE idRegister::idRegister( void ) {
@@ -97,8 +97,8 @@ public:
 	void				Reset();
 	void				ReadFromDemoFile( idDemoFile *f );
 	void				WriteToDemoFile( idDemoFile *f );
-	void				WriteToSaveGame( idFile *savefile );
-	void				ReadFromSaveGame( idFile *savefile );
+	void				WriteToSaveGame( idSaveGame *savefile ) const;
+	void				ReadFromSaveGame( idRestoreGame *savefile );
 
 private:
 	idList<idRegister*>	regs;

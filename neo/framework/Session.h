@@ -105,6 +105,7 @@ public:
 
 	// Activates the main menu
 	virtual void	StartMenu( bool playIntro = false ) = 0;
+	virtual void	LoadGameMenu() = 0;
 
 	virtual void	SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) = 0;
 

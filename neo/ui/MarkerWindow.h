@@ -44,6 +44,10 @@ public:
 	idMarkerWindow(idUserInterfaceLocal *gui);
 	idMarkerWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	virtual ~idMarkerWindow();
+
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void ReadFromSaveGame( idRestoreGame *savefile );
+
 	virtual size_t Allocated(){return idWindow::Allocated();};
 
 	virtual const char *HandleEvent(const sysEvent_t *event, bool *updateVisuals);

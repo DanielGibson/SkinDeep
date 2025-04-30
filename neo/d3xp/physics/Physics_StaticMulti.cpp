@@ -83,25 +83,21 @@ idPhysics_StaticMulti::Save
 ================
 */
 void idPhysics_StaticMulti::Save( idSaveGame *savefile ) const {
-	int i;
+	savefile->WriteObject( self ); // idEntity * self
 
-	savefile->WriteObject( self );
-
-	savefile->WriteInt(current.Num());
-	for  ( i = 0; i < current.Num(); i++ ) {
+	savefile->WriteInt(current.Num()); // idList<staticPState_t> current
+	for  ( int i = 0; i < current.Num(); i++ ) {
 		savefile->WriteVec3( current[i].origin );
 		savefile->WriteMat3( current[i].axis );
 		savefile->WriteVec3( current[i].localOrigin );
 		savefile->WriteMat3( current[i].localAxis );
 	}
 
-	savefile->WriteInt( clipModels.Num() );
-	for ( i = 0; i < clipModels.Num(); i++ ) {
-		savefile->WriteClipModel( clipModels[i] );
-	}
+	SaveFileWriteArray( clipModels, clipModels.Num(), WriteClipModel ); // idList<idClipModel *> clipModels
 
-	savefile->WriteBool(hasMaster);
-	savefile->WriteBool(isOrientated);
+	savefile->WriteBool( neverBlock ); // bool neverBlock
+	savefile->WriteBool( hasMaster ); // bool hasMaster
+	savefile->WriteBool( isOrientated ); // bool isOrientated
 }
 
 /*
@@ -110,27 +106,23 @@ idPhysics_StaticMulti::Restore
 ================
 */
 void idPhysics_StaticMulti::Restore( idRestoreGame *savefile ) {
-	int i, num;
+	savefile->ReadObject( self ); // idEntity * self
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
-
-	savefile->ReadInt(num);
-	current.AssureSize( num );
-	for ( i = 0; i < num; i++ ) {
+	int num;
+	savefile->ReadInt( num ); // idList<staticPState_t> current
+	current.SetNum( num );
+	for  ( int i = 0; i < num; i++ ) {
 		savefile->ReadVec3( current[i].origin );
 		savefile->ReadMat3( current[i].axis );
 		savefile->ReadVec3( current[i].localOrigin );
 		savefile->ReadMat3( current[i].localAxis );
 	}
 
-	savefile->ReadInt(num);
-	clipModels.SetNum( num );
-	for ( i = 0; i < num; i++ ) {
-		savefile->ReadClipModel( clipModels[i] );
-	}
+	SaveFileReadList( clipModels, ReadClipModel ); // idList<idClipModel *> clipModels
 
-	savefile->ReadBool(hasMaster);
-	savefile->ReadBool(isOrientated);
+	savefile->ReadBool( neverBlock ); // bool neverBlock
+	savefile->ReadBool( hasMaster ); // bool hasMaster
+	savefile->ReadBool( isOrientated ); // bool isOrientated
 }
 
 /*

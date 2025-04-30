@@ -99,6 +99,98 @@ idSliderWindow::~idSliderWindow() {
 
 }
 
+void idSliderWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	value.WriteToSaveGame( savefile ); // idWinFloat value
+	savefile->WriteFloat( low ); // float low
+	savefile->WriteFloat( high ); // float high
+	savefile->WriteFloat( visiblePercent ); // float visiblePercent
+	savefile->WriteFloat( thumbWidth ); // float thumbWidth
+	savefile->WriteFloat( thumbHeight ); // float thumbHeight
+	savefile->WriteFloat( stepSize ); // float stepSize
+	savefile->WriteFloat( lastValue ); // float lastValue
+	savefile->WriteRect( thumbRect ); // idRectangle thumbRect
+
+	savefile->WriteString( thumbShader ); // idString thumbShader
+	// thumbMat = declManager->FindMaterial(thumbShader); // const idMaterial * thumbMat
+
+	savefile->WriteBool( vertical ); // bool vertical
+	savefile->WriteBool( verticalFlip ); // bool verticalFlip
+	savefile->WriteBool( scrollbar ); // bool scrollbar
+	
+	//savefile->WriteSGPtr( buddyWin ); // idWindow * buddyWin // blendo eric: set by parent
+
+	cvarStr.WriteToSaveGame( savefile ); // idWinStr cvarStr
+	// InitCvar() // idCVar * cvar
+	savefile->WriteBool( cvar_init ); // bool cvar_init
+	liveUpdate.WriteToSaveGame( savefile ); // idWinBool liveUpdate
+	cvarGroup.WriteToSaveGame( savefile ); // idWinStr cvarGroup
+	savefile->WriteFloat( modifiedSum ); // float modifiedSum
+	savefile->WriteFloat( modifiedMultiplier ); // float modifiedMultiplier
+	savefile->WriteBool( initThumbWidth ); // bool initThumbWidth
+	savefile->WriteBool( initThumbHeight ); // bool initThumbHeight
+	savefile->WriteBool( initThumbColor ); // bool initThumbColor
+	savefile->WriteBool( initThumbAuto ); // bool initThumbAuto
+	savefile->WriteBool( initHoverColor ); // bool initHoverColor
+	savefile->WriteBool( initBarColor ); // bool initBarColor
+	savefile->WriteVec4( sliderThumbLockColor ); // idVec4 sliderThumbLockColor
+	savefile->WriteVec4( sliderBarLockColor ); // idVec4 sliderBarLockColor
+
+	savefile->WriteVec2( thumbImgSize ); // idVec2 thumbImgSize
+	savefile->WriteBool( thumbFillAuto ); // bool thumbFillAuto
+	savefile->WriteBool( thumbCapAuto ); // bool thumbCapAuto
+	savefile->WriteFloat( thumbCapRescale ); // float thumbCapRescale
+	savefile->WriteRect( thumbCapRect ); // idRectangle thumbCapRect
+}
+
+void idSliderWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	value.ReadFromSaveGame( savefile ); // idWinFloat value
+	savefile->ReadFloat( low ); // float low
+	savefile->ReadFloat( high ); // float high
+	savefile->ReadFloat( visiblePercent ); // float visiblePercent
+	savefile->ReadFloat( thumbWidth ); // float thumbWidth
+	savefile->ReadFloat( thumbHeight ); // float thumbHeight
+	savefile->ReadFloat( stepSize ); // float stepSize
+	savefile->ReadFloat( lastValue ); // float lastValue
+	savefile->ReadRect( thumbRect ); // idRectangle thumbRect
+
+	savefile->ReadString( thumbShader ); // idString thumbShader
+	thumbMat = declManager->FindMaterial(thumbShader); // const idMaterial * thumbMat
+
+	savefile->ReadBool( vertical ); // bool vertical
+	savefile->ReadBool( verticalFlip ); // bool verticalFlip
+	savefile->ReadBool( scrollbar ); // bool scrollbar
+
+	//savefile->ReadSGPtr( (idSaveGamePtr**)&buddyWin ); // idWindow * buddyWin // blendo eric: set by parent
+
+	cvarStr.ReadFromSaveGame( savefile ); // idWinStr cvarStr
+	InitCvar(); // idCVar * cvar
+	savefile->ReadBool( cvar_init ); // bool cvar_init
+	liveUpdate.ReadFromSaveGame( savefile ); // idWinBool liveUpdate
+	cvarGroup.ReadFromSaveGame( savefile ); // idWinStr cvarGroup
+	savefile->ReadFloat( modifiedSum ); // float modifiedSum
+	savefile->ReadFloat( modifiedMultiplier ); // float modifiedMultiplier
+	savefile->ReadBool( initThumbWidth ); // bool initThumbWidth
+	savefile->ReadBool( initThumbHeight ); // bool initThumbHeight
+	savefile->ReadBool( initThumbColor ); // bool initThumbColor
+	savefile->ReadBool( initThumbAuto ); // bool initThumbAuto
+	savefile->ReadBool( initHoverColor ); // bool initHoverColor
+	savefile->ReadBool( initBarColor ); // bool initBarColor
+	savefile->ReadVec4( sliderThumbLockColor ); // idVec4 sliderThumbLockColor
+	savefile->ReadVec4( sliderBarLockColor ); // idVec4 sliderBarLockColor
+
+	savefile->ReadVec2( thumbImgSize ); // idVec2 thumbImgSize
+	savefile->ReadBool( thumbFillAuto ); // bool thumbFillAuto
+	savefile->ReadBool( thumbCapAuto ); // bool thumbCapAuto
+	savefile->ReadFloat( thumbCapRescale ); // float thumbCapRescale
+	savefile->ReadRect( thumbCapRect ); // idRectangle thumbCapRect
+}
+
 bool idSliderWindow::ParseInternalVar(const char *_name, idParser *src) {
 	if (idStr::Icmp(_name, "stepsize") == 0 || idStr::Icmp(_name, "step") == 0) {
 		stepSize = src->ParseFloat();

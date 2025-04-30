@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "framework/DeclEntityDef.h"
 #include "framework/DeclSkin.h"
 
+#include "idlib/LangDict.h"
+
 #include "gamesys/SysCvar.h"
 #include "ai/AI.h"
 #include "Player.h"
@@ -449,131 +451,108 @@ idWeapon::Save
 ================
 */
 void idWeapon::Save( idSaveGame *savefile ) const {
+	savefile->WriteBool( autoaimEnabled ); // bool autoaimEnabled
+	savefile->WriteBool( isGrenade ); // bool isGrenade
 
-	savefile->WriteInt( status );
-	savefile->WriteObject( thread );
-	savefile->WriteString( state );
-	savefile->WriteString( idealState );
-	savefile->WriteInt( animBlendFrames );
-	savefile->WriteInt( animDoneTime );
-	savefile->WriteBool( isLinked );
+	savefile->WriteBool( isJiggling ); // bool isJiggling
+	savefile->WriteBool( multiCarry ); // bool multiCarry
 
-	savefile->WriteObject( owner );
-	worldModel.Save( savefile );
+	//idScriptBool WEAPON_ATTACK; // idScriptBool WEAPON_ATTACK
+	//idScriptBool WEAPON_RELOAD; // idScriptBool WEAPON_RELOAD
+	//idScriptBool WEAPON_NETRELOAD; // idScriptBool WEAPON_NETRELOAD
+	//idScriptBool WEAPON_NETENDRELOAD; // idScriptBool WEAPON_NETENDRELOAD
+	//idScriptBool WEAPON_NETFIRING; // idScriptBool WEAPON_NETFIRING
+	//idScriptBool WEAPON_RAISEWEAPON; // idScriptBool WEAPON_RAISEWEAPON
+	//idScriptBool WEAPON_LOWERWEAPON; // idScriptBool WEAPON_LOWERWEAPON
 
-	savefile->WriteInt( hideTime );
-	savefile->WriteFloat( hideDistance );
-	savefile->WriteInt( hideStartTime );
-	savefile->WriteFloat( hideStart );
-	savefile->WriteFloat( hideEnd );
-	savefile->WriteFloat( hideOffset );
-	savefile->WriteBool( hide );
-	savefile->WriteBool( disabled );
+	//idScriptBool WEAPON_RACKTHESLIDE; // idScriptBool WEAPON_RACKTHESLIDE
+	//idScriptBool WEAPON_INSPECTMAGAZINE; // idScriptBool WEAPON_INSPECTMAGAZINE
+	//idScriptBool WEAPON_INSPECTCHAMBER; // idScriptBool WEAPON_INSPECTCHAMBER
+	//idScriptBool WEAPON_INSPECTWEAPON; // idScriptBool WEAPON_INSPECTWEAPON
 
-	savefile->WriteInt( berserk );
+	//idScriptBool WEAPON_AIMMODE; // idScriptBool WEAPON_AIMMODE
 
-	savefile->WriteVec3( playerViewOrigin );
-	savefile->WriteMat3( playerViewAxis );
+	savefile->WriteInt( status ); // weaponStatus_t status
+	savefile->WriteObject( thread ); // idThread * thread
+	savefile->WriteString( state ); // idString state
+	savefile->WriteString( idealState ); // idString idealState
+	savefile->WriteInt( animBlendFrames ); // int animBlendFrames
+	savefile->WriteInt( animDoneTime ); // int animDoneTime
+	savefile->WriteBool( isLinked ); // bool isLinked
+	savefile->WriteObject( projectileEnt ); // idEntity * projectileEnt
 
-	savefile->WriteVec3( viewWeaponOrigin );
-	savefile->WriteMat3( viewWeaponAxis );
+	savefile->WriteObject( owner ); // idPlayer * owner
+	worldModel.Save( savefile ); // idEntityPtr<idAnimatedEntity> worldModel
+	savefile->WriteInt( hideTime ); // int hideTime
+	savefile->WriteFloat( hideDistance ); // float hideDistance
+	savefile->WriteInt( hideStartTime ); // int hideStartTime
+	savefile->WriteFloat( hideStart ); // float hideStart
+	savefile->WriteFloat( hideEnd ); // float hideEnd
+	savefile->WriteFloat( hideOffset ); // float hideOffset
+	savefile->WriteBool( hide ); // bool hide
+	savefile->WriteBool( disabled ); // bool disabled
+	savefile->WriteInt( berserk ); // int berserk
+	savefile->WriteVec3( playerViewOrigin ); // idVec3 playerViewOrigin
+	savefile->WriteMat3( playerViewAxis ); // idMat3 playerViewAxis
+	savefile->WriteVec3( viewWeaponOrigin ); // idVec3 viewWeaponOrigin
+	savefile->WriteMat3( viewWeaponAxis ); // idMat3 viewWeaponAxis
+	savefile->WriteVec3( muzzleOrigin ); // idVec3 muzzleOrigin
+	savefile->WriteMat3( muzzleAxis ); // idMat3 muzzleAxis
 
-	savefile->WriteVec3( muzzleOrigin );
-	savefile->WriteMat3( muzzleAxis );
+	savefile->WriteVec3( pushVelocity ); // idVec3 pushVelocity
 
-	savefile->WriteVec3( pushVelocity );
+	
+	savefile->WriteEntityDef( weaponDef ); // const idDeclEntityDef * weaponDef
+	savefile->WriteEntityDef( meleeDef ); // const idDeclEntityDef * meleeDef
+	savefile->WriteDict( &projectileDict ); // idDict projectileDict
+	savefile->WriteFloat( meleeDistance ); // float meleeDistance
+	savefile->WriteString( meleeDefName ); // idString meleeDefName
+	savefile->WriteDict( &brassDict ); // idDict brassDict
+	savefile->WriteInt( brassDelay ); // int brassDelay
+	savefile->WriteString( icon ); // idString icon
+	savefile->WriteRenderLight( guiLight ); // renderLight_t guiLight
+	savefile->WriteInt( guiLightHandle ); // int guiLightHandle
+	savefile->WriteRenderLight( muzzleFlash ); // renderLight_t muzzleFlash
+	savefile->WriteInt( muzzleFlashHandle ); // int muzzleFlashHandle
 
-	savefile->WriteString( weaponDef->GetName() );
-	savefile->WriteFloat( meleeDistance );
-	savefile->WriteString( meleeDefName );
-	savefile->WriteInt( brassDelay );
-	savefile->WriteString( icon );
+	savefile->WriteRenderLight( worldMuzzleFlash ); // renderLight_t worldMuzzleFlash
+	savefile->WriteInt( worldMuzzleFlashHandle ); // int worldMuzzleFlashHandle
 
-	savefile->WriteInt( guiLightHandle );
-	savefile->WriteRenderLight( guiLight );
+	savefile->WriteVec3( flashColor ); // idVec3 flashColor
+	savefile->WriteInt( muzzleFlashEnd ); // int muzzleFlashEnd
+	savefile->WriteInt( flashTime ); // int flashTime
+	savefile->WriteBool( lightOn ); // bool lightOn
+	savefile->WriteBool( silent_fire ); // bool silent_fire
+	savefile->WriteBool( allowDrop ); // bool allowDrop
+	savefile->WriteBool( hasBloodSplat ); // bool hasBloodSplat
+	savefile->WriteInt( kick_endtime ); // int kick_endtime
+	savefile->WriteInt( muzzle_kick_time ); // int muzzle_kick_time
+	savefile->WriteInt( muzzle_kick_maxtime ); // int muzzle_kick_maxtime
+	savefile->WriteAngles( muzzle_kick_angles ); // idAngles muzzle_kick_angles
+	savefile->WriteVec3( muzzle_kick_offset ); // idVec3 muzzle_kick_offset
+	savefile->WriteInt( ammoType ); // ammo_t ammoType
+	savefile->WriteInt( ammoRequired ); // int ammoRequired
+	savefile->WriteInt( clipSize ); // int clipSize
+	savefile->WriteInt( ammoClip ); // int ammoClip
+	savefile->WriteInt( lowAmmo ); // int lowAmmo
+	savefile->WriteBool( powerAmmo ); // bool powerAmmo
 
-	savefile->WriteInt( muzzleFlashHandle );
-	savefile->WriteRenderLight( muzzleFlash );
+	savefile->WriteBool( isFiring ); // bool isFiring // blendo eric: TODO this might be problematic?
 
-	savefile->WriteInt( worldMuzzleFlashHandle );
-	savefile->WriteRenderLight( worldMuzzleFlash );
+	savefile->WriteInt( zoomFov ); // int zoomFov
+	savefile->WriteJoint( barrelJointView ); // jointHandle_t barrelJointView
+	savefile->WriteJoint( flashJointView ); // jointHandle_t flashJointView
+	savefile->WriteJoint( ejectJointView ); // jointHandle_t ejectJointView
+	savefile->WriteJoint( guiLightJointView ); // jointHandle_t guiLightJointView
+	savefile->WriteJoint( ventLightJointView ); // jointHandle_t ventLightJointView
 
-	savefile->WriteVec3( flashColor );
-	savefile->WriteInt( muzzleFlashEnd );
-	savefile->WriteInt( flashTime );
+	savefile->WriteJoint( flashJointWorld ); // jointHandle_t flashJointWorld
+	savefile->WriteJoint( barrelJointWorld ); // jointHandle_t barrelJointWorld
+	savefile->WriteJoint( ejectJointWorld ); // jointHandle_t ejectJointWorld
 
-	savefile->WriteBool( lightOn );
-	savefile->WriteBool( silent_fire );
+	savefile->WriteJoint( smokeJointView ); // jointHandle_t smokeJointView
 
-	savefile->WriteInt( kick_endtime );
-	savefile->WriteInt( muzzle_kick_time );
-	savefile->WriteInt( muzzle_kick_maxtime );
-	savefile->WriteAngles( muzzle_kick_angles );
-	savefile->WriteVec3( muzzle_kick_offset );
-
-	savefile->WriteInt( ammoType );
-	savefile->WriteInt( ammoRequired );
-	savefile->WriteInt( clipSize );
-	savefile->WriteInt( ammoClip );
-	savefile->WriteInt( lowAmmo );
-	savefile->WriteBool( powerAmmo );
-
-	// savegames <= 17
-	savefile->WriteInt( 0 );
-
-	savefile->WriteInt( zoomFov );
-
-	savefile->WriteJoint( barrelJointView );
-	savefile->WriteJoint( flashJointView );
-	savefile->WriteJoint( ejectJointView );
-	savefile->WriteJoint( guiLightJointView );
-	savefile->WriteJoint( ventLightJointView );
-
-	savefile->WriteJoint( flashJointWorld );
-	savefile->WriteJoint( barrelJointWorld );
-	savefile->WriteJoint( ejectJointWorld );
-
-	savefile->WriteBool( hasBloodSplat );
-
-	savefile->WriteSoundShader( sndHum );
-
-	savefile->WriteParticle( weaponSmoke );
-	savefile->WriteInt( weaponSmokeStartTime );
-	savefile->WriteBool( continuousSmoke );
-	savefile->WriteParticle( strikeSmoke );
-	savefile->WriteInt( strikeSmokeStartTime );
-	savefile->WriteVec3( strikePos );
-	savefile->WriteMat3( strikeAxis );
-	savefile->WriteInt( nextStrikeFx );
-
-	savefile->WriteBool( nozzleFx );
-	savefile->WriteInt( nozzleFxFade );
-
-	savefile->WriteInt( lastAttack );
-
-	savefile->WriteInt( nozzleGlowHandle );
-	savefile->WriteRenderLight( nozzleGlow );
-
-	savefile->WriteVec3( nozzleGlowColor );
-	savefile->WriteMaterial( nozzleGlowShader );
-	savefile->WriteFloat( nozzleGlowRadius );
-
-	savefile->WriteInt( weaponAngleOffsetAverages );
-	savefile->WriteFloat( weaponAngleOffsetScale );
-	savefile->WriteFloat( weaponAngleOffsetMax );
-	savefile->WriteFloat( weaponOffsetTime );
-	savefile->WriteFloat( weaponOffsetScale );
-
-	savefile->WriteBool( allowDrop );
-	savefile->WriteObject( projectileEnt );
-
-#ifdef _D3XP
-	savefile->WriteStaticObject( grabber );
-	savefile->WriteInt( grabberState );
-
-	savefile->WriteJoint ( smokeJointView );
-
-	savefile->WriteInt(weaponParticles.Num());
+	savefile->WriteInt(weaponParticles.Num()); // idHashTable<WeaponParticle_t> weaponParticles
 	for(int i = 0; i < weaponParticles.Num(); i++) {
 		WeaponParticle_t* part = weaponParticles.GetIndex(i);
 		savefile->WriteString( part->name );
@@ -586,7 +565,7 @@ void idWeapon::Save( idSaveGame *savefile ) const {
 			savefile->WriteObject(part->emitter);
 		}
 	}
-	savefile->WriteInt(weaponLights.Num());
+	savefile->WriteInt(weaponLights.Num()); // idHashTable<WeaponLight_t> weaponLights
 	for(int i = 0; i < weaponLights.Num(); i++) {
 		WeaponLight_t* light = weaponLights.GetIndex(i);
 		savefile->WriteString( light->name );
@@ -596,8 +575,43 @@ void idWeapon::Save( idSaveGame *savefile ) const {
 		savefile->WriteInt( light->lightHandle );
 		savefile->WriteRenderLight( light->light );
 	}
-#endif
 
+	savefile->WriteSoundShader( sndHum ); // const idSoundShader * sndHum
+	savefile->WriteParticle( weaponSmoke ); // const idDeclParticle * weaponSmoke
+	savefile->WriteInt( weaponSmokeStartTime ); // int weaponSmokeStartTime
+	savefile->WriteBool( continuousSmoke ); // bool continuousSmoke
+	savefile->WriteParticle( strikeSmoke ); // const idDeclParticle * strikeSmoke
+	savefile->WriteInt( strikeSmokeStartTime ); // int strikeSmokeStartTime
+	savefile->WriteVec3( strikePos ); // idVec3 strikePos
+	savefile->WriteMat3( strikeAxis ); // idMat3 strikeAxis
+	savefile->WriteInt( nextStrikeFx ); // int nextStrikeFx
+	savefile->WriteBool( nozzleFx ); // bool nozzleFx
+	savefile->WriteInt( nozzleFxFade ); // int nozzleFxFade
+	savefile->WriteInt( lastAttack ); // int lastAttack
+	savefile->WriteRenderLight( nozzleGlow ); // renderLight_t nozzleGlow
+	savefile->WriteInt( nozzleGlowHandle ); // int nozzleGlowHandle
+
+	savefile->WriteVec3( nozzleGlowColor ); // idVec3 nozzleGlowColor
+	savefile->WriteMaterial( nozzleGlowShader ); // const idMaterial * nozzleGlowShader
+	savefile->WriteFloat( nozzleGlowRadius ); // float nozzleGlowRadius
+	savefile->WriteInt( weaponAngleOffsetAverages ); // int weaponAngleOffsetAverages
+	savefile->WriteFloat( weaponAngleOffsetScale ); // float weaponAngleOffsetScale
+	savefile->WriteFloat( weaponAngleOffsetMax ); // float weaponAngleOffsetMax
+	savefile->WriteFloat( weaponOffsetTime ); // float weaponOffsetTime
+	savefile->WriteFloat( weaponOffsetScale ); // float weaponOffsetScale
+
+	savefile->WriteStaticObject( idWeapon::grabber ); // idGrabber grabber
+	savefile->WriteInt( grabberState ); // int grabberState
+
+	savefile->WriteBool( nozzleLerping ); // bool nozzleLerping
+	savefile->WriteInt( nozzleLerpTimer ); // int nozzleLerpTimer
+	savefile->WriteFloat( nozzleLerpValueStart ); // float nozzleLerpValueStart
+	savefile->WriteFloat( nozzleLerpValueEnd ); // float nozzleLerpValueEnd
+	savefile->WriteBool( nozzleGlowAffectLightMeter ); // bool nozzleGlowAffectLightMeter
+
+	savefile->WriteDict( &singleAmmoDict ); // idDict singleAmmoDict
+
+	savefile->WriteInt( lastEndattack ); // int lastEndattack
 }
 
 /*
@@ -606,189 +620,117 @@ idWeapon::Restore
 ================
 */
 void idWeapon::Restore( idRestoreGame *savefile ) {
+	savefile->ReadBool( autoaimEnabled ); // bool autoaimEnabled
+	savefile->ReadBool( isGrenade ); // bool isGrenade
 
-	savefile->ReadInt( (int &)status );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( thread ) );
-	savefile->ReadString( state );
-	savefile->ReadString( idealState );
-	savefile->ReadInt( animBlendFrames );
-	savefile->ReadInt( animDoneTime );
-	savefile->ReadBool( isLinked );
+	savefile->ReadBool( isJiggling ); // bool isJiggling
+	savefile->ReadBool( multiCarry ); // bool multiCarry
 
 	// Re-link script fields
-	WEAPON_ATTACK.LinkTo(		scriptObject, "WEAPON_ATTACK" );
-	WEAPON_RELOAD.LinkTo(		scriptObject, "WEAPON_RELOAD" );
-	WEAPON_NETRELOAD.LinkTo(	scriptObject, "WEAPON_NETRELOAD" );
-	WEAPON_NETENDRELOAD.LinkTo(	scriptObject, "WEAPON_NETENDRELOAD" );
-	WEAPON_NETFIRING.LinkTo(	scriptObject, "WEAPON_NETFIRING" );
-	WEAPON_RAISEWEAPON.LinkTo(	scriptObject, "WEAPON_RAISEWEAPON" );
-	WEAPON_LOWERWEAPON.LinkTo(	scriptObject, "WEAPON_LOWERWEAPON" );
+	WEAPON_ATTACK.LinkTo(		scriptObject, "WEAPON_ATTACK" ); // idScriptBool WEAPON_ATTACK
+	WEAPON_RELOAD.LinkTo(		scriptObject, "WEAPON_RELOAD" ); // idScriptBool WEAPON_RELOAD
+	WEAPON_NETRELOAD.LinkTo(	scriptObject, "WEAPON_NETRELOAD" ); // idScriptBool WEAPON_NETRELOAD
+	WEAPON_NETENDRELOAD.LinkTo(	scriptObject, "WEAPON_NETENDRELOAD" ); // idScriptBool WEAPON_NETENDRELOAD
+	WEAPON_NETFIRING.LinkTo(	scriptObject, "WEAPON_NETFIRING" ); // idScriptBool WEAPON_NETFIRING
+	WEAPON_RAISEWEAPON.LinkTo(	scriptObject, "WEAPON_RAISEWEAPON" ); // idScriptBool WEAPON_RAISEWEAPON
+	WEAPON_LOWERWEAPON.LinkTo(	scriptObject, "WEAPON_LOWERWEAPON" ); // idScriptBool WEAPON_LOWERWEAPON
+
+	WEAPON_RACKTHESLIDE.LinkTo(scriptObject, "WEAPON_RACKTHESLIDE"); // idScriptBool WEAPON_RACKTHESLIDE
+	WEAPON_INSPECTMAGAZINE.LinkTo(scriptObject, "WEAPON_INSPECTMAGAZINE"); // idScriptBool WEAPON_INSPECTMAGAZINE
+	WEAPON_INSPECTCHAMBER.LinkTo(scriptObject, "WEAPON_INSPECTCHAMBER"); // idScriptBool WEAPON_INSPECTCHAMBER
+	WEAPON_INSPECTWEAPON.LinkTo(scriptObject, "WEAPON_INSPECTWEAPON"); // idScriptBool WEAPON_INSPECTWEAPON
+
+	WEAPON_AIMMODE.LinkTo(scriptObject, "WEAPON_AIMMODE"); // idScriptBool WEAPON_AIMMODE
+
+	savefile->ReadInt( (int&)status ); // weaponStatus_t status
+	savefile->ReadObject( CastClassPtrRef(thread) ); // idThread * thread
+	savefile->ReadString( state ); // idString state
+	savefile->ReadString( idealState ); // idString idealState
+	savefile->ReadInt( animBlendFrames ); // int animBlendFrames
+	savefile->ReadInt( animDoneTime ); // int animDoneTime
+	savefile->ReadBool( isLinked ); // bool isLinked
+	savefile->ReadObject( projectileEnt ); // idEntity * projectileEnt
+
+	savefile->ReadObject( CastClassPtrRef(owner) ); // idPlayer * owner
+	worldModel.Restore( savefile ); // idEntityPtr<idAnimatedEntity> worldModel
+	savefile->ReadInt( hideTime ); // int hideTime
+	savefile->ReadFloat( hideDistance ); // float hideDistance
+	savefile->ReadInt( hideStartTime ); // int hideStartTime
+	savefile->ReadFloat( hideStart ); // float hideStart
+	savefile->ReadFloat( hideEnd ); // float hideEnd
+	savefile->ReadFloat( hideOffset ); // float hideOffset
+	savefile->ReadBool( hide ); // bool hide
+	savefile->ReadBool( disabled ); // bool disabled
+	savefile->ReadInt( berserk ); // int berserk
+	savefile->ReadVec3( playerViewOrigin ); // idVec3 playerViewOrigin
+	savefile->ReadMat3( playerViewAxis ); // idMat3 playerViewAxis
+	savefile->ReadVec3( viewWeaponOrigin ); // idVec3 viewWeaponOrigin
+	savefile->ReadMat3( viewWeaponAxis ); // idMat3 viewWeaponAxis
+	savefile->ReadVec3( muzzleOrigin ); // idVec3 muzzleOrigin
+	savefile->ReadMat3( muzzleAxis ); // idMat3 muzzleAxis
+
+	savefile->ReadVec3( pushVelocity ); // idVec3 pushVelocity
 
 
-	WEAPON_RACKTHESLIDE.LinkTo(scriptObject, "WEAPON_RACKTHESLIDE");
-	WEAPON_INSPECTMAGAZINE.LinkTo(scriptObject, "WEAPON_INSPECTMAGAZINE");
-	WEAPON_INSPECTCHAMBER.LinkTo(scriptObject, "WEAPON_INSPECTCHAMBER");
-	WEAPON_INSPECTWEAPON.LinkTo(scriptObject, "WEAPON_INSPECTWEAPON");
-
-	WEAPON_AIMMODE.LinkTo(scriptObject, "WEAPON_AIMMODE");
-
-
-	savefile->ReadObject( reinterpret_cast<idClass *&>( owner ) );
-	worldModel.Restore( savefile );
-
-	savefile->ReadInt( hideTime );
-	savefile->ReadFloat( hideDistance );
-	savefile->ReadInt( hideStartTime );
-	savefile->ReadFloat( hideStart );
-	savefile->ReadFloat( hideEnd );
-	savefile->ReadFloat( hideOffset );
-	savefile->ReadBool( hide );
-	savefile->ReadBool( disabled );
-
-	savefile->ReadInt( berserk );
-
-	savefile->ReadVec3( playerViewOrigin );
-	savefile->ReadMat3( playerViewAxis );
-
-	savefile->ReadVec3( viewWeaponOrigin );
-	savefile->ReadMat3( viewWeaponAxis );
-
-	savefile->ReadVec3( muzzleOrigin );
-	savefile->ReadMat3( muzzleAxis );
-
-	savefile->ReadVec3( pushVelocity );
-
-	idStr objectname;
-	savefile->ReadString( objectname );
-	weaponDef = gameLocal.FindEntityDef( objectname );
-	meleeDef = gameLocal.FindEntityDef( weaponDef->dict.GetString( "def_melee" ), false );
-
-	const idDeclEntityDef *projectileDef = gameLocal.FindEntityDef( weaponDef->dict.GetString( "def_projectile" ), false );
-	if ( projectileDef ) {
-		projectileDict = projectileDef->dict;
-	} else {
-		projectileDict.Clear();
+	savefile->ReadEntityDef( weaponDef ); // const idDeclEntityDef * weaponDef
+	savefile->ReadEntityDef( meleeDef ); // const idDeclEntityDef * meleeDef
+	savefile->ReadDict( &projectileDict ); // idDict projectileDict
+	savefile->ReadFloat( meleeDistance ); // float meleeDistance
+	savefile->ReadString( meleeDefName ); // idString meleeDefName
+	savefile->ReadDict( &brassDict ); // idDict brassDict
+	savefile->ReadInt( brassDelay ); // int brassDelay
+	savefile->ReadString( icon ); // idString icon
+	savefile->ReadRenderLight( guiLight ); // renderLight_t guiLight
+	savefile->ReadInt( guiLightHandle ); // int guiLightHandle
+	if ( guiLightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( guiLightHandle, &guiLight );
+	}
+	savefile->ReadRenderLight( muzzleFlash ); // renderLight_t muzzleFlash
+	savefile->ReadInt( muzzleFlashHandle ); // int muzzleFlashHandle
+	if ( muzzleFlashHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( muzzleFlashHandle, &muzzleFlash );
 	}
 
-	const idDeclEntityDef *brassDef = gameLocal.FindEntityDef( weaponDef->dict.GetString( "def_ejectBrass" ), false );
-	if ( brassDef ) {
-		brassDict = brassDef->dict;
-	} else {
-		brassDict.Clear();
+	savefile->ReadRenderLight( worldMuzzleFlash ); // renderLight_t worldMuzzleFlash
+	savefile->ReadInt( worldMuzzleFlashHandle ); // int worldMuzzleFlashHandle
+	if ( worldMuzzleFlashHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( worldMuzzleFlashHandle, &worldMuzzleFlash );
 	}
 
-	savefile->ReadFloat( meleeDistance );
-	savefile->ReadString( meleeDefName );
-	savefile->ReadInt( brassDelay );
-	savefile->ReadString( icon );
+	savefile->ReadVec3( flashColor ); // idVec3 flashColor
+	savefile->ReadInt( muzzleFlashEnd ); // int muzzleFlashEnd
+	savefile->ReadInt( flashTime ); // int flashTime
+	savefile->ReadBool( lightOn ); // bool lightOn
+	savefile->ReadBool( silent_fire ); // bool silent_fire
+	savefile->ReadBool( allowDrop ); // bool allowDrop
+	savefile->ReadBool( hasBloodSplat ); // bool hasBloodSplat
+	savefile->ReadInt( kick_endtime ); // int kick_endtime
+	savefile->ReadInt( muzzle_kick_time ); // int muzzle_kick_time
+	savefile->ReadInt( muzzle_kick_maxtime ); // int muzzle_kick_maxtime
+	savefile->ReadAngles( muzzle_kick_angles ); // idAngles muzzle_kick_angles
+	savefile->ReadVec3( muzzle_kick_offset ); // idVec3 muzzle_kick_offset
+	savefile->ReadInt( ammoType ); // ammo_t ammoType
+	savefile->ReadInt( ammoRequired ); // int ammoRequired
+	savefile->ReadInt( clipSize ); // int clipSize
+	savefile->ReadInt( ammoClip ); // int ammoClip
+	savefile->ReadInt( lowAmmo ); // int lowAmmo
+	savefile->ReadBool( powerAmmo ); // bool powerAmmo
+	savefile->ReadBool( isFiring ); // bool isFiring // blendo eric: TODO this might be problematic?
+	savefile->ReadInt( zoomFov ); // int zoomFov
+	savefile->ReadJoint( barrelJointView ); // jointHandle_t barrelJointView
+	savefile->ReadJoint( flashJointView ); // jointHandle_t flashJointView
+	savefile->ReadJoint( ejectJointView ); // jointHandle_t ejectJointView
+	savefile->ReadJoint( guiLightJointView ); // jointHandle_t guiLightJointView
+	savefile->ReadJoint( ventLightJointView ); // jointHandle_t ventLightJointView
 
-	savefile->ReadInt( guiLightHandle );
-	savefile->ReadRenderLight( guiLight );
-#ifdef _D3XP
-	if ( guiLightHandle >= 0 ) {
-		guiLightHandle = gameRenderWorld->AddLightDef( &guiLight );
-	}
-#endif
+	savefile->ReadJoint( flashJointWorld ); // jointHandle_t flashJointWorld
+	savefile->ReadJoint( barrelJointWorld ); // jointHandle_t barrelJointWorld
+	savefile->ReadJoint( ejectJointWorld ); // jointHandle_t ejectJointWorld
 
-	savefile->ReadInt( muzzleFlashHandle );
-	savefile->ReadRenderLight( muzzleFlash );
-#ifdef _D3XP
-	if ( muzzleFlashHandle >= 0 ) {
-		muzzleFlashHandle = gameRenderWorld->AddLightDef( &muzzleFlash );
-	}
-#endif
-
-	savefile->ReadInt( worldMuzzleFlashHandle );
-	savefile->ReadRenderLight( worldMuzzleFlash );
-#ifdef _D3XP
-	if ( worldMuzzleFlashHandle >= 0 ) {
-		worldMuzzleFlashHandle = gameRenderWorld->AddLightDef( &worldMuzzleFlash );
-	}
-#endif
-
-	savefile->ReadVec3( flashColor );
-	savefile->ReadInt( muzzleFlashEnd );
-	savefile->ReadInt( flashTime );
-
-	savefile->ReadBool( lightOn );
-	savefile->ReadBool( silent_fire );
-
-	savefile->ReadInt( kick_endtime );
-	savefile->ReadInt( muzzle_kick_time );
-	savefile->ReadInt( muzzle_kick_maxtime );
-	savefile->ReadAngles( muzzle_kick_angles );
-	savefile->ReadVec3( muzzle_kick_offset );
-
-	savefile->ReadInt( (int &)ammoType );
-	savefile->ReadInt( ammoRequired );
-	savefile->ReadInt( clipSize );
-	savefile->ReadInt( ammoClip );
-	savefile->ReadInt( lowAmmo );
-	savefile->ReadBool( powerAmmo );
-
-	// savegame versions <= 17
-	int foo;
-	savefile->ReadInt( foo );
-
-	savefile->ReadInt( zoomFov );
-
-	savefile->ReadJoint( barrelJointView );
-	savefile->ReadJoint( flashJointView );
-	savefile->ReadJoint( ejectJointView );
-	savefile->ReadJoint( guiLightJointView );
-	savefile->ReadJoint( ventLightJointView );
-
-	savefile->ReadJoint( flashJointWorld );
-	savefile->ReadJoint( barrelJointWorld );
-	savefile->ReadJoint( ejectJointWorld );
-
-	savefile->ReadBool( hasBloodSplat );
-
-	savefile->ReadSoundShader( sndHum );
-
-	savefile->ReadParticle( weaponSmoke );
-	savefile->ReadInt( weaponSmokeStartTime );
-	savefile->ReadBool( continuousSmoke );
-	savefile->ReadParticle( strikeSmoke );
-	savefile->ReadInt( strikeSmokeStartTime );
-	savefile->ReadVec3( strikePos );
-	savefile->ReadMat3( strikeAxis );
-	savefile->ReadInt( nextStrikeFx );
-
-	savefile->ReadBool( nozzleFx );
-	savefile->ReadInt( nozzleFxFade );
-
-	savefile->ReadInt( lastAttack );
-
-	savefile->ReadInt( nozzleGlowHandle );
-	savefile->ReadRenderLight( nozzleGlow );
-#ifdef _D3XP
-	if ( nozzleGlowHandle >= 0 ) {
-		nozzleGlowHandle = gameRenderWorld->AddLightDef( &nozzleGlow );
-	}
-#endif
-
-	savefile->ReadVec3( nozzleGlowColor );
-	savefile->ReadMaterial( nozzleGlowShader );
-	savefile->ReadFloat( nozzleGlowRadius );
-
-	savefile->ReadInt( weaponAngleOffsetAverages );
-	savefile->ReadFloat( weaponAngleOffsetScale );
-	savefile->ReadFloat( weaponAngleOffsetMax );
-	savefile->ReadFloat( weaponOffsetTime );
-	savefile->ReadFloat( weaponOffsetScale );
-
-	savefile->ReadBool( allowDrop );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( projectileEnt ) );
-
-#ifdef _D3XP
-	savefile->ReadStaticObject( grabber );
-	savefile->ReadInt( grabberState );
-
-	savefile->ReadJoint ( smokeJointView );
+	savefile->ReadJoint( smokeJointView ); // jointHandle_t smokeJointView
 
 	int particleCount;
-	savefile->ReadInt( particleCount );
+	savefile->ReadInt( particleCount );  // idHashTable<WeaponParticle_t> weaponParticles
 	for(int i = 0; i < particleCount; i++) {
 		WeaponParticle_t newParticle;
 		memset(&newParticle, 0, sizeof(newParticle));
@@ -814,7 +756,7 @@ void idWeapon::Restore( idRestoreGame *savefile ) {
 	}
 
 	int lightCount;
-	savefile->ReadInt( lightCount );
+	savefile->ReadInt( lightCount ); // idHashTable<WeaponLight_t> weaponLights
 	for(int i = 0; i < lightCount; i++) {
 		WeaponLight_t newLight;
 		memset(&newLight, 0, sizeof(newLight));
@@ -828,12 +770,51 @@ void idWeapon::Restore( idRestoreGame *savefile ) {
 		savefile->ReadJoint( newLight.joint );
 		savefile->ReadInt( newLight.lightHandle );
 		savefile->ReadRenderLight( newLight.light );
-		if ( newLight.lightHandle >= 0 ) {
-			newLight.lightHandle = gameRenderWorld->AddLightDef( &newLight.light );
+		if ( newLight.lightHandle != - 1 ) {
+			gameRenderWorld->UpdateLightDef( newLight.lightHandle, &newLight.light );
 		}
 		weaponLights.Set(newLight.name, newLight);
 	}
-#endif
+
+	savefile->ReadSoundShader( sndHum ); // const idSoundShader * sndHum
+	savefile->ReadParticle( weaponSmoke ); // const idDeclParticle * weaponSmoke
+	savefile->ReadInt( weaponSmokeStartTime ); // int weaponSmokeStartTime
+	savefile->ReadBool( continuousSmoke ); // bool continuousSmoke
+	savefile->ReadParticle( strikeSmoke ); // const idDeclParticle * strikeSmoke
+	savefile->ReadInt( strikeSmokeStartTime ); // int strikeSmokeStartTime
+	savefile->ReadVec3( strikePos ); // idVec3 strikePos
+	savefile->ReadMat3( strikeAxis ); // idMat3 strikeAxis
+	savefile->ReadInt( nextStrikeFx ); // int nextStrikeFx
+	savefile->ReadBool( nozzleFx ); // bool nozzleFx
+	savefile->ReadInt( nozzleFxFade ); // int nozzleFxFade
+	savefile->ReadInt( lastAttack ); // int lastAttack
+	savefile->ReadRenderLight( nozzleGlow ); // renderLight_t nozzleGlow
+	savefile->ReadInt( nozzleGlowHandle ); // int nozzleGlowHandle
+	if ( nozzleGlowHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( nozzleGlowHandle, &nozzleGlow );
+	}
+
+	savefile->ReadVec3( nozzleGlowColor ); // idVec3 nozzleGlowColor
+	savefile->ReadMaterial( nozzleGlowShader ); // const idMaterial * nozzleGlowShader
+	savefile->ReadFloat( nozzleGlowRadius ); // float nozzleGlowRadius
+	savefile->ReadInt( weaponAngleOffsetAverages ); // int weaponAngleOffsetAverages
+	savefile->ReadFloat( weaponAngleOffsetScale ); // float weaponAngleOffsetScale
+	savefile->ReadFloat( weaponAngleOffsetMax ); // float weaponAngleOffsetMax
+	savefile->ReadFloat( weaponOffsetTime ); // float weaponOffsetTime
+	savefile->ReadFloat( weaponOffsetScale ); // float weaponOffsetScale
+
+	savefile->ReadStaticObject( grabber ); // idGrabber grabber
+	savefile->ReadInt( grabberState ); // int grabberState
+
+	savefile->ReadBool( nozzleLerping ); // bool nozzleLerping
+	savefile->ReadInt( nozzleLerpTimer ); // int nozzleLerpTimer
+	savefile->ReadFloat( nozzleLerpValueStart ); // float nozzleLerpValueStart
+	savefile->ReadFloat( nozzleLerpValueEnd ); // float nozzleLerpValueEnd
+	savefile->ReadBool( nozzleGlowAffectLightMeter ); // bool nozzleGlowAffectLightMeter
+
+	savefile->ReadDict( &singleAmmoDict ); // idDict singleAmmoDict
+
+	savefile->ReadInt( lastEndattack ); // int lastEndattack
 }
 
 /***********************************************************************
@@ -2289,7 +2270,10 @@ bool idWeapon::BloodSplat( float size )
 	localOrigin[1] += gameLocal.random.CRandomFloat() * 4.0f;
 	localOrigin[2] += gameLocal.random.CRandomFloat() * 2.0f;
 
-	ProjectOverlay(localOrigin, idVec3(0,0,-1), size, "textures/decals/weaponsplat");
+	if (g_bloodEffects.GetBool())
+	{
+		ProjectOverlay(localOrigin, idVec3(0, 0, -1), size, "textures/decals/weaponsplat");
+	}
 
 	return true;
 
@@ -2993,7 +2977,7 @@ const char *idWeapon::GetAmmoPickupNameForNum( ammo_t ammonum ) {
 		for( i = 0; i < num; i++ ) {
 			kv = ammoDict->GetKeyVal( i );
 			if ( idStr::Icmp( kv->GetKey(), name) == 0 ) {
-				return kv->GetValue();
+				return common->GetLanguageDict()->GetString( kv->GetValue() ); //BC 3-24-2025: now returns localized name.
 			}
 		}
 	}
@@ -4758,19 +4742,21 @@ bool idWeapon::Event_UnloadMag()
 	
 	int amountToReturn = 0;
 
+	//BC 2-22-2025: fix bug where you magically get more ammo whenever you reload. Remove this logic bit for auto unchambering when unloading mag.
 	//Handle chamber.
-	if (Event_RoundIsChambered())
-	{
-		owner->inventory.UseAmmo(ammoType, -1); //Return the chambered bullet.
-		Event_SetChambered(false);
-		amountToReturn += 1;
-	}
+	//if (Event_RoundIsChambered())
+	//{
+	//	owner->inventory.UseAmmo(ammoType, -1); //Return the chambered bullet.
+	//	Event_SetChambered(false);
+	//	amountToReturn += 1;
+	//}
 
 	//Handle mag.
 	int ammoInClip = AmmoInClip();
 	if (ammoInClip > 0)
 	{
-		owner->inventory.UseAmmo(ammoType, -ammoInClip);
+		//Return ammo from magazine and put it back into player pocket.
+		//owner->inventory.UseAmmo(ammoType, -ammoInClip); //BC 2-22-2025: fix bug where ammo was being returned to player pocket twice. Commented out this line.
 		ammoClip = 0;
 		int weaponIndex = owner->inventory.GetWeaponIndex( owner, spawnArgs.GetString("inv_weapon", "") );
 		int weaponSlot = owner->inventory.GetHotbarslotViaWeaponIndex( weaponIndex );
@@ -4779,7 +4765,8 @@ bool idWeapon::Event_UnloadMag()
 	}
 	
 
-	bool success = owner->inventory.GiveAmmo(owner, GetAmmoNameForNum(ammoType), va("%d", amountToReturn));
+	//BC 2-22-2025: fix bug where ammo was being returned to player pocket twice. It now only happens once, in this line.
+	bool success = owner->inventory.GiveAmmo(owner, GetAmmoNameForNum(ammoType), idStr::Format("%d", amountToReturn).c_str()); //put ammo back in pocket.
 	if (amountToReturn > 0 && success)
 	{
 		StartSound("snd_unload", SND_CHANNEL_ANY, 0, false, NULL);

@@ -130,7 +130,91 @@ idEditWindow::idEditWindow( idUserInterfaceLocal *g ) : idWindow(g) {
 }
 
 idEditWindow::~idEditWindow() {
+}
 
+void idEditWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	savefile->WriteInt( maxChars ); // int maxChars
+	savefile->WriteInt( paintOffset ); // int paintOffset
+	savefile->WriteInt( cursorPos ); // int cursorPos
+	savefile->WriteInt( cursorLine ); // int cursorLine
+	savefile->WriteInt( cvarMax ); // int cvarMax
+	savefile->WriteBool( wrap ); // bool wrap
+	savefile->WriteBool( readonly ); // bool readonly
+	savefile->WriteBool( numeric ); // bool numeric
+	savefile->WriteString( sourceFile ); // idString sourceFile
+
+	// blendo eric: newed by init, set as child window
+	//bool scrollIsChild = GetChildIndex((idWindow*)scroller) >= 0;
+	//savefile->WriteBool( scrollIsChild );
+	//if (scrollIsChild) {
+	//	savefile->WriteSGPtr( scroller ); // idSliderWindow* scroller
+	//} else {
+	//	scroller->WriteToSaveGame(savefile); // idSliderWindow* scroller
+	//}
+
+	SaveFileWriteList( breaks, WriteInt );
+
+	savefile->WriteFloat( sizeBias ); // float sizeBias
+	savefile->WriteInt( textIndex ); // int textIndex
+	savefile->WriteInt( lastTextLength ); // int lastTextLength
+	savefile->WriteBool( forceScroll ); // bool forceScroll
+	password.WriteToSaveGame( savefile ); // idWinBool password
+
+	cvarStr.WriteToSaveGame( savefile ); // idWinStr cvarStr
+	// cvar = cvarSystem->Find( cvarStr ); // idCVar * cvar
+
+	liveUpdate.WriteToSaveGame( savefile ); // idWinBool liveUpdate
+	cvarGroup.WriteToSaveGame( savefile ); // idWinStr cvarGroup
+
+	savefile->WriteCheckSizeMarker();
+}
+
+void idEditWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	savefile->ReadInt( maxChars ); // int maxChars
+	savefile->ReadInt( paintOffset ); // int paintOffset
+	savefile->ReadInt( cursorPos ); // int cursorPos
+	savefile->ReadInt( cursorLine ); // int cursorLine
+	savefile->ReadInt( cvarMax ); // int cvarMax
+	savefile->ReadBool( wrap ); // bool wrap
+	savefile->ReadBool( readonly ); // bool readonly
+	savefile->ReadBool( numeric ); // bool numeric
+	savefile->ReadString( sourceFile ); // idString sourceFile
+
+	// blendo eric: newed by init, set as child window
+	//bool scrollIsChild;
+	//savefile->ReadBool(scrollIsChild);
+	//if( scrollIsChild ) {
+	//	savefile->ReadSGPtr( (idSaveGamePtr**)&scroller ); // idSliderWindow* scroller
+	//} else {
+	//	scroller->ReadFromSaveGame(savefile); // idSliderWindow* scroller
+	//	if (GetChildIndex(scroller) < 0) {
+	//		InsertChild(scroller, NULL);
+	//	}
+	//}
+
+	scroller->SetBuddy(this);
+
+	SaveFileReadList( breaks, ReadInt ); // idList<int> breaks
+
+	savefile->ReadFloat( sizeBias ); // float sizeBias
+	savefile->ReadInt( textIndex ); // int textIndex
+	savefile->ReadInt( lastTextLength ); // int lastTextLength
+	savefile->ReadBool( forceScroll ); // bool forceScroll
+	password.ReadFromSaveGame( savefile ); // idWinBool password
+
+	cvarStr.ReadFromSaveGame( savefile ); // idWinStr cvarStr
+	cvar = cvarSystem->Find( cvarStr ); // idCVar * cvar
+
+	liveUpdate.ReadFromSaveGame( savefile ); // idWinBool liveUpdate
+	cvarGroup.ReadFromSaveGame( savefile ); // idWinStr cvarGroup
+
+	savefile->ReadCheckSizeMarker();
 }
 
 void idEditWindow::GainFocus() {

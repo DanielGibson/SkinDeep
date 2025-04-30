@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ui/DeviceContext.h"
 #include "ui/Window.h"
 #include "ui/UserInterfaceLocal.h"
+#include "Game_local.h"
 
 #include "ui/RenderWindow.h"
 
@@ -50,9 +51,93 @@ idRenderWindow::~idRenderWindow() {
 	renderSystem->FreeRenderWorld( world );
 }
 
+void idRenderWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	savefile->WriteRenderView( refdef ); // renderView_t refdef
+	// needsRender = true; // idRenderWorld * world// regened in PreRender()
+
+	savefile->WriteRenderEntity( worldEntity ); // renderEntity_t worldEntity
+	savefile->WriteRenderLight( rLight ); // renderLight_t rLight
+
+	savefile->WriteBool( modelAnim != nullptr ); // updateAnimation // const idMD5Anim * modelAnim // regened in BuildAnimation()
+
+	savefile->WriteInt( worldModelDef ); // int worldModelDef
+	savefile->WriteInt( lightDef ); // int lightDef
+	savefile->WriteInt( modelDef ); // int modelDef
+
+	modelName.WriteToSaveGame( savefile ); // idWinStr modelName
+	savefile->WriteString( lastModelName ); // idString lastModelName
+	animName.WriteToSaveGame( savefile ); // idWinStr animName
+	savefile->WriteString( animClass ); // idString animClass
+	lightOrigin.WriteToSaveGame( savefile ); // idWinVec4 lightOrigin
+	lightColor.WriteToSaveGame( savefile ); // idWinVec4 lightColor
+	modelOrigin.WriteToSaveGame( savefile ); // idWinVec4 modelOrigin
+	modelRotate.WriteToSaveGame( savefile ); // idWinVec4 modelRotate
+	viewOffset.WriteToSaveGame( savefile ); // idWinVec4 viewOffset
+	needsRender.WriteToSaveGame( savefile ); // idWinBool needsRender
+	savefile->WriteInt( animLength ); // int animLength
+	savefile->WriteInt( animEndTime ); // int animEndTime
+	savefile->WriteBool( updateAnimation ); // bool updateAnimation
+	skinName.WriteToSaveGame( savefile ); // idWinStr skinName
+	modelFov.WriteToSaveGame( savefile ); // idWinFloat modelFov
+}
+
+void idRenderWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	savefile->ReadRenderView( refdef ); // renderView_t refdef
+	world->InitFromMap( NULL ); // needsRender = true // idRenderWorld * world // already alloced
+
+	savefile->ReadRenderEntity( worldEntity ); // renderEntity_t worldEntity
+	savefile->ReadRenderLight( rLight ); // renderLight_t rLight
+
+	bool forceUpdateAnimation;
+	savefile->ReadBool( forceUpdateAnimation ); // const idMD5Anim * modelAnim // regened in BuildAnimation()
+
+	savefile->ReadInt( worldModelDef ); // int worldModelDef // blendo eric: this isn't used (modelDef is)?
+
+	savefile->ReadInt( lightDef ); // int lightDef
+	if ( lightDef != - 1 ) {
+		gameRenderWorld->UpdateLightDef( lightDef, &rLight );
+	}
+
+	savefile->ReadInt( modelDef ); // int modelDef
+	if ( modelDef != - 1 ) {
+		gameRenderWorld->UpdateEntityDef( modelDef, &worldEntity );
+	}
+
+	modelName.ReadFromSaveGame( savefile ); // idWinStr modelName
+	savefile->ReadString( lastModelName ); // idString lastModelName
+	animName.ReadFromSaveGame( savefile ); // idWinStr animName
+	savefile->ReadString( animClass ); // idString animClass
+	lightOrigin.ReadFromSaveGame( savefile ); // idWinVec4 lightOrigin
+	lightColor.ReadFromSaveGame( savefile ); // idWinVec4 lightColor
+	modelOrigin.ReadFromSaveGame( savefile ); // idWinVec4 modelOrigin
+	modelRotate.ReadFromSaveGame( savefile ); // idWinVec4 modelRotate
+	viewOffset.ReadFromSaveGame( savefile ); // idWinVec4 viewOffset
+	needsRender.ReadFromSaveGame( savefile ); // idWinBool needsRender
+	savefile->ReadInt( animLength ); // int animLength
+	savefile->ReadInt( animEndTime ); // int animEndTime
+	savefile->ReadBool( updateAnimation ); // bool updateAnimation
+	skinName.ReadFromSaveGame( savefile ); // idWinStr skinName
+	modelFov.ReadFromSaveGame( savefile ); // idWinFloat modelFov
+
+
+	// BuildAnimation(gameLocal.hudTime); // crashes without world.hmodel, use updateanim
+	updateAnimation = updateAnimation || forceUpdateAnimation;
+}
+
 void idRenderWindow::CommonInit() {
+	memset(&refdef, 0, sizeof(refdef));
+	memset(&worldEntity, 0, sizeof(worldEntity));
+	memset(&rLight, 0, sizeof(rLight));
+
 	world = renderSystem->AllocRenderWorld();
 	needsRender = true;
+	lightDef = -1;
 	lightOrigin = idVec4(-128.0f, 0.0f, 0.0f, 1.0f);
 	lightColor = idVec4(1.0f, 1.0f, 1.0f, 1.0f);
 	modelOrigin.Zero();
@@ -61,6 +146,7 @@ void idRenderWindow::CommonInit() {
 	animLength = 0;
 	animEndTime = -1;
 	modelDef = -1;
+	worldModelDef = -1;
 	updateAnimation = true;
 
 	//BC
@@ -144,7 +230,7 @@ void idRenderWindow::Render( int time ) {
 }
 
 
-void idRenderWindow::Draw(int time, float x, float y) {
+void idRenderWindow::Draw(int time, float x_, float y_) {
 	PreRender();
 	Render(time);
 
@@ -158,10 +244,20 @@ void idRenderWindow::Draw(int time, float x, float y) {
 	refdef.shaderParms[2] = 1;
 	refdef.shaderParms[3] = 1;
 
-	refdef.x = drawRect.x;
-	refdef.y = drawRect.y;
-	refdef.width = drawRect.w;
-	refdef.height = drawRect.h;
+	// DG: for scaling menus to 4:3 (like that spinning mars globe in the main menu)
+ 	float x = drawRect.x;
+ 	float y = drawRect.y;
+ 	float w = drawRect.w;
+ 	float h = drawRect.h;
+ 	if(dc->IsMenuScaleFixActive()) {
+ 		dc->AdjustCoords(&x, &y, &w, &h);
+ 	}
+ 
+ 	refdef.x = x;
+ 	refdef.y = y;
+ 	refdef.width = w;
+ 	refdef.height = h;
+ 	// DG end
 	//refdef.fov_x = modelFov;
 	//refdef.fov_y = 2 * atan((float)drawRect.h / drawRect.w) * idMath::M_RAD2DEG;
 	refdef.fov_x = modelFov;

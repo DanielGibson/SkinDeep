@@ -44,10 +44,58 @@ idSpaceMine::~idSpaceMine(void)
 
 void idSpaceMine::Save( idSaveGame *savefile ) const
 {
+	savefile->WriteInt( state ); // spacemine_state_t state
+
+	savefile->WriteInt( timer ); // int timer
+
+	savefile->WriteInt( warningCounter ); // int warningCounter
+	savefile->WriteInt( warningTimer ); // int warningTimer
+
+	savefile->WriteString( damageDef ); // idString damageDef
+
+	savefile->WriteInt( moveSpeed ); // int moveSpeed
+
+	savefile->WriteParticle( trailParticles ); // const idDeclParticle * trailParticles
+	savefile->WriteInt( trailParticlesFlyTime ); // int trailParticlesFlyTime
+
+	savefile->WriteObject( pursuitTarget ); // idEntityPtr<idEntity> pursuitTarget
+
+	savefile->WriteObject( wireOrigin ); // idBeam* wireOrigin
+	savefile->WriteObject( wireTarget ); // idBeam* wireTarget
+	savefile->WriteObject( harpoonModel ); // idEntity * harpoonModel
+	savefile->WriteBool( harpoonActive ); // bool harpoonActive
+
+	savefile->WriteVec3( impulseTarget ); // idVec3 impulseTarget
+	savefile->WriteBool( impulseActive ); // bool impulseActive
+	savefile->WriteInt( impulseTimer ); // int impulseTimer
 }
 
 void idSpaceMine::Restore( idRestoreGame *savefile )
 {
+	savefile->ReadInt( (int&)state ); // spacemine_state_t state
+
+	savefile->ReadInt( timer ); // int timer
+
+	savefile->ReadInt( warningCounter ); // int warningCounter
+	savefile->ReadInt( warningTimer ); // int warningTimer
+
+	savefile->ReadString( damageDef ); // idString damageDef
+
+	savefile->ReadInt( moveSpeed ); // int moveSpeed
+
+	savefile->ReadParticle( trailParticles ); // const idDeclParticle * trailParticles
+	savefile->ReadInt( trailParticlesFlyTime ); // int trailParticlesFlyTime
+
+	savefile->ReadObject( pursuitTarget ); // idEntityPtr<idEntity> pursuitTarget
+
+	savefile->ReadObject( CastClassPtrRef(wireOrigin) ); // idBeam* wireOrigin
+	savefile->ReadObject( CastClassPtrRef(wireTarget) ); // idBeam* wireTarget
+	savefile->ReadObject( harpoonModel ); // idEntity * harpoonModel
+	savefile->ReadBool( harpoonActive ); // bool harpoonActive
+
+	savefile->ReadVec3( impulseTarget ); // idVec3 impulseTarget
+	savefile->ReadBool( impulseActive ); // bool impulseActive
+	savefile->ReadInt( impulseTimer ); // int impulseTimer
 }
 
 void idSpaceMine::Spawn( void )
@@ -421,13 +469,16 @@ void idSpaceMine::RemoveHarpoon()
 	if (this->wireTarget) 
 	{
 		this->wireTarget->PostEventMS(&EV_Remove, 0);
+		wireTarget = nullptr;
 	}
 	if (this->wireOrigin)
 	{
 		this->wireOrigin->PostEventMS(&EV_Remove, 0);
+		wireOrigin = nullptr;
 	}
 	if (this->harpoonModel)
 	{
 		this->harpoonModel->PostEventMS(&EV_Remove, 0);
+		harpoonModel = nullptr;
 	}
 }

@@ -26,12 +26,20 @@ idPA_Control::idPA_Control(void)
 {
 	repairNode.SetOwner(this);
 	repairNode.AddToEnd(gameLocal.repairEntities);
+
 	needsRepair = false;
 	repairrequestTimestamp = 0;
-	idleSmoke = NULL;
+
+	idleSmoke = nullptr;
+	flagModel = nullptr;
 
 	flagState = FLG_INACTIVE;
 	flagCheckTimer = 0;
+
+	state = 0;
+	stateTimer = 0;
+
+	soundwaveEmitter = nullptr;
 }
 
 idPA_Control::~idPA_Control(void)
@@ -85,10 +93,28 @@ void idPA_Control::Spawn(void)
 
 void idPA_Control::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+	savefile->WriteObject( flagModel ); // idAnimatedEntity* flagModel
+	savefile->WriteInt( flagCheckTimer ); // int flagCheckTimer
+	savefile->WriteInt( flagState ); // int flagState
+
+	savefile->WriteObject( soundwaveEmitter ); // idFuncEmitter* soundwaveEmitter
 }
 
 void idPA_Control::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+	savefile->ReadObject( CastClassPtrRef(flagModel) ); // idAnimatedEntity* flagModel
+	savefile->ReadInt( flagCheckTimer ); // int flagCheckTimer
+	savefile->ReadInt( flagState ); // int flagState
+
+	savefile->ReadObject( CastClassPtrRef(soundwaveEmitter) ); // idFuncEmitter* soundwaveEmitter
 }
 
 void idPA_Control::Think(void)

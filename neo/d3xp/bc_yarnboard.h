@@ -13,7 +13,7 @@ public:
 							idYarnBoard(void);
 	virtual					~idYarnBoard(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -22,11 +22,13 @@ public:
 	
 	virtual void			Think(void);
 
+	virtual void			Hide(void);
+
 private:
 
 	bool					hasFrobbed;
 
-	idFuncEmitter			*sparkleParticles;
+	idFuncEmitter			*sparkleParticles = nullptr;
 
 	void					SetYarnInfo(const char* startModel, const char* endModel, const idVec3 &lookOffset, const char* voString );
 
@@ -40,7 +42,7 @@ private:
 	idStr					voName;
 
 
-	idEntity*				locboxes[YARNLOCBOXCOUNT];
+	idEntity*				locboxes[YARNLOCBOXCOUNT] = {};
 
 	enum					{
 								LB_ZENAMASKED,
@@ -64,5 +66,8 @@ private:
 	idStr					GetLocboxDefinitionViaIndex(int index);
 
 	void					SetLocboxVisibility(idStr modelname);
+
+	//BC 4-15-2025: scripting call for locbox visibility
+	void					SetLocboxVisibilityScript(const char* modelname);
 };
 //#pragma once

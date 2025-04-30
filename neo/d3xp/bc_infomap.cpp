@@ -74,10 +74,22 @@ void idInfoMap::Event_PostSpawn(void)
 
 void idInfoMap::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( infoState ); // bool infoState
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+
+	savefile->WriteObject( FTLDrive_ptr ); // idEntityPtr<idEntity> FTLDrive_ptr
 }
 
 void idInfoMap::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( infoState ); // bool infoState
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+
+	savefile->ReadObject( FTLDrive_ptr ); // idEntityPtr<idEntity> FTLDrive_ptr
 }
 
 void idInfoMap::Think(void)

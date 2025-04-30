@@ -35,10 +35,14 @@ idTutorialPrompt::~idTutorialPrompt(void)
 
 void idTutorialPrompt::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( promptActive ); // bool promptActive
+	savefile->WriteString( currentText ); // idString currentText
 }
 
 void idTutorialPrompt::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( promptActive ); // bool promptActive
+	savefile->ReadString( currentText ); // idString currentText
 }
 
 

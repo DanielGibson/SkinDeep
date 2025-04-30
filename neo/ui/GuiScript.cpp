@@ -92,7 +92,7 @@ void Script_ShowCursor(idWindow *window, idList<idGSWinVar> *src) {
 	idWinStr *parm = dynamic_cast<idWinStr*>((*src)[0].var);
 	if ( parm ) {
 		if ( atoi( *parm ) ) {
-			window->GetGui()->GetDesktop()->ClearFlag( WIN_NOCURSOR );
+																window->GetGui()->GetDesktop()->ClearFlag( WIN_NOCURSOR );
 		} else {
 			window->GetGui()->GetDesktop()->SetFlag( WIN_NOCURSOR );
 		}
@@ -330,7 +330,7 @@ idGuiScript::~idGuiScript() {
 idGuiScript::WriteToSaveGame
 =========================
 */
-void idGuiScript::WriteToSaveGame( idFile *savefile ) {
+void idGuiScript::WriteToSaveGame( idSaveGame *savefile ) const {
 	int i;
 
 	if ( ifList ) {
@@ -354,7 +354,7 @@ void idGuiScript::WriteToSaveGame( idFile *savefile ) {
 idGuiScript::ReadFromSaveGame
 =========================
 */
-void idGuiScript::ReadFromSaveGame( idFile *savefile ) {
+void idGuiScript::ReadFromSaveGame( idRestoreGame *savefile ) {
 	int i;
 
 	if ( ifList ) {
@@ -639,10 +639,9 @@ void idGuiScriptList::FixupParms(idWindow *win) {
 idGuiScriptList::WriteToSaveGame
 =========================
 */
-void idGuiScriptList::WriteToSaveGame( idFile *savefile ) {
-	int i;
-
-	for ( i = 0; i < list.Num(); i++ ) {
+void idGuiScriptList::WriteToSaveGame( idSaveGame *savefile ) const {
+	savefile->WriteInt( list.Num() );
+	for (int i = 0; i < list.Num(); i++ ) {
 		list[i]->WriteToSaveGame( savefile );
 	}
 }
@@ -652,10 +651,11 @@ void idGuiScriptList::WriteToSaveGame( idFile *savefile ) {
 idGuiScriptList::ReadFromSaveGame
 =========================
 */
-void idGuiScriptList::ReadFromSaveGame( idFile *savefile ) {
-	int i;
-
-	for ( i = 0; i < list.Num(); i++ ) {
+void idGuiScriptList::ReadFromSaveGame( idRestoreGame *savefile ) {
+	int num;
+	savefile->ReadInt( num );
+	list.SetNum(num);
+	for (int i = 0; i < list.Num(); i++ ) {
 		list[i]->ReadFromSaveGame( savefile );
 	}
 }

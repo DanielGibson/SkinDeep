@@ -672,7 +672,7 @@ static void	RB_SetFrameBuffer(const void *data)
 					globalImages->currentLightImage->texnum = lightTexture;
 
 					qglBindTexture(GL_TEXTURE_2D, lightTexture);
-					qglTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16, glConfig.vidWidth, glConfig.vidHeight, 0, GL_RGB, GL_UNSIGNED_SHORT, NULL);
+					qglTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, glConfig.vidWidth, glConfig.vidHeight, 0, GL_RGB, GL_FLOAT, NULL);
 					qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 					qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

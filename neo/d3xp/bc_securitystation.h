@@ -13,7 +13,7 @@ public:
 							idSecurityStation(void);
 	virtual					~idSecurityStation(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -35,7 +35,7 @@ private:
 	int						securityState;
 	
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	int						thinkTimer;
 

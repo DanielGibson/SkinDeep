@@ -6,8 +6,10 @@
 #include "Fx.h"
 #include "framework/DeclEntityDef.h"
 #include "Moveable.h"
+#include "idlib/LangDict.h"
 
 
+#include "bc_interestpoint.h"
 #include "bc_skullsaver.h"
 #include "bc_meta.h"
 #include "bc_lever.h"
@@ -35,7 +37,7 @@ const char* EXT_BUTTON_SKIN =			"skins/objects/button/button_c_exterior";
 const int	PNEUMATIC_SLOW_DOORTIME		= 4000; //after accumulators have exploded, make doors move slower.
 
 //const int	LOCKDOWN_DOORTIME = 300;	//when doing airlock lockdown, make the doors slam shut very quickly.
-const int	LOCKDOWN_PREAMBLE_DISPATCHTIME = 3000; //how long dispatch VO is.
+
 const int	LOCKDOWN_PREAMBLE_TIME = 6000; //how long warning VO is.
 const int	LOCKDOWN_OUTERDOORDELAY = 1000; //after gate slams down, delay before outer door opens.
 const int	LOCKDOWN_DELAY_BEFOREALLCLEAR = 3000;
@@ -45,6 +47,8 @@ const int	DOOR_WAITTIME = 7;
 const int	WARNINGSIGNS_MAX = 1;
 
 //#define FROBINDEX_EMERGENCYBUTTON 2
+
+#define SHUTTER_CLOSETIME 5000
 
 CLASS_DECLARATION(idStaticEntity, idAirlock)
 	EVENT(EV_PostSpawn, idAirlockAccumulator::Event_PostSpawn)
@@ -58,6 +62,11 @@ idAirlock::idAirlock(void)
 	itemVacuumSuckTimer = 0;
 	canEmergencyPurge = true;
 	hasPulledActors = false;
+
+	lastVoiceprint = VOICEPRINT_A;
+
+	shutterState = SHT_IDLE;
+	shutterTimer = 0;
 }
 
 idAirlock::~idAirlock(void)
@@ -532,6 +541,7 @@ void idAirlock::Spawn(void)
 		//args.SetBool("hide", true);
 		args.SetBool("solid", true);
 		args.Set("model", spawnArgs.GetString( "model_gate"));
+		args.Set("snd_shutteropen", "shutter_3sec");
 		fuseboxGates[i] = gameLocal.SpawnEntityType(idStaticEntity::Type, &args);
 		fuseboxGates[i]->Hide();
 	}
@@ -562,7 +572,8 @@ void idAirlock::Spawn(void)
 		args.SetFloat("angle", GetPhysics()->GetAxis().ToAngles().yaw);
 		args.SetVector("zoominspect_campos", idVec3(-15,0,0));
 		args.SetVector("zoominspect_angle", idVec3(0,1,0));
-		args.Set("displayname", "Airlock warning");
+		args.Set("displayname", common->GetLanguageDict()->GetString("#str_def_gameplay_airlockwarning"));
+		args.Set("loc_inspectiontext", "#str_label_airlockwarning");
 		gameLocal.SpawnEntityDef(args, &inspectpoint);
 
 		//gameRenderWorld->DebugArrowSimple(campos);
@@ -575,10 +586,96 @@ void idAirlock::Spawn(void)
 
 void idAirlock::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( canEmergencyPurge ); //  bool canEmergencyPurge
+	savefile->WriteInt( airlockState ); //  int airlockState
+	savefile->WriteInt( thinkTimer ); //  int thinkTimer
+
+	savefile->WriteObject( sirenLight ); //  idLight * sirenLight
+
+	SaveFileWriteArray(vacuumSeparators, 2, WriteObject);  // idVacuumSeparatorEntity * vacuumSeparators[2]
+
+	SaveFileWriteArray(innerDoor, 2, WriteObject);  // idDoor * innerDoor[2]
+	SaveFileWriteArray(outerDoor, 2, WriteObject);  // idDoor * outerDoor[2]
+
+	savefile->WriteBool( lastOuterdoorOpenState ); //  bool lastOuterdoorOpenState
+	savefile->WriteInt( pullTimer ); //  int pullTimer
+
+	savefile->WriteInt( doorOffset ); //  int doorOffset
+
+	SaveFileWriteArray(accumulatorList, accumulatorList.Num(), WriteInt);  //  idList<int> accumulatorList
+
+	SaveFileWriteArray(gauges, gaugeCount, WriteObject); // idEntity * gauges[MAX_GAUGES];
+	savefile->WriteInt( gaugeCount ); //  int gaugeCount
+
+	savefile->WriteBool( accumulatorsAllBroken ); //  bool accumulatorsAllBroken
+	savefile->WriteBool( doorslowmodeActivated ); //  bool doorslowmodeActivated
+
+
+	SaveFileWriteArray(gateProps, 2, WriteObject); // idAnimatedEntity* gateProps[2];
+	savefile->WriteInt( lockdownPreambleState ); //  int lockdownPreambleState
+	savefile->WriteInt( lockdownPreambleTimer ); //  int lockdownPreambleTimer
+
+	SaveFileWriteArray(warningsigns, 2, WriteObject); // idAnimatedEntity* warningsigns[2];
+
+	savefile->WriteObject( CCTV_monitor ); //  idEntity *				 CCTV_monitor
+	savefile->WriteObject( CCTV_camera ); //  idEntity *				 CCTV_camera
+
+	savefile->WriteInt( locationEntNum ); //  int locationEntNum
+	savefile->WriteInt( itemVacuumSuckTimer ); //  int itemVacuumSuckTimer
+	savefile->WriteBool( hasPulledActors ); //  bool hasPulledActors
+	savefile->WriteInt( lastVoiceprint ); //  int lastVoiceprint
+
+	SaveFileWriteArray(fuseboxGates, 2, WriteObject); // idAnimatedEntity* warningsigns[2];
+
+	savefile->WriteInt( shutterState ); //  int shutterState
+	savefile->WriteInt( shutterTimer ); //  int shutterTimer
 }
 
 void idAirlock::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( canEmergencyPurge ); //  bool canEmergencyPurge
+	savefile->ReadInt( airlockState ); //  int airlockState
+	savefile->ReadInt( thinkTimer ); //  int thinkTimer
+
+	savefile->ReadObject( CastClassPtrRef( sirenLight) ); //  idLight * sirenLight
+
+	SaveFileReadArrayCast(vacuumSeparators, ReadObject, idClass*& );  // idVacuumSeparatorEntity * vacuumSeparators[2]
+
+	SaveFileReadArrayCast(innerDoor, ReadObject, idClass*&);  // idDoor * innerDoor[2]
+	SaveFileReadArrayCast(outerDoor, ReadObject, idClass*&);  // idDoor * outerDoor[2]
+
+	savefile->ReadBool( lastOuterdoorOpenState ); //  bool lastOuterdoorOpenState
+	savefile->ReadInt( pullTimer ); //  int pullTimer
+
+	savefile->ReadInt( doorOffset ); //  int doorOffset
+
+	SaveFileReadList(accumulatorList, ReadInt);  //  idList<int> accumulatorList
+
+	SaveFileReadArrayCast(gauges, ReadObject,  idClass*&); // idEntity * gauges[MAX_GAUGES];
+	savefile->ReadInt( gaugeCount ); //  int gaugeCount
+
+	savefile->ReadBool( accumulatorsAllBroken ); //  bool accumulatorsAllBroken
+	savefile->ReadBool( doorslowmodeActivated ); //  bool doorslowmodeActivated
+
+
+	SaveFileReadArrayCast(gateProps, ReadObject, idClass*&); // idAnimatedEntity* gateProps[2];
+	savefile->ReadInt( lockdownPreambleState ); //  int lockdownPreambleState
+	savefile->ReadInt( lockdownPreambleTimer ); //  int lockdownPreambleTimer
+
+	SaveFileReadArrayCast(warningsigns, ReadObject, idClass*&); // idAnimatedEntity* warningsigns[2];
+
+	savefile->ReadObject( CCTV_monitor ); //  idEntity *				 CCTV_monitor
+	savefile->ReadObject( CCTV_camera ); //  idEntity *				 CCTV_camera
+
+	savefile->ReadInt( locationEntNum ); //  int locationEntNum
+	savefile->ReadInt( itemVacuumSuckTimer ); //  int itemVacuumSuckTimer
+	savefile->ReadBool( hasPulledActors ); //  bool hasPulledActors
+	savefile->ReadInt( lastVoiceprint ); //  int lastVoiceprint
+
+	SaveFileReadArrayCast(fuseboxGates, ReadObject, idClass*&); // idAnimatedEntity* warningsigns[2];
+
+	savefile->ReadInt( shutterState ); //  int shutterState
+	savefile->ReadInt( shutterTimer ); //  int shutterTimer
 }
 
 void idAirlock::Event_PostSpawn(void) //We need to do this post-spawn because not all ents exist when Spawn() is called. So, we need to wait until AFTER spawn has happened, and call this post-spawn function.
@@ -599,6 +696,30 @@ void idAirlock::Event_PostSpawn(void) //We need to do this post-spawn because no
 
 void idAirlock::Think(void)
 {
+	if (shutterState == SHT_SHUTTERING)
+	{
+		float lerp = (gameLocal.time - shutterTimer) / (float)SHUTTER_CLOSETIME;
+		lerp = idMath::ClampFloat(0, 1, lerp);
+		lerp = idMath::CubicEaseOut(lerp);
+
+		for (int i = 0; i < 2; i++)
+		{
+			fuseboxGates[i]->SetShaderParm(7, lerp);
+			fuseboxGates[i]->UpdateVisuals();
+		}
+		
+
+		if (gameLocal.time >= shutterTimer + SHUTTER_CLOSETIME)
+		{
+			for (int i = 0; i < 2; i++)
+			{
+				fuseboxGates[i]->Hide();
+			}
+
+			shutterState = SHT_SHUTTERED;
+		}
+	}
+
 	if (airlockState == AIRLOCKSTATE_INNERDOOR_PRIMING)
 	{
 		if (gameLocal.time >= thinkTimer && !outerDoor[0]->IsOpen() && !outerDoor[1]->IsOpen())
@@ -686,7 +807,8 @@ void idAirlock::Think(void)
 
 							if (ent->IsType(idSkullsaver::Type))
 							{
-								if (static_cast<idSkullsaver *>(ent)->IsConveying())
+								// SW 27th Feb 2025: Check for respawn state too
+								if (static_cast<idSkullsaver *>(ent)->IsConveying() || static_cast<idSkullsaver *>(ent)->IsRespawning())
 								{
 									static_cast<idSkullsaver *>(ent)->ResetConveyTime();
 									amountOfForce *= 2; //we really want to eject skullsavers out....give em an extra push
@@ -813,6 +935,7 @@ void idAirlock::Think(void)
 	}
 	else if (airlockState == AIRLOCKSTATE_LOCKDOWN_OUTERDOORDELAY)
 	{
+		//Lockdown purge. inner doors are closed; we now have a delay before we open the outer doors.
 		if (gameLocal.time >= thinkTimer)
 		{
 			outerDoor[0]->Open();
@@ -821,7 +944,16 @@ void idAirlock::Think(void)
 			sirenLight->Fade(idVec4(1, 0, 0, 1), .5f);
 			sirenLight->SetShader(spawnArgs.GetString("mtr_sirenlight"));
 
-			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartAllClearSequence(LOCKDOWN_DELAY_BEFOREALLCLEAR); //purge done. start the all-clear check.
+			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartAllClearSequence(LOCKDOWN_DELAY_BEFOREALLCLEAR, lastVoiceprint); //purge done. start the all-clear check.
+
+			
+			//BC 2-15-2025: do vacuum suck.
+			#define	HEIGHTOFFSET 64
+			idVec3 forward, up;
+			this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, &up);
+			idVec3 innerPos = GetPhysics()->GetOrigin() + (forward * spawnArgs.GetInt("exteriorbuttonoffset")) + (forward * -32) + (up * HEIGHTOFFSET);
+			idVec3 outerPos = GetPhysics()->GetOrigin() + (forward * spawnArgs.GetInt("exteriorbuttonoffset")) + (forward * 128) + (up * HEIGHTOFFSET);			
+			gameLocal.DoVacuumSuctionActors(innerPos, outerPos, GetPhysics()->GetAxis().ToAngles(), true);
 		}
 	}
 
@@ -833,14 +965,17 @@ void idAirlock::Think(void)
 
 		if (lockdownPreambleState == LDPA_DISPATCH)
 		{
-			//Currently playing dispatch VO audio.
+			//Currently playing dispatch VO audio. This is the airlock saying "I am initiating purge"
 
 			if (gameLocal.time >= lockdownPreambleTimer)
 			{
 				//Dispatch VO is done. Start the announcer.
 				lockdownPreambleState = LDPA_ANNOUNCER;
-				lockdownPreambleTimer = gameLocal.time + LOCKDOWN_PREAMBLE_TIME;
-				StartSound("snd_vo_lockdown", SND_CHANNEL_VOICE2);
+
+				int len;
+				StartSound("snd_vo_lockdown", SND_CHANNEL_VOICE2, 0, false, &len);
+				lockdownPreambleTimer = gameLocal.time + len;
+				
 				outerDoor[0]->SetPostEvents(false);
 				outerDoor[1]->SetPostEvents(false);
 
@@ -920,7 +1055,7 @@ bool idAirlock::DoFrob(int index, idEntity * frobber)
 
 		if (!ShouldButtonsWork())
 		{
-			innerDoor[0]->StartSound("snd_lockdownerror", SND_CHANNEL_VOICE); //Note: this sound is defined not in a .def, but in the spawn code in this file.
+			innerDoor[0]->StartSound("snd_lockdownerror", SND_CHANNEL_BODY); //Note: this sound is defined not in a .def, but in the spawn code in this file.
 			return false;
 		}
 		
@@ -953,7 +1088,7 @@ bool idAirlock::DoFrob(int index, idEntity * frobber)
         if (airlockState == AIRLOCKSTATE_BOARDING_DOORSOPENING || airlockState == AIRLOCKSTATE_BOARDING_DOCKED)
         {
             //when boarding ship is doing stuff, disable the buttons.
-            innerDoor[0]->StartSound("snd_lockdownerror", SND_CHANNEL_VOICE);
+            innerDoor[0]->StartSound("snd_lockdownerror", SND_CHANNEL_BODY);
             return false;
         }
 
@@ -965,7 +1100,7 @@ bool idAirlock::DoFrob(int index, idEntity * frobber)
 			}
 			else
 			{
-				innerDoor[0]->StartSound("snd_lockdownerror", SND_CHANNEL_VOICE); //Note: this sound is defined not in a .def, but in the spawn code in this file.
+				innerDoor[0]->StartSound("snd_lockdownerror", SND_CHANNEL_BODY); //Note: this sound is defined not in a .def, but in the spawn code in this file.
 			}
 
 			return false;
@@ -1232,7 +1367,7 @@ void idAirlock::DoAccumulatorStatusUpdate(int gaugeIndex)
 		if (canEmergencyPurge)
 		{
 			DoEmergencyPurge();
-			StartSound("snd_emergencyopen", SND_CHANNEL_ANY);
+			StartSound("snd_emergencyopen", SND_CHANNEL_BODY);
 		}
 	}
 	
@@ -1283,21 +1418,59 @@ void idAirlock::DoAirlockLockdown(bool value, idEntity* interestpoint)
 		if (airlockState == AIRLOCKSTATE_BOARDING_DOORSOPENING || airlockState == AIRLOCKSTATE_BOARDING_DOCKED) //if boarding ship stuff is happening, disable the lockdown stuff.
 			return;
 
-		//Activate lockdown.
-		idStr soundCue = "snd_vo_dispatch";
+		//Get the voiceprint of who "reported" this airlock lockdown.
+		lastVoiceprint = VOICEPRINT_A;
+		if (interestpoint != nullptr)
+		{
+			if (interestpoint->IsType(idInterestPoint::Type))
+			{
+				if (static_cast<idInterestPoint*>(interestpoint)->claimant.IsValid())
+				{
+					lastVoiceprint = static_cast<idInterestPoint*>(interestpoint)->claimant.GetEntity()->spawnArgs.GetInt("voiceprint");
+				}
+			}
+		}
+
+		//Activate lockdown. This is the dispatch VO of a pirate saying "we need to initiate purge"
+		idStr soundCue = "snd_vo_dispatch_a";
+		if (lastVoiceprint == VOICEPRINT_BOSS)
+		{
+			soundCue = "snd_vo_dispatch_boss";
+		}
+		else if (lastVoiceprint == VOICEPRINT_B)
+		{
+			soundCue = "snd_vo_dispatch_b";
+		}
+		else
+		{
+			soundCue = "snd_vo_dispatch_a";
+		}
+
 
 		//If the interestpoint was a smelly one, do smell-specific VO.
 		if (interestpoint != nullptr)
 		{
 			if (interestpoint->spawnArgs.GetBool("is_smelly"))
 			{
-				soundCue = "snd_vo_dispatch_smelly";
+				if (lastVoiceprint == VOICEPRINT_BOSS)
+				{
+					soundCue = "snd_vo_dispatch_boss_smelly";
+				}
+				else if (lastVoiceprint == VOICEPRINT_B)
+				{
+					soundCue = "snd_vo_dispatch_b_smelly";
+				}
+				else
+				{
+					soundCue = "snd_vo_dispatch_a_smelly";
+				}
 			}
 		}
 
-		StartSound(soundCue.c_str(), SND_CHANNEL_VOICE);
+		int len;
+		StartSound(soundCue.c_str(), SND_CHANNEL_VOICE, 0, false, &len);
 		lockdownPreambleState = LDPA_DISPATCH;
-		lockdownPreambleTimer = gameLocal.time + LOCKDOWN_PREAMBLE_DISPATCHTIME;
+		lockdownPreambleTimer = gameLocal.time + len;
 	}
 	else
 	{
@@ -1412,9 +1585,10 @@ void idAirlock::StartBoardingDoorOpen()
 	outerDoor[0]->Open();
 
 
-	//Since the boarding ship is docked with the airlock, we treat it as 'sealing' up the vacuum. So, even though the outer door is open, we block the vacuum.
+	// Since the boarding ship is docked with the airlock, we treat it as 'sealing' up the vacuum. So, even though the outer door is open, we block the vacuum.
+	// SW 5th March 2025: Removing bounds expansion to prevent airlock from grabbing outermost portal by accident
 	qhandle_t portal;
-	idBounds bounds = idBounds(outerDoor[0]->GetPhysics()->GetAbsBounds().Expand(4));
+	idBounds bounds = idBounds(outerDoor[0]->GetPhysics()->GetAbsBounds());
 	portal = gameRenderWorld->FindPortal(bounds);
 	if (portal)
 	{
@@ -1462,6 +1636,10 @@ void idAirlock::VacuumSuckItems(idVec3 suctionInteriorPosition, idVec3 suctionEx
 		if (entLoc->entityNumber != innerLocEnt->entityNumber && entLoc->entityNumber != locationEntNum)
 			continue;	
 
+		// SW 1st April 2025: don't try to drag the item out of the player's hands
+		idEntity* carryable = gameLocal.GetLocalPlayer()->GetCarryable();
+		if (carryable && carryable->entityNumber == ent->entityNumber)
+			continue;
 
 		//entity is in the room.
 		trace_t trInterior, trExterior;
@@ -1520,7 +1698,18 @@ void idAirlock::SetFuseboxGateOpen(bool value)
 	{
 		if (value)
 		{
-			fuseboxGates[i]->Hide();
+			//BC 2-18-2025: airlock shutter logic
+			//Open the shutter....
+			if (shutterState != SHT_SHUTTERING)
+			{
+				fuseboxGates[i]->StartSound("snd_shutteropen", SND_CHANNEL_BODY);
+			}
+
+			shutterState = SHT_SHUTTERING;
+			shutterTimer = gameLocal.time;			
+
+			fuseboxGates[i]->fl.takedamage = false;
+			fuseboxGates[i]->GetPhysics()->SetContents(0);
 		}
 		else
 		{

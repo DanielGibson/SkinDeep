@@ -14,7 +14,7 @@ public:
 							idCatpodInterior(void);
 	virtual					~idCatpodInterior(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -34,7 +34,7 @@ private:
 	enum					{ IDLE };
 	int						state;
 	
-	idLight *				ceilingLight;	
+	idLight *				ceilingLight = nullptr;
 
 	void					EquipSlots();
 
@@ -42,7 +42,7 @@ private:
 	idEntity*				SpawnEquipSingle(idStr defName);
 
 	//Frob cube for the exit.
-	idEntity*				frobBar;
+	idEntity*				frobBar = nullptr;
 
 	void					DoExitPod();
 	idVec3					lastPlayerPosition;
@@ -55,13 +55,13 @@ private:
 	int						fanfareState;
 	enum					{ FF_DORMANT, FF_WAITING, FF_DONE };
 
-	idAnimated*				catprisonerModel[CAT_INHABITANTS_MAX];
+	idAnimated*				catprisonerModel[CAT_INHABITANTS_MAX] = {};
 	int						totalcatInhabitants;
 	bool					playerIsInCatpod;
 
 	int						trackerSequence;
 	enum                    {TRK_NONE, TRK_WAITINGFORPLAYER, TRK_SPAWNDELAY, TRK_VOLINE_1, TRK_VOLINE_2, TRK_DONE};
-	idAnimated*				trackerModel;
+	idAnimated*				trackerModel = nullptr;
 	int						trackerTimer;
 
 	float					trackerProgressStartValue; //0.0-1.0
@@ -70,7 +70,8 @@ private:
 	int						trackerProgressTimer;
 	enum					{TPS_DORMANT, TPS_STARTPAUSE, TPS_LERPING, };
 
-	idStr					GetCatViaModel(idStr modelname, int *voiceprint);
+	// SW 10th March 2025
+	idList<idMoveableItem*>		GetItemsInside(void);
 	
 
 

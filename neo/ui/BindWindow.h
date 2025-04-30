@@ -38,6 +38,9 @@ public:
 	idBindWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	virtual ~idBindWindow();
 
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void ReadFromSaveGame( idRestoreGame *savefile );
+
 	virtual const char *HandleEvent(const sysEvent_t *event, bool *updateVisuals);
 	virtual void PostParse();
 	virtual void Draw(int time, float x, float y);
@@ -62,6 +65,9 @@ public:
 	idBindDisplayWindow(idUserInterfaceLocal* gui);
 	idBindDisplayWindow(idDeviceContext* d, idUserInterfaceLocal* gui);
 	virtual ~idBindDisplayWindow();
+
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void ReadFromSaveGame( idRestoreGame *savefile );
 
 	virtual void PostParse();
 	virtual void Draw(int time, float x, float y);

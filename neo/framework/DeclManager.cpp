@@ -1149,7 +1149,7 @@ const idDecl *idDeclManagerLocal::FindType( declType_t type, const char *name, b
 	if ( decl->declState == DS_UNPARSED ) {
 		if ( game && com_showHitchWarnings.GetBool() && !game->InLoadingContext() )
 		{
-			common->Warning( "HITCH load during gameplay: %s", name );
+			common->Warning( "HITCH load: %s", name );
 		}
 		decl->ParseLocal();
 	}

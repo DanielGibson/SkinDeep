@@ -131,6 +131,10 @@ void idMaterial::CommonInit() {
 	decalInfo.end[1] = 0;
 	decalInfo.end[2] = 0;
 	decalInfo.end[3] = 0;
+
+	// blendo eric: missing defaults
+	surfaceArea = 0.0f;
+	memset( texGenRegisters, 0, sizeof( texGenRegisters ) );
 }
 
 /*
@@ -304,6 +308,7 @@ static const infoParm_t	infoParms[] = {
 	{"corpse",		0,	0,	CONTENTS_CORPSE },
 
 	{ "playerlook_trigger",	0,	0,	CONTENTS_PLAYERLOOK_TRIGGER },
+	{ "contents_translucent",	0,	0,	CONTENTS_TRANSLUCENT },
 };
 
 static const int numInfoParms = sizeof(infoParms) / sizeof (infoParms[0]);
@@ -1210,7 +1215,29 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 
 		if (  !token.Icmp( "map" ) ) {
 			str = R_ParsePastImageProgram( src );
-			idStr::Copynz( imageName, str, sizeof( imageName ) );
+			// SM: For font materials, we may need to remap the name for font aliases (localization)
+			if (TestMaterialFlag(MF_FONT))
+			{
+				idStr fontStr = str;
+				idStrList splits = fontStr.Split('/');
+				if (splits.Num() == 3 && splits[0] == "newfonts")
+				{
+					const idFont* font = renderSystem->RegisterFont(splits[1]);
+					const idFont* alias = font->GetAlias();
+					if (alias)
+					{
+						fontStr = "newfonts/";
+						fontStr += alias->GetName();
+						fontStr += "/48";
+					}
+				}
+
+				idStr::Copynz(imageName, fontStr, sizeof(imageName));
+			}
+			else
+			{
+				idStr::Copynz(imageName, str, sizeof(imageName));
+			}
 			continue;
 		}
 
@@ -1623,6 +1650,12 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		return;
 	}
 
+	// SM: Decals always need to mask alpha or blending with other translucent objects
+	// will be broken. Fixes issue with glass piece blending
+	if (sort == SS_DECAL)
+	{
+		ss->drawStateBits |= GLS_ALPHAMASK;
+	}
 
 	// if we are using newStage, allocate a copy of it
 	if ( newStage.fragmentProgram || newStage.vertexProgram || newStage.glslName ) {

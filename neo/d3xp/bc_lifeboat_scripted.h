@@ -14,7 +14,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think(void);
@@ -37,8 +37,8 @@ private:
 
 	void					LaunchPod();
 	
-	idEntity*				beamEnd;
-	idEntity*				beamStart;
+	idEntityPtr<idEntity>	beamEnd;
+	idEntityPtr<idEntity>	beamStart;
 	
 
 	

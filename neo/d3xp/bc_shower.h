@@ -13,7 +13,7 @@ public:
 							idShower(void);
 	virtual					~idShower(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -28,7 +28,7 @@ private:
 	enum					{SW_OFF, SW_ON, SW_BROKEN};
 	int						state;
 	
-	idFuncEmitter			*waterParticle;
+	idFuncEmitter			*waterParticle = nullptr;
 
 	void					SetActive(bool value);
 

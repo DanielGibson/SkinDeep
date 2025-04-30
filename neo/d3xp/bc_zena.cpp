@@ -32,10 +32,16 @@ void idZena::Spawn(void)
 
 void idZena::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( currentAnim ); // int currentAnim
+	savefile->WriteInt( footstepparticleTimer ); // int footstepparticleTimer
 }
 
 void idZena::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( currentAnim ); // int currentAnim
+	savefile->ReadInt( footstepparticleTimer ); // int footstepparticleTimer
 }
 
 void idZena::Think(void)

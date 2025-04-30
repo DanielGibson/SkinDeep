@@ -185,11 +185,7 @@ idTrigger::Save
 ================
 */
 void idTrigger::Save( idSaveGame *savefile ) const {
-	if ( scriptFunction ) {
-		savefile->WriteString( scriptFunction->Name() );
-	} else {
-		savefile->WriteString( "" );
-	}
+	savefile->WriteFunction( scriptFunction );
 }
 
 /*
@@ -198,16 +194,7 @@ idTrigger::Restore
 ================
 */
 void idTrigger::Restore( idRestoreGame *savefile ) {
-	idStr funcname;
-	savefile->ReadString( funcname );
-	if ( funcname.Length() ) {
-		scriptFunction = gameLocal.program.FindFunction( funcname );
-		if ( scriptFunction == NULL ) {
-			gameLocal.Warning( "idTrigger_Multi '%s' at (%s) calls unknown function '%s'", name.c_str(), GetPhysics()->GetOrigin().ToString(0), funcname.c_str() );
-		}
-	} else {
-		scriptFunction = NULL;
-	}
+	savefile->ReadFunction( scriptFunction );
 }
 
 /*
@@ -302,17 +289,22 @@ idTrigger_Multi::Save
 ================
 */
 void idTrigger_Multi::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( wait );
-	savefile->WriteFloat( random );
-	savefile->WriteFloat( delay );
-	savefile->WriteFloat( random_delay );
-	savefile->WriteInt( nextTriggerTime );
-	savefile->WriteString( _requires );
-	savefile->WriteInt( removeItem );
-	savefile->WriteBool( touchClient );
-	savefile->WriteBool( touchOther );
-	savefile->WriteBool( triggerFirst );
-	savefile->WriteBool( triggerWithSelf );
+	savefile->WriteFloat( wait ); // float wait
+	savefile->WriteFloat( random ); // float random
+	savefile->WriteFloat( delay ); // float delay
+	savefile->WriteFloat( random_delay ); // float random_delay
+	savefile->WriteInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->WriteString( _requires ); // idString _requires
+	savefile->WriteInt( removeItem ); // int removeItem
+	savefile->WriteBool( touchClient ); // bool touchClient
+	savefile->WriteBool( touchOther ); // bool touchOther
+	savefile->WriteBool( triggerFirst ); // bool triggerFirst
+	savefile->WriteBool( triggerWithSelf ); // bool triggerWithSelf
+
+	savefile->WriteFunction( playerLookEnterFunc ); // const function_t* playerLookEnterFunc
+	savefile->WriteFunction( playerLookExitFunc ); // const function_t* playerLookExitFunc
+
+	savefile->WriteFloat( playerLookRange ); // float playerLookRange
 }
 
 /*
@@ -321,17 +313,22 @@ idTrigger_Multi::Restore
 ================
 */
 void idTrigger_Multi::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( wait );
-	savefile->ReadFloat( random );
-	savefile->ReadFloat( delay );
-	savefile->ReadFloat( random_delay );
-	savefile->ReadInt( nextTriggerTime );
-	savefile->ReadString( _requires );
-	savefile->ReadInt( removeItem );
-	savefile->ReadBool( touchClient );
-	savefile->ReadBool( touchOther );
-	savefile->ReadBool( triggerFirst );
-	savefile->ReadBool( triggerWithSelf );
+	savefile->ReadFloat( wait ); // float wait
+	savefile->ReadFloat( random ); // float random
+	savefile->ReadFloat( delay ); // float delay
+	savefile->ReadFloat( random_delay ); // float random_delay
+	savefile->ReadInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->ReadString( _requires ); // idString _requires
+	savefile->ReadInt( removeItem ); // int removeItem
+	savefile->ReadBool( touchClient ); // bool touchClient
+	savefile->ReadBool( touchOther ); // bool touchOther
+	savefile->ReadBool( triggerFirst ); // bool triggerFirst
+	savefile->ReadBool( triggerWithSelf ); // bool triggerWithSelf
+
+	savefile->ReadFunction( playerLookEnterFunc ); // const function_t* playerLookEnterFunc
+	savefile->ReadFunction( playerLookExitFunc ); // const function_t* playerLookExitFunc
+
+	savefile->ReadFloat( playerLookRange ); // float playerLookRange
 }
 
 /*
@@ -612,13 +609,13 @@ idTrigger_EntityName::Save
 ================
 */
 void idTrigger_EntityName::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( wait );
-	savefile->WriteFloat( random );
-	savefile->WriteFloat( delay );
-	savefile->WriteFloat( random_delay );
-	savefile->WriteInt( nextTriggerTime );
-	savefile->WriteBool( triggerFirst );
-	savefile->WriteString( entityName );
+	savefile->WriteFloat( wait ); // float wait
+	savefile->WriteFloat( random ); // float random
+	savefile->WriteFloat( delay ); // float delay
+	savefile->WriteFloat( random_delay ); // float random_delay
+	savefile->WriteInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->WriteBool( triggerFirst ); // bool triggerFirst
+	savefile->WriteString( entityName ); // idString entityName
 }
 
 /*
@@ -627,13 +624,13 @@ idTrigger_EntityName::Restore
 ================
 */
 void idTrigger_EntityName::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( wait );
-	savefile->ReadFloat( random );
-	savefile->ReadFloat( delay );
-	savefile->ReadFloat( random_delay );
-	savefile->ReadInt( nextTriggerTime );
-	savefile->ReadBool( triggerFirst );
-	savefile->ReadString( entityName );
+	savefile->ReadFloat( wait ); // float wait
+	savefile->ReadFloat( random ); // float random
+	savefile->ReadFloat( delay ); // float delay
+	savefile->ReadFloat( random_delay ); // float random_delay
+	savefile->ReadInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->ReadBool( triggerFirst ); // bool triggerFirst
+	savefile->ReadString( entityName ); // idString entityName
 }
 
 /*
@@ -798,12 +795,12 @@ idTrigger_Timer::Save
 ================
 */
 void idTrigger_Timer::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( random );
-	savefile->WriteFloat( wait );
-	savefile->WriteBool( on );
-	savefile->WriteFloat( delay );
-	savefile->WriteString( onName );
-	savefile->WriteString( offName );
+	savefile->WriteFloat( random ); // float random
+	savefile->WriteFloat( wait ); // float wait
+	savefile->WriteBool( on ); // bool on
+	savefile->WriteFloat( delay ); // float delay
+	savefile->WriteString( onName ); // idString onName
+	savefile->WriteString( offName ); // idString offName
 }
 
 /*
@@ -812,12 +809,12 @@ idTrigger_Timer::Restore
 ================
 */
 void idTrigger_Timer::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( random );
-	savefile->ReadFloat( wait );
-	savefile->ReadBool( on );
-	savefile->ReadFloat( delay );
-	savefile->ReadString( onName );
-	savefile->ReadString( offName );
+	savefile->ReadFloat( random ); // float random
+	savefile->ReadFloat( wait ); // float wait
+	savefile->ReadBool( on ); // bool on
+	savefile->ReadFloat( delay ); // float delay
+	savefile->ReadString( onName ); // idString onName
+	savefile->ReadString( offName ); // idString offName
 }
 
 /*
@@ -939,9 +936,9 @@ idTrigger_Count::Save
 ================
 */
 void idTrigger_Count::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( goal );
-	savefile->WriteInt( count );
-	savefile->WriteFloat( delay );
+	savefile->WriteInt( goal ); // int goal
+	savefile->WriteInt( count ); // int count
+	savefile->WriteFloat( delay ); // float delay
 }
 
 /*
@@ -950,9 +947,9 @@ idTrigger_Count::Restore
 ================
 */
 void idTrigger_Count::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( goal );
-	savefile->ReadInt( count );
-	savefile->ReadFloat( delay );
+	savefile->ReadInt( goal ); // int goal
+	savefile->ReadInt( count ); // int count
+	savefile->ReadFloat( delay ); // float delay
 }
 
 /*
@@ -1030,9 +1027,9 @@ idTrigger_Hurt::Save
 ================
 */
 void idTrigger_Hurt::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( on );
-	savefile->WriteFloat( delay );
-	savefile->WriteInt( nextTime );
+	savefile->WriteBool( on ); // bool on
+	savefile->WriteFloat( delay ); // float delay
+	savefile->WriteInt( nextTime ); // int nextTime
 }
 
 /*
@@ -1041,9 +1038,9 @@ idTrigger_Hurt::Restore
 ================
 */
 void idTrigger_Hurt::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( on );
-	savefile->ReadFloat( delay );
-	savefile->ReadInt( nextTime );
+	savefile->ReadBool( on ); // bool on
+	savefile->ReadFloat( delay ); // float delay
+	savefile->ReadInt( nextTime ); // int nextTime
 }
 
 /*
@@ -1196,7 +1193,7 @@ idTrigger_Touch::Save
 ================
 */
 void idTrigger_Touch::Save( idSaveGame *savefile ) {
-	savefile->WriteClipModel( clipModel );
+	savefile->WriteClipModel( clipModel ); // 	idClipModel * clipModel
 }
 
 /*
@@ -1205,7 +1202,7 @@ idTrigger_Touch::Restore
 ================
 */
 void idTrigger_Touch::Restore( idRestoreGame *savefile ) {
-	savefile->ReadClipModel( clipModel );
+	savefile->ReadClipModel( clipModel ); // 	idClipModel * clipModel
 }
 
 /*
@@ -1332,6 +1329,17 @@ void idTrigger_Flag::Spawn( void ) {
 	idTrigger_Multi::Spawn();
 }
 
+void idTrigger_Flag::Save(idSaveGame* savefile) {
+	savefile->WriteInt( team ); // int team
+	savefile->WriteBool( player ); // bool player
+	savefile->WriteEventDef( eventFlag ); // const idEventDef * eventFlag
+}
+void idTrigger_Flag::Restore(idRestoreGame* savefile) {
+	savefile->ReadInt( team ); // int team
+	savefile->ReadBool( player ); // bool player
+	savefile->ReadEventDef( eventFlag ); // const idEventDef * eventFlag
+}
+
 void idTrigger_Flag::Event_Touch( idEntity *other, trace_t *trace ) {
 
 	idItemTeam * flag = NULL;
@@ -1430,22 +1438,21 @@ idTrigger_Push::idTrigger_Push(void)
 }
 
 void idTrigger_Push::Save(idSaveGame *savefile) const {
-	savefile->WriteBool(on);
-	savefile->WriteInt(nextTime);
-	savefile->WriteInt(yaw);
-	savefile->WriteInt(pitch);
-	savefile->WriteInt(force);
-	savefile->WriteFloat(wait);
-
+	savefile->WriteBool( on ); // bool on
+	savefile->WriteInt( nextTime ); // int nextTime
+	savefile->WriteInt( yaw ); // int yaw
+	savefile->WriteInt( pitch ); // int pitch
+	savefile->WriteInt( force ); // int force
+	savefile->WriteFloat( wait ); // float wait
 }
 
 void idTrigger_Push::Restore(idRestoreGame *savefile) {
-	savefile->ReadBool(on);
-	savefile->ReadInt(nextTime);
-	savefile->ReadInt(yaw);
-	savefile->ReadInt(pitch);
-	savefile->ReadInt(force);
-	savefile->ReadFloat(wait);
+	savefile->ReadBool( on ); // bool on
+	savefile->ReadInt( nextTime ); // int nextTime
+	savefile->ReadInt( yaw ); // int yaw
+	savefile->ReadInt( pitch ); // int pitch
+	savefile->ReadInt( force ); // int force
+	savefile->ReadFloat( wait ); // float wait
 }
 
 
@@ -1540,11 +1547,25 @@ void idTrigger_Classname::Spawn(void) {
 }
 
 void idTrigger_Classname::Save(idSaveGame *savefile) {
-	savefile->WriteClipModel(clipModel);
+	savefile->WriteClipModel( clipModel ); // idClipModel * clipModel
+
+	savefile->WriteInt( wait ); // int wait
+	savefile->WriteInt( timer ); // int timer
+	SaveFileWriteArray( requiredClassnames, requiredClassnames.Num(), WriteString ); // idList<idStr> requiredClassnames
+
+	savefile->WriteBool( repeats ); // bool repeats
+	savefile->WriteBool( isEmpty ); // bool isEmpty
 }
 
 void idTrigger_Classname::Restore(idRestoreGame *savefile) {
-	savefile->ReadClipModel(clipModel);
+	savefile->ReadClipModel( clipModel ); // idClipModel * clipModel
+
+	savefile->ReadInt( wait ); // int wait
+	savefile->ReadInt( timer ); // int timer
+	SaveFileReadList( requiredClassnames, ReadString ); // idList<idStr> requiredClassnames
+
+	savefile->ReadBool( repeats ); // bool repeats
+	savefile->ReadBool( isEmpty ); // bool isEmpty
 }
 
 void idTrigger_Classname::TouchEntities(void) {
@@ -1693,10 +1714,22 @@ idTrigger_FallTrigger::idTrigger_FallTrigger(void)
 
 void idTrigger_FallTrigger::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( wait ); // int wait
+	savefile->WriteInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->WriteInt( nextThinkTime ); // int nextThinkTime
+
+	savefile->WriteVec3( popcornPos ); // idVec3 popcornPos
+	savefile->WriteFloat( popcornAngle ); // float popcornAngle
 }
 
 void idTrigger_FallTrigger::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( wait ); // int wait
+	savefile->ReadInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->ReadInt( nextThinkTime ); // int nextThinkTime
+
+	savefile->ReadVec3( popcornPos ); // idVec3 popcornPos
+	savefile->ReadFloat( popcornAngle ); // float popcornAngle
 }
 
 void idTrigger_FallTrigger::Spawn(void)

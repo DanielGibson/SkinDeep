@@ -26,10 +26,14 @@ END_CLASS
 
 void idTeleportPuck::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( HasCollided ); // bool HasCollided
+	savefile->WriteVec3( startPosition ); // idVec3 startPosition
 }
 
 void idTeleportPuck::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( HasCollided ); // bool HasCollided
+	savefile->ReadVec3( startPosition ); // idVec3 startPosition
 }
 
 void idTeleportPuck::Spawn(void)

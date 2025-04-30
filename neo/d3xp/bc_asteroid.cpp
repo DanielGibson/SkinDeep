@@ -32,10 +32,36 @@ idAsteroid::~idAsteroid(void)
 
 void idAsteroid::Save( idSaveGame *savefile ) const
 {
+	savefile->WriteInt( state ); //  asteroid_state_t state
+
+	savefile->WriteInt( timer ); //  int timer
+
+	savefile->WriteString( damageDef ); //  idString damageDef
+
+	savefile->WriteInt( angularSpeed ); //  int angularSpeed
+	savefile->WriteInt( moveSpeed ); //  int moveSpeed
+
+	savefile->WriteParticle( trailParticles ); // const  idDeclParticle *	 trailParticles
+	savefile->WriteInt( trailParticlesFlyTime ); //  int trailParticlesFlyTime
+
+	savefile->WriteInt( despawnThreshold ); //  int despawnThreshold
 }
 
 void idAsteroid::Restore( idRestoreGame *savefile )
 {
+	savefile->ReadInt( (int&)state ); //  asteroid_state_t state
+
+	savefile->ReadInt( timer ); //  int timer
+
+	savefile->ReadString( damageDef ); //  idString damageDef
+
+	savefile->ReadInt( angularSpeed ); //  int angularSpeed
+	savefile->ReadInt( moveSpeed ); //  int moveSpeed
+
+	savefile->ReadParticle( trailParticles ); // const  idDeclParticle * trailParticles
+	savefile->ReadInt( trailParticlesFlyTime ); //  int trailParticlesFlyTime
+
+	savefile->ReadInt( despawnThreshold ); //  int despawnThreshold
 }
 
 void idAsteroid::Spawn( void )

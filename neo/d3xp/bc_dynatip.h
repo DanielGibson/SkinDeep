@@ -11,7 +11,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save(idSaveGame* savefile) const;
+	void					Save(idSaveGame* savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame* savefile);
 
 	virtual void			Think(void);
@@ -38,8 +38,8 @@ private:
 
 	idStr					displayText;
 	idEntityPtr<idEntity>   targetEnt;
-	const idMaterial *		iconMaterial;
-	const idMaterial *		arrowMaterial;
+	const idMaterial *		iconMaterial = nullptr;
+	const idMaterial *		arrowMaterial = nullptr;
 	idVec2					offscreenDrawPos;
 	idVec2					actualscreenDrawPos;
 

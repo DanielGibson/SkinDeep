@@ -200,8 +200,8 @@ public:
 	const char *				GetSuperclass( void ) const;
 	void						FindUninitializedMemory( void );
 
-	void						Save( idSaveGame *savefile ) const {};
-	void						Restore( idRestoreGame *savefile ) {};
+	void						Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void						Restore( idRestoreGame *savefile );
 
 	bool						RespondsTo( const idEventDef &ev ) const;
 

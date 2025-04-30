@@ -8,6 +8,8 @@
 #include "Moveable.h"
 #include "Trigger.h"
 
+#include "framework/Session_local.h"
+
 #include "WorldSpawn.h"
 #include "Mover.h"
 #include "bc_meta.h"
@@ -20,8 +22,21 @@
 
 #define STUCK_COUNTERTHRESHOLD 6
 
+#define SAVELOAD_DURATION_MIN  "3000"
+#define SAVELOAD_DURATION_MAX  "30000"
+
 CLASS_DECLARATION(idEntity, idStressTester)
 END_CLASS
+
+
+idCVar stress_savegame("stress_savegame", "1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_CHEAT, "use savegame during stress test. 1 = random save & load most recent savegame. 2 = random load. 3 = end mission (if hub level). 4 = end mission (all maps).");
+idCVar stress_continueafterrestart("stress_continueafterrestart", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_CHEAT, "reactivate stress tester when map restarts");
+
+idCVar stress_savetimer_min("stress_savetimer_min", SAVELOAD_DURATION_MIN, CVAR_INTEGER | CVAR_SYSTEM | CVAR_CHEAT, "time between save load");
+idCVar stress_savetimer_max("stress_savetimer_max", SAVELOAD_DURATION_MAX, CVAR_INTEGER | CVAR_SYSTEM | CVAR_CHEAT, "time between save load");
+
+idCVar stress_jockey("stress_jockey", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_CHEAT, "do jockey behavior");
+idCVar stress_wander("stress_wander", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_CHEAT, "do wander behavior");
 
 //StressTester
 //Make the player randomly wander around the map.
@@ -41,7 +56,7 @@ void idStressTester::Spawn(void)
 	jockeyTimer = 0;
 	jockeySlamTimer = 0;
 	
-	gameLocal.GetLocalPlayer()->godmode = true;
+	
 
 	BecomeActive(TH_THINK);
 	common->Printf("\n\n*********** STRESSTEST SPAWNED ***********\n\n");
@@ -54,14 +69,63 @@ void idStressTester::Spawn(void)
 	GetUpTimer = 0;
 	stuckLastPosition = vec3_zero;
 	stuckCounter = 10000;
+
+
+	saveloadTimer = stress_savetimer_max.GetInteger();
 }
 
 void idStressTester::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( timer ); // int timer
+
+	savefile->WriteInt( pushledgeCount ); // int pushledgeCount
+
+	savefile->WriteInt( doorTimer ); // int doorTimer
+
+	savefile->WriteInt( jockeyTimer ); // int jockeyTimer
+	savefile->WriteInt( jockeySlamTimer ); // int jockeySlamTimer
+	savefile->WriteObject( meleeTarget ); // idEntityPtr<idEntity> meleeTarget
+
+	savefile->WriteInt( globalRestartTimer ); // int globalRestartTimer
+
+	savefile->WriteInt( globalUnlockFuseboxTimer ); // int globalUnlockFuseboxTimer
+	savefile->WriteBool( hasUnlockedGlobalFusebox ); // bool hasUnlockedGlobalFusebox
+
+	savefile->WriteInt( GetUpTimer ); // int GetUpTimer
+
+	savefile->WriteInt( stuckTimer ); // int stuckTimer
+	savefile->WriteVec3( stuckLastPosition ); // idVec3 stuckLastPosition
+	savefile->WriteInt( stuckCounter ); // int stuckCounter
+
+	savefile->WriteInt(saveloadTimer); // int saveloadTimer
 }
 
 void idStressTester::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( timer ); // int timer
+
+	savefile->ReadInt( pushledgeCount ); // int pushledgeCount
+
+	savefile->ReadInt( doorTimer ); // int doorTimer
+
+	savefile->ReadInt( jockeyTimer ); // int jockeyTimer
+	savefile->ReadInt( jockeySlamTimer ); // int jockeySlamTimer
+	savefile->ReadObject( meleeTarget ); // idEntityPtr<idEntity> meleeTarget
+
+	savefile->ReadInt( globalRestartTimer ); // int globalRestartTimer
+
+	savefile->ReadInt( globalUnlockFuseboxTimer ); // int globalUnlockFuseboxTimer
+	savefile->ReadBool( hasUnlockedGlobalFusebox ); // bool hasUnlockedGlobalFusebox
+
+	savefile->ReadInt( GetUpTimer ); // int GetUpTimer
+
+	savefile->ReadInt( stuckTimer ); // int stuckTimer
+	savefile->ReadVec3( stuckLastPosition ); // idVec3 stuckLastPosition
+	savefile->ReadInt( stuckCounter ); // int stuckCounter
+
+	savefile->ReadInt(saveloadTimer); // int saveloadTimer
 }
 
 void idStressTester::Think(void)
@@ -86,6 +150,8 @@ void idStressTester::Think(void)
 			pushledgeCount = 0;
 			timer = 0;
 			common->Printf("Stresstest: jumping.\n");
+
+			gameLocal.GetLocalPlayer()->godmode = true;
 		}
 	}
 	else if (state == PUSHLEDGE)
@@ -112,18 +178,10 @@ void idStressTester::Think(void)
 			if (pushledgeCount >= 4)
 			{
 				state = WANDER;
-				cvarSystem->SetCVarBool("aas_randomPullPlayer", true);
 
-				//unlock all barricades.
-				for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+				if (stress_wander.GetBool())
 				{
-					if (!ent)
-						continue;
-
-					if (ent->IsType(idDoorBarricade::Type))
-					{
-						static_cast<idDoorBarricade*>(ent)->DoHack();
-					}
+					cvarSystem->SetCVarBool("aas_randomPullPlayer", true);
 				}
 			}
 		}
@@ -138,7 +196,7 @@ void idStressTester::Think(void)
 		}
 		
 		//Try to jockey enemies that are nearby.
-		if (gameLocal.time > jockeyTimer)
+		if (gameLocal.time > jockeyTimer && stress_jockey.GetBool())
 		{
 			jockeyTimer = gameLocal.time + 30000;
 			if (!gameLocal.GetLocalPlayer()->IsJockeying())
@@ -165,6 +223,97 @@ void idStressTester::Think(void)
 		}
 
 		UpdateStuckLogic();
+
+
+		saveloadTimer -= gameLocal.msec; // using subtraction of frame time, since saving/loading can take up variable amounts of gameLocal.time
+		if (saveloadTimer <= 0 && stress_savegame.GetInteger() == STS_RANDOMSAVELOAD)
+		{
+			//BC behavior 1 = do random saving and loading
+			saveloadTimer = gameLocal.random.RandomInt(stress_savetimer_min.GetInteger(), stress_savetimer_max.GetInteger());
+
+			//just make the saveload be a random choice.
+			bool isSaving = gameLocal.random.RandomInt(100) <= 33;
+			// save once first (until sg is finalized, due to outdated save info causing issues, though this might not be an issue with autosave)
+			static bool savedOnce = false;
+			isSaving = isSaving || !savedOnce;
+
+			if (isSaving)
+			{
+				//do save.
+				savedOnce = true;
+				common->Printf("Stresstest: attempting to savegamesession.\n");
+				cmdSystem->BufferCommandText(CMD_EXEC_APPEND, va("savegamesession", name.c_str()));
+			}
+			else
+			{
+				//do load.
+				common->Printf("Stresstest: attempting to LoadLatestSave()\n");
+				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "loadgamesession" );
+				//LoadLatestSave();
+			}
+		}
+		else if (saveloadTimer <= 0 && stress_savegame.GetInteger() == STS_RANDOMLOAD)
+		{
+			//BC behavior 2 = ONLY do randomly loading game
+			LoadRandomSave();			
+			return;
+		}
+		else if (saveloadTimer <= 0 && stress_savegame.GetInteger() == STS_LOADHUBS)
+		{
+			//BC behavior 3 = end the mission (if hub level), otherwise load
+			saveloadTimer = gameLocal.random.RandomInt(stress_savetimer_min.GetInteger(), stress_savetimer_max.GetInteger());
+
+			idStr currentmapname = gameLocal.GetMapNameStripped();
+			if (currentmapname.Find("vig_hub", false) >= 0)
+			{
+				//is hub level.
+
+				//set some random persistent args.
+				for (int i = 2; i < 18; i++)
+				{
+					if (gameLocal.random.RandomInt(2) >= 1)
+					{
+						gameLocal.GetLocalPlayer()->PickupTape(i);
+					}
+				}
+				
+				//end mission.
+				cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "debugendmission");
+				return;
+			}
+			else
+			{
+				LoadRandomSave();
+				return;
+			}
+		}
+		else if (saveloadTimer <= 0 && stress_savegame.GetInteger() == STS_LOADALLMAPS)
+		{
+			//BC behavior 4 = end the mission. Go to next mission. The end result of this is doing an autosave for every level.
+			saveloadTimer = gameLocal.random.RandomInt(stress_savetimer_min.GetInteger(), stress_savetimer_max.GetInteger());
+
+			if (gameLocal.GetLocalPlayer()->GetLevelProgressionIndex() >= 22)
+			{
+				//Game has ended. Return to tutorial to restart the loop.
+				gameLocal.GetLocalPlayer()->DebugSetLevelProgressionIndex(0); //BC 4-21-2025: manually reset the campaign progress.
+				cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "map vig_tutorial");
+				return;
+			}
+
+			cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "impulse 25"); //This ends the mission. We use this instead of debugEndmission because impulse25 skips the post-game spectator mode.
+			return;
+		}
+
+
+		// unlock one barricade per frame to prevent overflowing event capacity
+		for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+		{
+			if (ent->IsType(idDoorBarricade::Type) && ((idDoorBarricade*)ent)->owningDoor.IsValid() )
+			{
+				static_cast<idDoorBarricade*>(ent)->DoHack();
+				break;
+			}
+		}
 	}
 
 	//Restart map 
@@ -172,8 +321,25 @@ void idStressTester::Think(void)
 	{
 		globalRestartTimer = gameLocal.time + 900000; //this is just so that we don't try to restart the map multiple times.
 		//restart map.
-		idStr restartCommand = "reloadScript";
-		cmdSystem->BufferCommandText(CMD_EXEC_NOW, restartCommand.c_str());
+		//idStr restartCommand = "reloadScript";
+		//cmdSystem->BufferCommandText(CMD_EXEC_NOW, restartCommand.c_str());
+
+		//BC 4-8-2025: map restart now uses the actual map restart logic (and not "reloadscript")
+		idStr mapname;
+		mapname = gameLocal.GetMapName();
+		mapname.StripPath();
+		mapname.StripFileExtension();
+		mapname.StripPath();
+		mapname.ToLower();
+
+		if (stress_continueafterrestart.GetBool())
+		{
+			cmdSystem->BufferCommandText(CMD_EXEC_APPEND, va("map %s;\n savegameauto %s;\n stresstest;\n",mapname.c_str(), mapname.c_str()) );
+		}
+		else
+		{
+			sessLocal.MoveToNewMap(mapname.c_str());
+		}
 	}
 
 	//Unlock all fuseboxes after a set time.
@@ -182,6 +348,51 @@ void idStressTester::Think(void)
 		hasUnlockedGlobalFusebox = true;
 		UnlockAllFusebox();
 	}
+}
+
+void idStressTester::LoadRandomSave()
+{
+	saveloadTimer = gameLocal.random.RandomInt(stress_savetimer_min.GetInteger(), stress_savetimer_max.GetInteger());
+
+	idStrList fileList;
+	idList<fileTIME_T> fileTimes;
+	sessLocal.GetSaveGameList(fileList, fileTimes);
+
+	if (fileList.Num() <= 0)
+	{
+		common->Warning("Stresstest: savegame folder is empty...");
+		return; //folder is empty, so do early exit here.
+	}
+
+	//randomly select a savegame.
+	int randomSaveIndex = gameLocal.random.RandomInt(fileList.Num());
+	common->Printf("Stresstest: loading '%s'\n", fileList[randomSaveIndex].c_str());
+
+	idStr loadcommand = idStr::Format("loadGame %s", fileList[randomSaveIndex].c_str());
+	cmdSystem->BufferCommandText(CMD_EXEC_APPEND, loadcommand.c_str());
+}
+
+void idStressTester::LoadLatestSave()
+{
+	idStrList fileList;
+	idList<fileTIME_T> fileTimes;
+	sessLocal.GetSaveGameList(fileList, fileTimes);
+
+	if (fileList.Num() <= 0)
+	{
+		common->Warning("savegame folder is empty.");
+		return; //folder is empty, so do early exit here.
+	}
+
+	idStrList loadGameList;
+	loadGameList.Clear();
+	loadGameList.SetNum(fileList.Num());
+
+	loadGameList[0] = fileList[fileTimes[0].index]; //This sorts by date.
+
+	//idStr savefilename = idStr::Format("savegames/%s.txt", fileList[i].c_str());
+	sessLocal.LoadGame(loadGameList[0]);
+	
 }
 
 void idStressTester::UpdateStuckLogic()

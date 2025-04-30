@@ -17,7 +17,7 @@ public:
 							idSpaceMine(void);
 	virtual					~idSpaceMine(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 	virtual void			Think( void );
@@ -58,14 +58,14 @@ private:
 	
 	int						moveSpeed;
 
-	const idDeclParticle *	trailParticles;
+	const idDeclParticle *	trailParticles = nullptr;
 	int						trailParticlesFlyTime;
 
 	idEntityPtr<idEntity>	pursuitTarget;
 
-	idBeam*					wireOrigin;
-	idBeam*					wireTarget;
-	idEntity				*harpoonModel;
+	idBeam*					wireOrigin = nullptr;
+	idBeam*					wireTarget = nullptr;
+	idEntity				*harpoonModel = nullptr;
 	bool					harpoonActive;
 	void					RemoveHarpoon();
 

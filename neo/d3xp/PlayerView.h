@@ -122,7 +122,7 @@ public:
 	// primary functions
 	bool					SetTriggerState( bool active );
 
-	virtual void			Save( idSaveGame *savefile );
+	virtual void			Save( idSaveGame *savefile ); // blendo eric: savegame pass 1
 	virtual void			Restore( idRestoreGame *savefile );
 
 	// fader functions
@@ -238,7 +238,7 @@ public:
 
 	void					EnableGrabber( bool active )			{ grabberEnabled = active; startWarpTime = gameLocal.slow.time; };
 
-	virtual void			Save( idSaveGame *savefile );
+	virtual void			Save( idSaveGame *savefile ); // blendo eric: savegame pass 1
 	virtual void			Restore( idRestoreGame *savefile );
 };
 
@@ -509,7 +509,7 @@ public:
 	FullscreenFX*			GetFX( int index )		{ return fx[index]; };
 	FullscreenFX*			FindFX( idStr name );
 
-	void					Save( idSaveGame *savefile );
+	void					Save( idSaveGame *savefile ); // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 };
 
@@ -527,7 +527,7 @@ class idPlayerView {
 public:
 						idPlayerView();
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				SetPlayerEntity( class idPlayer *playerEnt );

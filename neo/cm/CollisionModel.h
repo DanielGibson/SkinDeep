@@ -64,26 +64,30 @@ typedef enum {
 	CONTACT_TRMVERTEX						// trace model vertex hits model polygon
 } contactType_t;
 
+
+// blendo eric: providing default vals, since these might be constructed as members
+//				but shouldn't slow down game (?)
 // contact info
-typedef struct {
-	contactType_t			type;			// contact type
-	idVec3					point;			// point of contact
-	idVec3					normal;			// contact plane normal
-	float					dist;			// contact plane distance
-	int						contents;		// contents at other side of surface
-	const idMaterial *		material;		// surface material
-	int						modelFeature;	// contact feature on model
-	int						trmFeature;		// contact feature on trace model
-	int						entityNum;		// entity the contact surface is a part of
-	int						id;				// id of clip model the contact surface is part of
+typedef struct contactInfo_s {
+	contactType_t			type = CONTACT_NONE;	// contact type
+	idVec3					point = vec3_zero;		// point of contact
+	idVec3					normal= vec3_zero;		// contact plane normal
+	float					dist = 0;				// contact plane distance
+	int						contents = 0;			// contents at other side of surface
+	const idMaterial *		material = nullptr;		// surface material
+	int						modelFeature = 0;		// contact feature on model
+	int						trmFeature = 0;			// contact feature on trace model
+	int						entityNum = 0;			// entity the contact surface is a part of
+	int						id = -1;				// id of clip model the contact surface is part of
 } contactInfo_t;
 
+// blendo eric: providing default vals, since these might be constructed as members
 // trace result
 typedef struct trace_s {
-	float					fraction;		// fraction of movement completed, 1.0 = didn't hit anything
-	idVec3					endpos;			// final position of trace model
-	idMat3					endAxis;		// final axis of trace model
-	contactInfo_t			c;				// contact information, only valid if fraction < 1.0
+	float					fraction = idMath::INFINITY;			// fraction of movement completed, 1.0 = didn't hit anything
+	idVec3					endpos = vec3_zero;			// final position of trace model
+	idMat3					endAxis = mat3_identity;	// final axis of trace model
+	contactInfo_t			c = contactInfo_t();		// contact information, only valid if fraction < 1.0
 } trace_t;
 
 typedef int cmHandle_t;

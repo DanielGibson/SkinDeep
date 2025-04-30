@@ -79,10 +79,44 @@ void idOxygenStation::Spawn(void)
 
 void idOxygenStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( animTimer ); // int animTimer
+	savefile->WriteInt( animState ); // int animState
+
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteInt( remainingAirTics ); // int remainingAirTics
+	savefile->WriteInt( maxAirTics ); // int maxAirTics
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+
+	savefile->WriteFloat( armStartPos ); // float armStartPos
+	savefile->WriteFloat( armEndPos ); // float armEndPos
+
+	savefile->WriteInt( announceTimer ); // int announceTimer
 }
 
 void idOxygenStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( animTimer ); // int animTimer
+	savefile->ReadInt( animState ); // int animState
+
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadInt( remainingAirTics ); // int remainingAirTics
+	savefile->ReadInt( maxAirTics ); // int maxAirTics
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadFloat( armStartPos ); // float armStartPos
+	savefile->ReadFloat( armEndPos ); // float armEndPos
+
+	savefile->ReadInt( announceTimer ); // int announceTimer
 }
 
 //void idOxygenStation::Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType)

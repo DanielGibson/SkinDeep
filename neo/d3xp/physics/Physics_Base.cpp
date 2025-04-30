@@ -69,22 +69,16 @@ idPhysics_Base::Save
 ================
 */
 void idPhysics_Base::Save( idSaveGame *savefile ) const {
-	int i;
+	savefile->WriteObject( self ); //  idEntity * self
 
-	savefile->WriteObject( self );
-	savefile->WriteInt( clipMask );
-	savefile->WriteVec3( gravityVector );
-	savefile->WriteVec3( gravityNormal );
+	savefile->WriteInt( clipMask ); //  int clipMask
+	savefile->WriteVec3( gravityVector ); //  idVec3 gravityVector
+	savefile->WriteVec3( gravityNormal ); //  idVec3 gravityNormal
 
-	savefile->WriteInt( contacts.Num() );
-	for ( i = 0; i < contacts.Num(); i++ ) {
-		savefile->WriteContactInfo( contacts[i] );
-	}
+	SaveFileWriteArray( contacts, contacts.Num(), WriteContactInfo); //  idList<contactInfo_t> contacts
+	SaveFileWriteArray( contactEntities, contactEntities.Num(), WriteObject); //  idList<contactEntity_t> contactEntities
 
-	savefile->WriteInt( contactEntities.Num() );
-	for ( i = 0; i < contactEntities.Num(); i++ ) {
-		contactEntities[i].Save( savefile );
-	}
+	savefile->WriteBool( neverBlock ); //  bool neverBlock
 }
 
 /*
@@ -93,24 +87,16 @@ idPhysics_Base::Restore
 ================
 */
 void idPhysics_Base::Restore( idRestoreGame *savefile ) {
-	int i, num;
+	savefile->ReadObject( self ); //  idEntity * self
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
-	savefile->ReadInt( clipMask );
-	savefile->ReadVec3( gravityVector );
-	savefile->ReadVec3( gravityNormal );
+	savefile->ReadInt( clipMask ); //  int clipMask
+	savefile->ReadVec3( gravityVector ); //  idVec3 gravityVector
+	savefile->ReadVec3( gravityNormal ); //  idVec3 gravityNormal
 
-	savefile->ReadInt( num );
-	contacts.SetNum( num );
-	for ( i = 0; i < contacts.Num(); i++ ) {
-		savefile->ReadContactInfo( contacts[i] );
-	}
+	SaveFileReadList( contacts, ReadContactInfo); //  idList<contactInfo_t> contacts
+	SaveFileReadList( contactEntities, ReadObject); //  idList<contactEntity_t> contactEntities
 
-	savefile->ReadInt( num );
-	contactEntities.SetNum( num );
-	for ( i = 0; i < contactEntities.Num(); i++ ) {
-		contactEntities[i].Restore( savefile );
-	}
+	savefile->ReadBool( neverBlock ); //  bool neverBlock
 }
 
 /*
@@ -541,7 +527,7 @@ void idPhysics_Base::ClearContacts( void ) {
 
 	for ( i = 0; i < contacts.Num(); i++ ) {
 		ent = gameLocal.entities[ contacts[i].entityNum ];
-		if ( ent ) {
+		if ( ent && ent->GetPhysics() && (ent->thinkFlags != TH_DISABLED )) {
 			ent->RemoveContactEntity( self );
 		}
 	}

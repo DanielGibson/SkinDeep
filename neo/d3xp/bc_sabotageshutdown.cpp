@@ -12,12 +12,14 @@ END_CLASS
 
 void idSabotageShutdown::Save( idSaveGame *savefile ) const
 {
-	savefile->WriteInt(state);
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
 }
 
 void idSabotageShutdown::Restore( idRestoreGame *savefile )
 {
-	savefile->ReadInt(state);
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
 }
 
 void idSabotageShutdown::Spawn( void )

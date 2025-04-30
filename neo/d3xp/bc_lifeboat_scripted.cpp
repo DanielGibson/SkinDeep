@@ -27,14 +27,14 @@ END_CLASS
 
 idLifeboatScripted::~idLifeboatScripted(void)
 {
-	if (beamStart != nullptr)
+	if (beamStart.IsValid())
 	{
-		delete beamStart;
+		beamStart.GetEntity()->PostEventMS(&EV_Remove, 0);
 	}
 
-	if (beamEnd != nullptr)
+	if (beamEnd.IsValid())
 	{
-		delete beamEnd;
+		beamEnd.GetEntity()->PostEventMS(&EV_Remove, 0);
 	}
 }
 
@@ -69,10 +69,24 @@ void idLifeboatScripted::Event_PostSpawn(void)
 
 void idLifeboatScripted::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( lookCounter ); // int lookCounter
+
+	savefile->WriteObject( beamEnd ); // idEntity* beamEnd
+	savefile->WriteObject( beamStart ); // idEntity* beamStart
 }
 
 void idLifeboatScripted::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( lookCounter ); // int lookCounter
+
+	savefile->ReadObject( beamEnd ); // idEntity* beamEnd
+	savefile->ReadObject( beamStart ); // idEntity* beamStart
 }
 
 void idLifeboatScripted::Think(void)
@@ -183,15 +197,15 @@ void idLifeboatScripted::Event_Activate(idEntity* activator)
 	idVec3 targetPos = targets[0].GetEntity()->GetPhysics()->GetOrigin();
 	idDict args;
 	beamEnd = (idBeam*)gameLocal.SpawnEntityType(idBeam::Type, &args);
-	beamEnd->SetOrigin(targetPos);
+	beamEnd.GetEntity()->SetOrigin(targetPos);
 
 	args.Clear();
-	args.Set("target", beamEnd->name.c_str());
+	args.Set("target", beamEnd.GetEntity()->name.c_str());
 	args.SetVector("origin", GetPhysics()->GetOrigin());
 	args.SetBool("start_off", false);
 	args.Set("width", spawnArgs.GetString("laserwidth", "8"));
 	args.Set("skin", spawnArgs.GetString("laserskin", "skins/beam_beacon"));
 	beamStart = (idBeam*)gameLocal.SpawnEntityType(idBeam::Type, &args);
-	beamStart->Hide(); //For some reason start_off causes problems.... so spawn it normally, and then do a hide() here. oh well :/
+	beamStart.GetEntity()->Hide(); //For some reason start_off causes problems.... so spawn it normally, and then do a hide() here. oh well :/
 	
 }

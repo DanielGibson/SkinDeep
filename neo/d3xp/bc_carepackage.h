@@ -17,7 +17,7 @@ public:
 							idCarepackage(void);
 	virtual					~idCarepackage(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 	virtual void			Think( void );
@@ -35,7 +35,7 @@ private:
 	carepackage_state_t		state;
 	int						stateTimer;
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	renderLight_t			boatlight;
 	qhandle_t				boatlightHandle;
@@ -44,15 +44,15 @@ private:
 	void					EquipSecondarySlot();
 	void					EquipTertiarySlot();
 
-	idEntity *				packageMini;
+	idEntity *				packageMini = nullptr;
 
 	void					DeployPackage(idVec3 _pos, idMat3 _rot);
 	idVec3					FindClearSpot(idVec3 _pos, idMat3 _rot);
 
 
 	void					DoTetherWire(idVec3 _pos, int _idx);
-	idBeam*					wireOrigin[2];
-	idBeam*					wireTarget[2];
+	idBeam*					wireOrigin[2] = {};
+	idBeam*					wireTarget[2] = {};
 
 	void					SpawnDebrisPanels();
 

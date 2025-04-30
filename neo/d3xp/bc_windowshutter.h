@@ -13,7 +13,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					SetShutterOpen(bool value);
@@ -32,6 +32,9 @@ private:
 	enum                    {SHT_IDLE, SHT_SHUTTERING, SHT_SHUTTERED};
 	int						shutterState;
 	int						shutterTimer;
+
+	//BC 3-26-2025: locbox.
+	idEntity*				locbox = nullptr;
 
 };
 //#pragma once#pragma once

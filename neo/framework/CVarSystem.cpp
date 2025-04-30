@@ -456,7 +456,7 @@ public:
 
 	virtual void			ResetFlaggedVariables( int flags );
 	virtual void			RemoveFlaggedAutoCompletion( int flags );
-	virtual void			WriteFlaggedVariables( int flags, const char *setCmd, idFile *f ) const;
+	virtual void			WriteFlaggedVariables( int flags, const char *setCmd, idFile *f, int excludeFlags = 0) const;
 
 	virtual const idDict *	MoveCVarsToDict( int flags ) const;
 	virtual void			SetCVarsFromDict( const idDict &dict );
@@ -856,10 +856,10 @@ Appends lines containing "set variable value" for all variables
 with the "flags" flag set to true.
 ============
 */
-void idCVarSystemLocal::WriteFlaggedVariables( int flags, const char *setCmd, idFile *f ) const {
+void idCVarSystemLocal::WriteFlaggedVariables( int flags, const char *setCmd, idFile *f, int excludeFlags /*= 0*/ ) const {
 	for( int i = 0; i < cvars.Num(); i++ ) {
 		idInternalCVar *cvar = cvars[i];
-		if ( cvar->GetFlags() & flags ) {
+		if ( (cvar->GetFlags() & flags) == flags && !(cvar->GetFlags() & excludeFlags) ) {
 			f->Printf( "%s %s \"%s\"\n", setCmd, cvar->GetName(), cvar->GetString() );
 		}
 	}

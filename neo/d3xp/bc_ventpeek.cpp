@@ -134,10 +134,58 @@ void idVentpeek::Event_PostSpawn(void)
 
 void idVentpeek::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( peekEnt ); // idEntityPtr<idEntity> peekEnt
+
+	savefile->WriteBool( forVentDoor ); // bool forVentDoor
+	savefile->WriteBool( forTelescope ); // bool forTelescope
+
+	savefile->WriteObject( ownerEnt ); // idEntityPtr<idEntity> ownerEnt
+
+	savefile->WriteInt( harc ); // int harc
+	savefile->WriteInt( varc ); // int varc
+	savefile->WriteFloat( rotateScale ); // float rotateScale
+
+	savefile->WriteInt( peekTimer ); // int peekTimer
+
+	savefile->WriteInt( peekState ); // int peekState
+
+	savefile->WriteInt( peekType ); // int peekType
+	savefile->WriteBool( bidirectional ); // bool bidirectional
+	savefile->WriteBool( stopIfOpen ); // bool stopIfOpen
+
+	savefile->WriteFloat( turningSoundThreshold ); // float turningSoundThreshold
+	savefile->WriteInt( turningSoundDelay ); // int turningSoundDelay
+	savefile->WriteBool( lockListener ); // bool lockListener
+
+	savefile->WriteBool( canFrobExit ); // bool canFrobExit
 }
 
 void idVentpeek::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( peekEnt ); // idEntityPtr<idEntity> peekEnt
+
+	savefile->ReadBool( forVentDoor ); // bool forVentDoor
+	savefile->ReadBool( forTelescope ); // bool forTelescope
+
+	savefile->ReadObject( ownerEnt ); // idEntityPtr<idEntity> ownerEnt
+
+	savefile->ReadInt( harc ); // int harc
+	savefile->ReadInt( varc ); // int varc
+	savefile->ReadFloat( rotateScale ); // float rotateScale
+
+	savefile->ReadInt( peekTimer ); // int peekTimer
+
+	savefile->ReadInt( peekState ); // int peekState
+
+	savefile->ReadInt( peekType ); // int peekType
+	savefile->ReadBool( bidirectional ); // bool bidirectional
+	savefile->ReadBool( stopIfOpen ); // bool stopIfOpen
+
+	savefile->ReadFloat( turningSoundThreshold ); // float turningSoundThreshold
+	savefile->ReadInt( turningSoundDelay ); // int turningSoundDelay
+	savefile->ReadBool( lockListener ); // bool lockListener
+
+	savefile->ReadBool( canFrobExit ); // bool canFrobExit
 }
 
 void idVentpeek::Think(void)
@@ -742,6 +790,8 @@ void idVentpeekTelescope::Event_PostSpawn(void)
 	fastForwardIteration = 0;
 	fastForwardWait = 0;
 
+	lockOnFunction = NULL; // SW 2nd April 2025: fixes save/load crash in observatory
+
 	//sanity check
 	if (targets.Num() <= 0)
 	{
@@ -756,6 +806,135 @@ void idVentpeekTelescope::Event_PostSpawn(void)
 		gameLocal.Error("ventpeek '%s' has bad target.", GetName());
 		return;
 	}
+}
+
+void idVentpeekTelescope::Save(idSaveGame* savefile) const
+{
+	savefile->WriteFloat( maxFov ); // float maxFov
+	savefile->WriteFloat( minFov ); // float minFov
+	savefile->WriteFloat( fovStep ); // float fovStep
+	savefile->WriteFloat( currentFov ); // float currentFov
+
+	savefile->WriteFloat( fovLerpStart ); // float fovLerpStart
+	savefile->WriteFloat( fovLerpEnd ); // float fovLerpEnd
+	savefile->WriteFloat( fovLerpStartTime ); // float fovLerpStartTime
+	savefile->WriteFloat( fovLerpEndTime ); // float fovLerpEndTime
+	savefile->WriteInt( fovLerpType ); // int fovLerpType
+
+	savefile->WriteBool( fovIsLerping ); // bool fovIsLerping
+
+	savefile->WriteBool( canUseCamera ); // bool canUseCamera
+	savefile->WriteInt( cameraTimer ); // int cameraTimer
+	savefile->WriteInt( cameraState ); // int cameraState
+
+	savefile->WriteInt( photoCount ); // int photoCount
+
+	savefile->WriteBool( canPanAndZoom ); // bool canPanAndZoom
+	savefile->WriteBool( isLockedOn ); // bool isLockedOn
+	savefile->WriteFunction( lockOnFunction ); // const function_t* lockOnFunction
+
+	savefile->WriteObject( nextTarget ); // idEntityPtr<idEntity> nextTarget
+	savefile->WriteObject( previousTarget ); // idEntityPtr<idEntity> previousTarget
+
+	savefile->WriteInt( zoomTransitionState ); // int zoomTransitionState
+	savefile->WriteInt( zoomTransitionTimer ); // int zoomTransitionTimer
+	savefile->WriteInt( zoomTransitionTimerStart ); // int zoomTransitionTimerStart
+
+
+	savefile->WriteInt( lookTargets.Num() ); // idList<idLookTarget> lookTargets
+
+	for (int idx = 0; idx < lookTargets.Num(); idx++)
+	{
+		savefile->WriteObject( lookTargets[idx].entity ); // const idEntity* entity
+		savefile->WriteFunction( lookTargets[idx].focusFunction ); // const function_t* focusFunction
+		savefile->WriteFunction( lookTargets[idx].seenFunction ); // const function_t* seenFunction
+		savefile->WriteInt( lookTargets[idx].seenTime ); // int seenTime
+		savefile->WriteBool( lookTargets[idx].seen ); // bool seen
+	}
+
+	int foundIdx = -1; // idLookTarget* currentFocusTarget
+	for (int idx = 0; idx < lookTargets.Num(); idx++)
+	{
+		if (currentFocusTarget == &lookTargets[idx])
+		{
+			foundIdx = idx;
+			break;
+		}
+	}
+	savefile->WriteInt(foundIdx);
+
+	savefile->WriteInt( focusTime ); // int focusTime
+
+	savefile->WriteBool( isCracked ); // bool isCracked
+	savefile->WriteBool( isFastForward ); // bool isFastForward
+	savefile->WriteInt( fastForwardIteration ); // int fastForwardIteration
+	savefile->WriteInt( fastForwardWait ); // int fastForwardWait
+}
+
+void idVentpeekTelescope::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadFloat( maxFov ); // float maxFov
+	savefile->ReadFloat( minFov ); // float minFov
+	savefile->ReadFloat( fovStep ); // float fovStep
+	savefile->ReadFloat( currentFov ); // float currentFov
+
+	savefile->ReadFloat( fovLerpStart ); // float fovLerpStart
+	savefile->ReadFloat( fovLerpEnd ); // float fovLerpEnd
+	savefile->ReadFloat( fovLerpStartTime ); // float fovLerpStartTime
+	savefile->ReadFloat( fovLerpEndTime ); // float fovLerpEndTime
+	savefile->ReadInt( fovLerpType ); // int fovLerpType
+
+	savefile->ReadBool( fovIsLerping ); // bool fovIsLerping
+
+	savefile->ReadBool( canUseCamera ); // bool canUseCamera
+	savefile->ReadInt( cameraTimer ); // int cameraTimer
+	savefile->ReadInt( cameraState ); // int cameraState
+
+	savefile->ReadInt( photoCount ); // int photoCount
+
+	savefile->ReadBool( canPanAndZoom ); // bool canPanAndZoom
+	savefile->ReadBool( isLockedOn ); // bool isLockedOn
+	savefile->ReadFunction( lockOnFunction ); // const function_t* lockOnFunction
+
+	savefile->ReadObject( nextTarget ); // idEntityPtr<idEntity> nextTarget
+	savefile->ReadObject( previousTarget ); // idEntityPtr<idEntity> previousTarget
+
+	savefile->ReadInt( zoomTransitionState ); // int zoomTransitionState
+	savefile->ReadInt( zoomTransitionTimer ); // int zoomTransitionTimer
+	savefile->ReadInt( zoomTransitionTimerStart ); // int zoomTransitionTimerStart
+
+	int num;
+	savefile->ReadInt( num ); // idList<idLookTarget> lookTargets
+	lookTargets.SetNum( num );
+	for (int idx = 0; idx < num; idx++)
+	{
+		idClass* obj;
+		savefile->ReadObject( obj ); // const idEntity* entity
+		lookTargets[idx].entity = (idEntity*)obj;
+		savefile->ReadFunction( lookTargets[idx].focusFunction ); // const function_t* focusFunction
+		savefile->ReadFunction( lookTargets[idx].seenFunction ); // const function_t* seenFunction
+		savefile->ReadInt( lookTargets[idx].seenTime ); // int seenTime
+		savefile->ReadBool( lookTargets[idx].seen ); // bool seen
+	}
+
+	int foundIdx;
+	savefile->ReadInt(foundIdx); // idLookTarget* currentFocusTarget
+
+	if (foundIdx >= 0)
+	{
+		currentFocusTarget = &lookTargets[foundIdx];
+	}
+	else
+	{
+		currentFocusTarget = nullptr;
+	}
+
+	savefile->ReadInt( focusTime ); // int focusTime
+
+	savefile->ReadBool( isCracked ); // bool isCracked
+	savefile->ReadBool( isFastForward ); // bool isFastForward
+	savefile->ReadInt( fastForwardIteration ); // int fastForwardIteration
+	savefile->ReadInt( fastForwardWait ); // int fastForwardWait
 }
 
 bool idVentpeekTelescope::IsLensCracked()

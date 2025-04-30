@@ -16,7 +16,7 @@ public:
 							idLostAndFound(void);
 	virtual					~idLostAndFound(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -43,11 +43,17 @@ private:
 	int						stateTimer;
 	int						updateCacheTimer;
 
-	idListGUI *				itemList;		// easy map list handling
+	idListGUI *				itemList = nullptr;		// easy map list handling
 
 	const idDeclEntityDef	*itemDef;
 
 	idProximityAnnouncer	proximityAnnouncer;
+
+	//BC 3-25-2025: locbox.
+	idEntity* locbox = nullptr;
+
+	//BC 4-10-2025: more robust handling of finding a candidate position for spawning objects.
+	idVec3					FindValidSpawnPosition(idBounds itemBounds);
 
 };
 //#pragma once

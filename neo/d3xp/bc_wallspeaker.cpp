@@ -18,12 +18,19 @@ END_CLASS
 
 idWallspeaker::idWallspeaker(void)
 {
+	//physicsObj = idPhysics_RigidBody();
+	soundwaves = {};
+	deathtimer = {};
 }
 
 idWallspeaker::~idWallspeaker(void)
 {
 	physicsObj.PostEventMS(&EV_Remove, 0);
-	soundwaves->PostEventMS(&EV_Remove, 0);
+	if ( soundwaves ) // check, since might not exist on savegame load failure
+	{
+		soundwaves->PostEventMS(&EV_Remove, 0);
+		soundwaves = nullptr;
+	}
 }
 
 void idWallspeaker::Spawn(void)
@@ -51,10 +58,28 @@ void idWallspeaker::Spawn(void)
 
 void idWallspeaker::Save(idSaveGame *savefile) const
 {
+	savefile->WriteStaticObject( idWallspeaker::physicsObj ); //  idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	assert( soundwaves );
+	savefile->WriteObject(soundwaves); //  idFuncEmitter *soundwaves;
+	savefile->WriteInt( deathtimer ); //  int deathtimer
 }
 
 void idWallspeaker::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadStaticObject(physicsObj); //  idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadObject(reinterpret_cast<idClass*&>(soundwaves)); //  idFuncEmitter *soundwaves;
+	assert( soundwaves );
+	savefile->ReadInt( deathtimer ); //  int deathtimer
 }
 
 void idWallspeaker::Think(void)

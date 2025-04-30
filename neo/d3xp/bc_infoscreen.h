@@ -13,7 +13,7 @@ public:
 							idInfoScreen(void);
 	virtual					~idInfoScreen(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -29,7 +29,7 @@ private:
 	enum					{ INFOSTAT_IDLE, INFOSTAT_DAMAGED };
 	int						infoState;
 	
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	renderLight_t			headlight;
 	qhandle_t				headlightHandle;

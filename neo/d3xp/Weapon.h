@@ -110,9 +110,8 @@ public:
 
 	static void				CacheWeapon( const char *weaponName );
 
-	// save games
-	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
-	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
 
 	// Weapon definition management
 	void					Clear( void );

@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __USERCMDGEN_H__
 #define __USERCMDGEN_H__
 
+#include "framework/CVarSystem.h"
+
 /*
 ===============================================================================
 
@@ -103,40 +105,8 @@ const int IMPULSE_40			= 40;			// use vehicle
 // usercmd_t->flags
 const int UCF_IMPULSE_SEQUENCE	= 0x0001;		// toggled every time an impulse command is sent
 
-class usercmd_t {
-public:
-	int			gameFrame;						// frame number
-	int			gameTime;						// game time
-	int			duplicateCount;					// duplication count for networking
-	//byte		buttons;						// buttons
-	short		buttons;						//BC increase byte to short........... make sure this doesn't break anything yikes yikes
-	signed char	forwardmove;					// forward/backward movement
-	signed char	rightmove;						// left/right movement
-	signed char	upmove;							// up/down movement
-	short		angles[3];						// view angles
-	short		mx;								// mouse delta x
-	short		my;								// mouse delta y
-	signed char impulse;						// impulse command
-	byte		flags;							// additional flags
-	int			sequence;						// just for debugging
-	// SM: Added this to allow the player to make more decisions about what to do
-	int			*buttonState;					// current button state
-	int			*prevButtonState;				// button state for last frame
-
-public:
-	void		ByteSwap();						// on big endian systems, byte swap the shorts and ints
-	bool		operator==( const usercmd_t &rhs ) const;
-};
-
-typedef enum {
-	INHIBIT_SESSION = 0,
-	INHIBIT_ASYNC
-} inhibit_t;
-
-const int MAX_BUFFERED_USERCMD = 64;
-
 // SM: Move the move speed and button enums into the header
-const int KEY_MOVESPEED = 127; 
+const int KEY_MOVESPEED = 127;
 typedef enum {
 	UB_NONE,
 
@@ -240,6 +210,39 @@ typedef enum {
 	UB_MAX_BUTTONS
 } usercmdButton_t;
 
+class usercmd_t {
+public:
+	int			gameFrame;						// frame number
+	int			gameTime;						// game time
+	int			duplicateCount;					// duplication count for networking
+	//byte		buttons;						// buttons
+	short		buttons;						//BC increase byte to short........... make sure this doesn't break anything yikes yikes
+	signed char	forwardmove;					// forward/backward movement
+	signed char	rightmove;						// left/right movement
+	signed char	upmove;							// up/down movement
+	short		angles[3];						// view angles
+	short		mx;								// mouse delta x
+	short		my;								// mouse delta y
+	signed char impulse;						// impulse command
+	byte		flags;							// additional flags
+	int			sequence;						// just for debugging
+	// SM: Added this to allow the player to make more decisions about what to do
+	// eric blendo: altered to allow multiple copies
+	int buttonState[UB_MAX_BUTTONS];					// current button state
+	int prevButtonState[UB_MAX_BUTTONS];				// button state for last frame
+
+public:
+	void		ByteSwap();						// on big endian systems, byte swap the shorts and ints
+	bool		operator==( const usercmd_t &rhs ) const;
+};
+
+typedef enum {
+	INHIBIT_SESSION = 0,
+	INHIBIT_ASYNC
+} inhibit_t;
+
+const int MAX_BUFFERED_USERCMD = 64;
+
 class idUsercmdGen {
 public:
 	virtual				~idUsercmdGen( void ) {}
@@ -292,8 +295,16 @@ public:
 
 	virtual bool	IsUsingJoystick() const = 0;
 	virtual float	JoystickAxisState(int axis) const = 0;
+
+	// blendo eric
+	virtual int*		ButtonStates() = 0;
+	virtual int*		PrevButtonStates() = 0;
 };
 
 extern idUsercmdGen	*usercmdGen;
+
+extern idCVar m_sensitivity;
+extern idCVar m_pitch;
+extern idCVar m_yaw;
 
 #endif /* !__USERCMDGEN_H__ */

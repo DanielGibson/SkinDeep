@@ -26,6 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "sys/platform.h"
 
 #include "idlib/math/Simd_MMX.h"
@@ -362,3 +364,5 @@ loop2:
 }
 
 #endif /* _MSC_VER */
+
+#endif

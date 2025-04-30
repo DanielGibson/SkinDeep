@@ -49,6 +49,9 @@ idWindowseal::idWindowseal()
 	breachAnnounceTimer = 0;
 	leverEnt = NULL;
 	autoResealTimer = 0;
+
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idWindowseal::~idWindowseal(void)
@@ -69,9 +72,6 @@ void idWindowseal::Spawn(void)
 	renderEntity.noShadow = true;
 	pushTimer = 0;
 	pushDir = vec3_zero;
-
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 	gameLocal.DoOriginContainmentCheck(this);
 
@@ -114,6 +114,7 @@ void idWindowseal::Event_PostSpawn(void)
 			leverEnt = targets[i].GetEntity();
 			leverEnt->spawnArgs.SetInt("frobindex", LEVER_FROBINDEX);
 			leverEnt->GetPhysics()->GetClipModel()->SetOwner(this);
+			leverEnt->GetPhysics()->SetContents(0); // SW 24th April 2025: Don't let this lever be targeted by bash frob trace until it is visible
 			leverEnt->Hide();
 		}
 	}
@@ -131,10 +132,38 @@ void idWindowseal::Event_PostSpawn(void)
 
 void idWindowseal::Save(idSaveGame *savefile) const
 {
+	savefile->WriteString( fxActivate ); // idString fxActivate
+
+	savefile->WriteInt( timer ); // int timer
+
+	savefile->WriteInt( autoResealTimer ); // int autoResealTimer
+	savefile->WriteBool( autoReseal ); // bool autoReseal
+
+	savefile->WriteInt( state ); // int state
+	savefile->WriteVec3( pushDir ); // idVec3 pushDir
+	savefile->WriteInt( pushTimer ); // int pushTimer
+
+	savefile->WriteObject( leverEnt ); // idEntity * leverEnt
+
+	savefile->WriteInt( breachAnnounceTimer ); // int breachAnnounceTimer
 }
 
 void idWindowseal::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadString( fxActivate ); // idString fxActivate
+
+	savefile->ReadInt( timer ); // int timer
+
+	savefile->ReadInt( autoResealTimer ); // int autoResealTimer
+	savefile->ReadBool( autoReseal ); // bool autoReseal
+
+	savefile->ReadInt( state ); // int state
+	savefile->ReadVec3( pushDir ); // idVec3 pushDir
+	savefile->ReadInt( pushTimer ); // int pushTimer
+
+	savefile->ReadObject( leverEnt ); // idEntity * leverEnt
+
+	savefile->ReadInt( breachAnnounceTimer ); // int breachAnnounceTimer
 }
 
 //This gets triggered when the window is shattered. Seal starts broadcasting "Hey I need to be repaired"
@@ -218,6 +247,7 @@ void idWindowseal::Event_Activate()
 	{
 		//Lever was manually placed by the designer. Unhide it.
 		leverEnt->Show();
+		leverEnt->GetPhysics()->SetContents(CONTENTS_RENDERMODEL); // SW 24th April 2025
 	}
 
 	if (leverEnt != NULL)
@@ -313,6 +343,7 @@ void idWindowseal::Think()
 			if (leverEnt != NULL)
 			{
 				leverEnt->PostEventMS(&EV_Remove, 0);
+				leverEnt = nullptr;
 			}
 
 

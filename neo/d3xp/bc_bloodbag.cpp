@@ -25,10 +25,12 @@ END_CLASS
 
 void idBloodbag::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( hasExploded ); //  bool hasExploded
 }
 
 void idBloodbag::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( hasExploded ); //  bool hasExploded
 }
 
 void idBloodbag::Spawn(void)

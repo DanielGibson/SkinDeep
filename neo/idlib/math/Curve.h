@@ -43,6 +43,8 @@ If you have questions concerning this license or the applicable additional terms
 
 template< class type >
 class idCurve {
+	friend class idSaveGame;
+	friend class idRestoreGame;
 public:
 						idCurve( void );
 	virtual				~idCurve( void );
@@ -931,7 +933,8 @@ ID_INLINE void idCurve_CubicBezier<type>::BasisSecondDerivative( const float t, 
 
 template< class type >
 class idCurve_Spline : public idCurve<type> {
-
+	friend class idSaveGame;
+	friend class idRestoreGame;
 public:
 	enum				boundary_t { BT_FREE, BT_CLAMPED, BT_CLOSED };
 

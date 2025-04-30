@@ -27,6 +27,15 @@ END_CLASS
 
 idRadioWall::idRadioWall(void)
 {
+	isOn = false;
+
+	activateTimer = 0;
+
+	musicNotes = nullptr;
+	soundwaves = nullptr;
+
+	interestTimer = 0;
+
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
 
@@ -94,11 +103,40 @@ void idRadioWall::Spawn(void)
 
 
 void idRadioWall::Save(idSaveGame *savefile) const
-{
+{		
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
+	savefile->WriteBool( isOn ); //  bool isOn
+	savefile->WriteInt( activateTimer ); //  int activateTimer
+
+	savefile->WriteObject( musicNotes ); //  idFuncEmitter			* musicNotes
+	savefile->WriteObject( soundwaves ); //  idFuncEmitter			* soundwaves
+
+	savefile->WriteInt( interestTimer ); //  int interestTimer
+	savefile->WriteObject( interestPoint ); //  idEntityPtr<idEntity> interestPoint
+
+	savefile->WriteObject( idleSmoke ); //  idFuncEmitter			* idleSmoke
 }
 
 void idRadioWall::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadBool( isOn ); //  bool isOn
+	savefile->ReadInt( activateTimer ); //  int activateTimer
+
+	savefile->ReadObject( CastClassPtrRef(musicNotes) ); //  idFuncEmitter			* musicNotes
+	savefile->ReadObject( CastClassPtrRef(soundwaves) ); //  idFuncEmitter			* soundwaves
+
+	savefile->ReadInt( interestTimer ); //  int interestTimer
+	savefile->ReadObject( interestPoint ); //  idEntityPtr<idEntity> interestPoint
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); //  idFuncEmitter			* idleSmoke
 }
 
 idVec3 idRadioWall::GetSpeakerPos()
@@ -271,6 +309,8 @@ void idRadioWall::Killed(idEntity *inflictor, idEntity *attacker, int damage, co
 {
 	if (!fl.takedamage)
 		return;
+
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
 
 	SetActivate(false);
 	SetColor(0, 0, 0);

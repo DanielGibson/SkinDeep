@@ -10,6 +10,7 @@
 #include "bc_airlock_accumulator.h"
 #include "SmokeParticles.h"
 #include "ai/AI.h"
+#include "bc_gunner.h"
 #include "bc_meta.h"
 #include "bc_frobcube.h"
 #include "bc_airlock.h"
@@ -109,12 +110,13 @@ void idPirateship::Spawn(void)
     idVec3 frobPos = GetPhysics()->GetOrigin() + (forwardDir * -128) + (rightDir * 24);    
     args.Clear();
     args.Set("model", "models/objects/frobcube/cube4x4.ase");
-    args.Set("displayname", "Open");
+    args.Set("displayname", "#str_def_gameplay_900145");
     openFrobcube = gameLocal.SpawnEntityType(idFrobcube::Type, &args);
     openFrobcube->SetOrigin(frobPos);
     openFrobcube->GetPhysics()->GetClipModel()->SetOwner(this);
     static_cast<idFrobcube*>(openFrobcube)->SetIndex(DOOR_FROBINDEX);
     openFrobcube->Bind(this, false);
+	openFrobcube->Hide(); //BC 3-21-2025: hide the frobcube in dormant state.
 
 
 	//Spawn the particle emitters.
@@ -280,10 +282,76 @@ idEntity * idPirateship::FindMyAirlock()
 
 void idPirateship::Save(idSaveGame *savefile) const
 {
+	SaveFileWriteArray( boosterEmitter, 2, WriteObject ); // idFuncEmitter *boosterEmitter[2]
+
+	savefile->WriteObject( wireOrigin ); // idBeam* wireOrigin
+	savefile->WriteObject( wireTarget ); // idBeam* wireTarget
+
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteInt( moveStartTime ); // int moveStartTime
+
+
+	savefile->WriteObject( airlockEnt ); // idEntityPtr<idEntity> airlockEnt
+
+	savefile->WriteObject( openFrobcube ); // idEntity * openFrobcube
+
+	savefile->WriteInt( smokegrenadeCounter ); // int smokegrenadeCounter
+	savefile->WriteInt( smokegrenadeTimer ); // int smokegrenadeTimer
+
+	savefile->WriteInt( spawnIndex ); // int spawnIndex
+	savefile->WriteInt( spawnIntervalTimer ); // int spawnIntervalTimer
+	SaveFileWriteArray( spawnList, spawnList.Num(), WriteInt ); // idList<int> spawnList
+
+	savefile->WriteParticle( smoketrail ); // const idDeclParticle * smoketrail
+	savefile->WriteInt( smoketrailFlyTime ); // int smoketrailFlyTime
+
+	savefile->WriteObject( ftlPortal ); // idEntity * ftlPortal
+	savefile->WriteInt( portalFadeTimer ); // int portalFadeTimer
+	savefile->WriteBool( portalActive ); // bool portalActive
+
+	savefile->WriteInt( countdownValue ); // int countdownValue
+	savefile->WriteInt( countdownStartTime ); // int countdownStartTime
+
+	savefile->WriteInt( keylocationTimer ); // int keylocationTimer
+	savefile->WriteObject( dynatipEnt ); // idEntity * dynatipEnt
 }
 
 void idPirateship::Restore(idRestoreGame *savefile)
 {
+	SaveFileReadArrayCast( boosterEmitter, ReadObject, idClass*& ); // idFuncEmitter *boosterEmitter[2]
+
+	savefile->ReadObject( CastClassPtrRef(wireOrigin) ); // idBeam* wireOrigin
+	savefile->ReadObject( CastClassPtrRef(wireTarget) ); // idBeam* wireTarget
+
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadInt( moveStartTime ); // int moveStartTime
+
+
+	savefile->ReadObject( airlockEnt ); // idEntityPtr<idEntity> airlockEnt
+
+	savefile->ReadObject( openFrobcube ); // idEntity * openFrobcube
+
+	savefile->ReadInt( smokegrenadeCounter ); // int smokegrenadeCounter
+	savefile->ReadInt( smokegrenadeTimer ); // int smokegrenadeTimer
+
+	savefile->ReadInt( spawnIndex ); // int spawnIndex
+	savefile->ReadInt( spawnIntervalTimer ); // int spawnIntervalTimer
+	SaveFileReadList( spawnList, ReadInt ); // idList<int> spawnList
+
+	savefile->ReadParticle( smoketrail ); // const idDeclParticle * smoketrail
+	savefile->ReadInt( smoketrailFlyTime ); // int smoketrailFlyTime
+
+	savefile->ReadObject( ftlPortal ); // idEntity * ftlPortal
+	savefile->ReadInt( portalFadeTimer ); // int portalFadeTimer
+	savefile->ReadBool( portalActive ); // bool portalActive
+
+	savefile->ReadInt( countdownValue ); // int countdownValue
+	savefile->ReadInt( countdownStartTime ); // int countdownStartTime
+
+	savefile->ReadInt( keylocationTimer ); // int keylocationTimer
+	savefile->ReadObject( dynatipEnt ); // idEntity * dynatipEnt
 }
 
 void idPirateship::Think(void)
@@ -304,6 +372,7 @@ void idPirateship::Think(void)
 		if (gameLocal.time >= portalFadeTimer)
 		{
 			ftlPortal->PostEventMS(&EV_Remove, 0);
+			ftlPortal = nullptr;
 			portalActive = false;
 		}
 	}
@@ -362,11 +431,12 @@ void idPirateship::Think(void)
 
 			BecomeInactive(TH_UPDATEPARTICLES);
 
-			SetCountdownStr("Pirate boarding ship is docking with airlock.");
+			SetCountdownStr("#str_def_gameplay_boarding_docking");
 
 			if (dynatipEnt != NULL)
 			{
 				dynatipEnt->PostEventMS(&EV_Remove, 0);
+				dynatipEnt = nullptr;
 			}
         }
     }
@@ -448,6 +518,18 @@ void idPirateship::Think(void)
 			moveStartTime = gameLocal.time;
 			StartSound("snd_thump", SND_CHANNEL_ANY);
 
+			// SW 5th March 2025:
+			// Snap ship to airlock to avoid discrepancies caused by occasional mover wonkiness
+			// We need to find the dock position again and then SetOrigin()
+			int airlockOff = airlockEnt.GetEntity()->spawnArgs.GetFloat("exteriorbuttonoffset");
+			idVec3 airlockForward = airlockEnt.GetEntity()->GetPhysics()->GetAxis().ToAngles().ToForward();
+			idVec3 airlockDockPos = airlockEnt.GetEntity()->GetPhysics()->GetOrigin() + (airlockForward * (airlockOff + SHIP_HALFLENGTH - DOCK_OVERLAP_AMOUNT));
+
+			float verticalOffset = airlockEnt.GetEntity()->spawnArgs.GetFloat("airlockheight");
+			airlockDockPos += idVec3(0, 0, verticalOffset / 2);
+			Event_StopMoving();
+			SetOrigin(airlockDockPos);
+
 			//particle effect.			
 			idVec3 forward = GetPhysics()->GetAxis().ToAngles().ToForward();
 			idVec3 particlePos = GetPhysics()->GetOrigin() + forward * -SHIP_HALFLENGTH;
@@ -463,10 +545,18 @@ void idPirateship::Think(void)
 
 
 
+			// SW 5th March 2025: changed to coplanar so there's no possibility of us accidentally using the door portal
+			// Also changed how the butt position is calculated to avoid ambiguity
+			// 
+			// Handle the visportal. We expect a visportal near the outer edge of the airlock. It should be coplanar with the airlock's exterior edge. 
+			idVec3 buttPos = airlockEnt.GetEntity()->GetPhysics()->GetOrigin() + (airlockForward * airlockOff);
+			idBounds shipButtBounds = idBounds(buttPos).Expand(1);
 
-			//Handle the visportal. We expect a visportal near the outer edge of the airlock. It should be 4 units away from the airlock's exterior edge.
-			idVec3 buttPos = GetPhysics()->GetOrigin() + forward * -124;
-			idBounds shipButtBounds = idBounds(buttPos).Expand(4);
+			if (developer.GetBool())
+			{
+				gameRenderWorld->DebugBounds(idVec4(1, 1, 0, 1), shipButtBounds, vec3_origin, 10000);
+			}
+
 			qhandle_t portal = gameRenderWorld->FindPortal(shipButtBounds);
 			if (portal)
 			{
@@ -623,7 +713,7 @@ void idPirateship::Think(void)
 				StartSound("snd_doorclose", SND_CHANNEL_ANY);
 				moveStartTime = gameLocal.time + BOARDINGCREWONBOARD_MESSAGETIME;
 
-				SetCountdownStr("Pirate boarding crew is onboard.");
+				SetCountdownStr("#str_def_gameplay_boarding_onboard");
 			}
 		}
 	}
@@ -675,7 +765,7 @@ void idPirateship::UpdateKeyLocation()
 			float distance = (pirateshipButtPos - keyPos).Length();
 			distance *= DOOM_TO_METERS;
 
-			Event_SetGuiParm("keylocationtext", idStr::Format("#str_def_gameplay_pirateship_keylocation", locName.c_str(), distance)); /*KEY LOCATION:\n%s\nKEY DISTANCE:\n%.1f meters*/
+			Event_SetGuiParm("keylocationtext", idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_pirateship_keylocation"), locName.c_str(), distance)); /*KEY LOCATION:\n%s\nKEY DISTANCE:\n%.1f meters*/
 
 			return;
 		}		
@@ -749,7 +839,13 @@ bool idPirateship::SpawnPersonInAirlockViaEntNum(int idx)
 				static_cast<idAI *>(personEnt)->MoveToPosition(pathPosition);
 				//gameRenderWorld->DebugArrow(colorOrange, personEnt->targets[0].GetEntity()->GetPhysics()->GetOrigin(), pathPosition, 8, 90000);
 			}
-		}		
+		}	
+
+		// SW 2nd April 2025: keeps the pirates from immediately greeting each other the moment they exit the pirate ship (funny, but not intentional)
+		if (personEnt->IsType(idGunnerMonster::Type))
+		{
+			static_cast<idGunnerMonster*>(personEnt)->ResetCallresponseTimer();
+		}
 	}
 	
 	return true;
@@ -865,12 +961,14 @@ void idPirateship::StartEntranceSequence()
 	args.Clear();
 	args.SetVector("origin", GetPhysics()->GetOrigin()); //the postition doesn't really matter. the icon gets bound to the entity position in the dynatip logic.
 	args.Set("classname", "func_dynatip");
-	args.Set("text", "Pirate Reinforcements");
+	args.Set("text", "");
 	args.Set("mtr_icon", spawnArgs.GetString("mtr_hinticon"));
 	args.Set("target", this->GetName());
 	//args.SetVector("drawOffset", idVec3(0, 0, 80));
 	args.SetBool("force_on", true);
 	gameLocal.SpawnEntityDef(args, &dynatipEnt);
+
+	openFrobcube->Show(); //BC 3-21-2025: fixed bug where frob was available during dormant state.
 }
 
 void idPirateship::UpdateCountdownText()

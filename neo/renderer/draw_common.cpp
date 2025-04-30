@@ -517,8 +517,11 @@ void RB_STD_FillCustomMask(drawSurf_t** drawSurfs, int numDrawSurfs) {
 	GL_State(GLS_DEPTHFUNC_ALWAYS | GLS_DEPTHMASK);
 	
 	// We need logical OR writes for this pass
-	qglEnable(GL_COLOR_LOGIC_OP);
-	qglLogicOp(GL_OR);
+	if (!glConfig.isBrokenAMDR7200)
+	{
+		qglEnable(GL_COLOR_LOGIC_OP);
+		qglLogicOp(GL_OR);
+	}
 
 	R_GLSL_SetActiveProgram("customMaskPass");
 
@@ -526,7 +529,10 @@ void RB_STD_FillCustomMask(drawSurf_t** drawSurfs, int numDrawSurfs) {
 
 	R_GLSL_DisablePrograms();
 
-	qglDisable(GL_COLOR_LOGIC_OP);
+	if (!glConfig.isBrokenAMDR7200)
+	{
+		qglDisable(GL_COLOR_LOGIC_OP);
+	}
 
 	if (backEnd.viewDef->numClipPlanes) {
 		GL_SelectTexture(1);

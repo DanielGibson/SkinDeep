@@ -23,14 +23,23 @@ END_CLASS
 
 idLostAndFound::idLostAndFound(void)
 {
+	locbox = NULL;
+
 	proximityAnnouncer.sensor = this;
 	proximityAnnouncer.checkHealth = false;
 	proximityAnnouncer.coolDownPeriod = 10000;
+
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
+
+	itemList = uiManager->AllocListGUI();
 }
 
 idLostAndFound::~idLostAndFound(void)
 {
 	repairNode.Remove();
+
+	uiManager->FreeListGUI(itemList);
 }
 
 void idLostAndFound::Spawn(void)
@@ -47,8 +56,6 @@ void idLostAndFound::Spawn(void)
 
 	needsRepair = false;
 	repairrequestTimestamp = 0;
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 	UpdateVisuals();
 
@@ -56,12 +63,27 @@ void idLostAndFound::Spawn(void)
 	itemDef = nullptr;
 
 	//the list that the items will populate
-	itemList = uiManager->AllocListGUI();
 	itemList->Config(renderEntity.gui[0], "itemList");
 	itemList->Clear();
 	itemList->SetSelection(0);
 
 	proximityAnnouncer.Start();
+
+	//3-25-2025: locbox
+	idVec3 forward, up;
+	this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward,NULL, &up);
+	#define LOCBOXWIDTH 30
+	#define LOCBOXHEIGHT 5
+	#define LOCBOXDEPTH 3
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_gui_info_station_100075"));
+	args.SetVector("origin", GetPhysics()->GetOrigin() + (up * 90) + (forward * 16));
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXDEPTH, -LOCBOXWIDTH, -LOCBOXHEIGHT));
+	args.SetVector("maxs", idVec3(LOCBOXDEPTH, LOCBOXWIDTH, LOCBOXHEIGHT));
+	locbox = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+	locbox->SetAxis(GetPhysics()->GetAxis());
+
 
 	updateCacheTimer = 0;
 	BecomeActive( TH_THINK );
@@ -71,10 +93,36 @@ void idLostAndFound::Spawn(void)
 
 void idLostAndFound::Save(idSaveGame *savefile) const
 {
+	SaveFileWriteArray( cachedEntityDefNums,cachedEntityDefNums.Num(), WriteInt ); // idList<int> cachedEntityDefNums
+
+	savefile->WriteInt( vendState ); // int vendState
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( updateCacheTimer ); // int updateCacheTimer
+
+	itemList->Save( savefile ); // idListGUI * itemList
+
+	savefile->WriteEntityDef( itemDef ); // const idDeclEntityDef	* itemDef
+
+	proximityAnnouncer.Save( savefile ); // idProximityAnnouncer proximityAnnouncer
+
+	savefile->WriteObject( locbox ); //  idEntity* locbox
 }
 
 void idLostAndFound::Restore(idRestoreGame *savefile)
 {
+	SaveFileReadList( cachedEntityDefNums, ReadInt ); // idList<int> cachedEntityDefNums
+
+	savefile->ReadInt( vendState ); // int vendState
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( updateCacheTimer ); // int updateCacheTimer
+
+	itemList->Restore( savefile ); // idListGUI * itemList
+
+	savefile->ReadEntityDef( itemDef ); // const idDeclEntityDef	* itemDef
+
+	proximityAnnouncer.Restore( savefile ); // idProximityAnnouncer proximityAnnouncer
+
+	savefile->ReadObject( locbox ); //  idEntity* locbox
 }
 
 void idLostAndFound::Think(void)
@@ -97,12 +145,9 @@ void idLostAndFound::Think(void)
 			if (spawnedItem)
 			{
 				//Find a suitable place to spawn the item.
-				candidateSpawnPos = GetDispenserPosition();
+				candidateSpawnPos = FindValidSpawnPosition(spawnedItem->GetPhysics()->GetBounds());
 	
-				trace_t boundTr;
-				gameLocal.clip.TraceBounds(boundTr, candidateSpawnPos, candidateSpawnPos, spawnedItem->GetPhysics()->GetBounds(), MASK_SOLID, NULL);
-	
-				if (boundTr.fraction >= 1.0f)
+				if (candidateSpawnPos != vec3_zero)
 				{
 					//all clear.
 					spawnedItem->SetOrigin(candidateSpawnPos);
@@ -150,7 +195,7 @@ void idLostAndFound::Think(void)
 			}
 		}
 
-		if( hasCriticalItem )
+		if( hasCriticalItem && health > 0) //BC 3-3-2025: don't do announcement if I'm dead
 		{
 			proximityAnnouncer.Update();
 		}
@@ -162,6 +207,52 @@ void idLostAndFound::Think(void)
 	}
 
 	idStaticEntity::Think();
+}
+
+//BC 4-10-2025: lost and found now attempts various candidate spawn positions.
+idVec3 idLostAndFound::FindValidSpawnPosition(idBounds itemBounds)
+{
+	//this is an array of offset positions for the object spawn point.
+	//Values are: forward, right, up
+	const int ARRAYSIZE = 9;
+	idVec3 offsetArray[] =
+	{
+		idVec3(0, 0, 0),	//no offset.
+		idVec3(8, 0, 0),	//a little bit forward
+		idVec3(16, 0, 0),	//a lot of bit forward
+		idVec3(16, -16, 0), //forward, and to the left
+		idVec3(16, 16, 0),	//forward, and to the right
+		idVec3(32, 0, 0),	//desperation time
+		idVec3(32, -32, 0), //desperation time
+		idVec3(32, 32, 0),	//desperation time
+		idVec3(64, 0, 0)	//desperation time
+	};
+
+	idVec3 forward, right, up;
+	this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, &right, &up);
+
+	for (int i = 0; i < ARRAYSIZE; i++)
+	{
+		idVec3 spawnPosition = GetDispenserPosition() + (forward * offsetArray[i].x) + (right * offsetArray[i].y) + (up * offsetArray[i].z);
+
+		//Check if this point starts inside geometry
+		//We do this because we can get a false positive if the entirety of the bounds check is inside the void.
+		int penetrationContents = gameLocal.clip.Contents(spawnPosition, NULL, mat3_identity, CONTENTS_SOLID, NULL);
+		if (penetrationContents & MASK_SOLID)
+		{
+			continue; //If it starts in solid, then exit.
+		}
+
+		trace_t boundTr;
+		gameLocal.clip.TraceBounds(boundTr, spawnPosition, spawnPosition, itemBounds, MASK_SOLID, NULL);
+
+		if (boundTr.fraction >= 1.0f)
+		{
+			return spawnPosition; //There is clearance, so spot is valid. Return valid position.
+		}
+	}
+
+	return vec3_zero; //Failed to find a valid spot.
 }
 
 idVec3 idLostAndFound::GetDispenserPosition()
@@ -197,6 +288,8 @@ void idLostAndFound::Killed(idEntity *inflictor, idEntity *attacker, int damage,
 	if (!fl.takedamage)
 		return;
 
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
+
 	fl.takedamage = false;
 	SetColor(idVec3(0, 0, 0));
 	StopSound(SND_CHANNEL_BODY, false);
@@ -224,6 +317,13 @@ void idLostAndFound::DoGenericImpulse(int index)
 	if (index == IDX_RETRIEVEBUTTON)
 	{
 		//Retrieve the item.
+
+		// SW 14th April 2025: Moved this check higher so that player cannot change itemDef by spamming the button mid-vend
+		if (vendState != VENDSTATE_IDLE)
+		{
+			StartSound("snd_fail", SND_CHANNEL_ANY, 0, false, NULL);
+			return;
+		}
 		
 		//First get the item definition.
 		int selNum = itemList->GetSelection( nullptr, 0 );
@@ -237,12 +337,6 @@ void idLostAndFound::DoGenericImpulse(int index)
 		//itemDef = gameLocal.FindEntityDef(spawnArgs.GetString("def_itemspawn"), false);
 
 		if (itemDef == nullptr)
-		{
-			StartSound("snd_fail", SND_CHANNEL_ANY, 0, false, NULL);
-			return;
-		}
-
-		if (vendState != VENDSTATE_IDLE)
 		{
 			StartSound("snd_fail", SND_CHANNEL_ANY, 0, false, NULL);
 			return;
@@ -296,7 +390,7 @@ void idLostAndFound::UpdateLostEntityCache()
 		{
 			int defNum = cachedEntityDefNums[i];
 			const idDeclEntityDef* def = static_cast< const idDeclEntityDef* >( declManager->DeclByIndex( DECL_ENTITYDEF, defNum ) );
-			const char* displayName = def->dict.GetString( "displayname", "UNKNOWN" );
+			const char* displayName = def->dict.GetString( "displayname", "#str_loc_unknown_00104" );
 			if ( displayName[0] == '#' )
 			{
 				displayName = common->GetLanguageDict()->GetString( displayName );

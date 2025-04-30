@@ -13,7 +13,7 @@ public:
 							idVentdoor();
 	virtual					~idVentdoor(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -46,7 +46,10 @@ private:
 	void					SetAASAreaState(bool closed); // SW: Override idDoor's method to prevent vents from messing with any nearby cluster portals
 
 	//idFuncEmitter			*peekSparkle;
-	idAnimatedEntity		*warningsign[2];
+	idAnimatedEntity		*warningsign[2] = {};
 	idStr					displayNamePeek;
+
+	//BC 3-25-2025: locbox.
+	idEntity* locbox = nullptr;
 };
 //#pragma once

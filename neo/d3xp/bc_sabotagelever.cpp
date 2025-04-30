@@ -18,12 +18,16 @@ END_CLASS
 
 void idSabotageLever::Save( idSaveGame *savefile ) const
 {
-	savefile->WriteInt(state);
+	savefile->WriteInt( typeIndex ); // int typeIndex
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( nextThinkTime ); // int nextThinkTime
 }
 
 void idSabotageLever::Restore( idRestoreGame *savefile )
 {
-	savefile->ReadInt(state);
+	savefile->ReadInt( typeIndex ); // int typeIndex
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( nextThinkTime ); // int nextThinkTime
 }
 
 void idSabotageLever::Spawn( void )

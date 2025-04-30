@@ -8,6 +8,8 @@
 #include "Moveable.h"
 #include "Trigger.h"
 
+#include "idlib/LangDict.h"
+
 #include "bc_meta.h"
 #include "bc_radio.h"
 
@@ -29,6 +31,14 @@ idRadio::idRadio(void)
 {
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
+	isOn = false;
+
+	activateTimer = 0;
+
+	musicNotes = nullptr;
+	soundwaves = nullptr;
+
+	interestTimer = 0;
 }
 
 idRadio::~idRadio(void)
@@ -82,10 +92,37 @@ void idRadio::Spawn(void)
 
 void idRadio::Save(idSaveGame *savefile) const
 {
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteBool( isOn ); // bool isOn
+
+	savefile->WriteInt( activateTimer ); // int activateTimer
+
+	savefile->WriteObject( musicNotes ); // idFuncEmitter * musicNotes
+	savefile->WriteObject( soundwaves ); // idFuncEmitter * soundwaves
+
+	savefile->WriteInt( interestTimer ); // int interestTimer
+	savefile->WriteObject( interestPoint ); // idEntityPtr<idEntity> interestPoint
 }
 
 void idRadio::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadBool( isOn ); // bool isOn
+
+	savefile->ReadInt( activateTimer ); // int activateTimer
+
+	savefile->ReadObject( CastClassPtrRef(musicNotes) ); // idFuncEmitter * musicNotes
+	savefile->ReadObject( CastClassPtrRef(soundwaves) ); // idFuncEmitter * soundwaves
+
+	savefile->ReadInt( interestTimer ); // int interestTimer
+	savefile->ReadObject( interestPoint ); // idEntityPtr<idEntity> interestPoint
 }
 
 bool idRadio::DoFrob(int index, idEntity * frobber)
@@ -136,7 +173,7 @@ void idRadio::SetActivate(bool value)
 
 		
 		SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_on")));
-		displayNameHold = "(hold) Turn Off";
+		displayNameHold = common->GetLanguageDict()->GetString("#str_def_gameplay_turnoff");
 		BecomeActive(TH_THINK);
 		SetColor(FROBCOLOR);
 	}
@@ -159,7 +196,7 @@ void idRadio::SetActivate(bool value)
 			musicNotes->SetActive(false);
 
 		SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_off")));
-		displayNameHold = "(hold) Turn On";
+		displayNameHold = common->GetLanguageDict()->GetString("#str_def_gameplay_turnon");
 		StopSound(SND_CHANNEL_MUSIC);
 		BecomeInactive(TH_THINK);
 		SetColor(IDLECOLOR);

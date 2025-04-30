@@ -69,14 +69,14 @@ idForce_Field::Save
 ================
 */
 void idForce_Field::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( type );
-	savefile->WriteInt( applyType);
-	savefile->WriteFloat( magnitude );
-	savefile->WriteVec3( dir );
-	savefile->WriteFloat( randomTorque );
-	savefile->WriteBool( playerOnly );
-	savefile->WriteBool( monsterOnly );
-	savefile->WriteClipModel( clipModel );
+	savefile->WriteInt( type ); // forceFieldType type
+	savefile->WriteInt( applyType); // forceFieldApplyType applyType
+	savefile->WriteFloat( magnitude ); // float magnitude
+	savefile->WriteVec3( dir ); // idVec3 dir
+	savefile->WriteFloat( randomTorque ); // float randomTorque
+	savefile->WriteBool( playerOnly ); // bool playerOnly
+	savefile->WriteBool( monsterOnly ); // bool monsterOnly
+	savefile->WriteClipModel( clipModel ); // idClipModel * clipModel
 }
 
 /*
@@ -85,14 +85,14 @@ idForce_Field::Restore
 ================
 */
 void idForce_Field::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( (int &)type );
-	savefile->ReadInt( (int &)applyType);
-	savefile->ReadFloat( magnitude );
-	savefile->ReadVec3( dir );
-	savefile->ReadFloat( randomTorque );
-	savefile->ReadBool( playerOnly );
-	savefile->ReadBool( monsterOnly );
-	savefile->ReadClipModel( clipModel );
+	savefile->ReadInt( (int&)type ); // forceFieldType type
+	savefile->ReadInt( (int&)applyType); // forceFieldApplyType applyType
+	savefile->ReadFloat( magnitude ); // float magnitude
+	savefile->ReadVec3( dir ); // idVec3 dir
+	savefile->ReadFloat( randomTorque ); // float randomTorque
+	savefile->ReadBool( playerOnly ); // bool playerOnly
+	savefile->ReadBool( monsterOnly ); // bool monsterOnly
+	savefile->ReadClipModel( clipModel ); // idClipModel * clipModel
 }
 
 /*

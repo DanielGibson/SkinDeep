@@ -175,6 +175,8 @@ const idEventDef EV_Meta_SetWorldBaffled("SetWorldBaffled", "d");
 const idEventDef EV_Meta_StartGlobalStunState("StartGlobalStunState", "s");
 
 const idEventDef EV_Meta_LaunchScriptedProjectile("launchScriptedProjectile", "esvv", 'e');
+const idEventDef EV_Meta_SetDebrisBurst("setDebrisBurst", "svdffv");
+
 
 const idEventDef EV_Meta_SetEnableTrash("SetEnableTrash", "d");
 const idEventDef EV_Meta_SetEnableAirlocks("SetEnableAirlocks", "d");
@@ -188,40 +190,43 @@ const idEventDef EV_Meta_SetMilestone("SetMilestone", "d");
 
 const idEventDef EV_Meta_SetExitVR("SetExitVR");
 
+const idEventDef EV_Meta_DoHighlighter("doHighlighter", "ee");
+
 
 
 CLASS_DECLARATION(idTarget, idMeta)
-EVENT(EV_PostSpawn,						idMeta::Event_PostSpawn)
+EVENT(EV_PostSpawn, idMeta::Event_PostSpawn)
 
-EVENT(EV_Meta_GetBeaconPosition,		idMeta::Event_GetBeaconPosition)
-EVENT(EV_Meta_GetLastSwordfishTime,		idMeta::Event_GetLastSwordfishTime)
-EVENT(EV_Meta_SetSwordfishTime,			idMeta::Event_SetSwordfishTime)
+EVENT(EV_Meta_GetBeaconPosition, idMeta::Event_GetBeaconPosition)
+EVENT(EV_Meta_GetLastSwordfishTime, idMeta::Event_GetLastSwordfishTime)
+EVENT(EV_Meta_SetSwordfishTime, idMeta::Event_SetSwordfishTime)
 
-EVENT(EV_Meta_SetLKP,					idMeta::SetLKPVisible)
-EVENT(EV_Meta_GetLKP,					idMeta::GetLKPPosition)
-EVENT(EV_Meta_GetLKPReachable,			idMeta::Event_GetLKPReachable)
-EVENT(EV_Meta_GetEscalationLevel,		idMeta::Event_GetEscalationLevel)
-EVENT(EV_Meta_GetSearchTimer,			idMeta::Event_GetSearchTimer)
-EVENT(EV_Meta_SomeoneStartedSearching,	idMeta::SomeoneStartedSearching)
-EVENT(EV_Meta_GetSignallampActive,		idMeta::GetSignallampActive)
-EVENT(EV_Meta_SetCombatState,			idMeta::Event_SetCombatState)
-EVENT(EV_Meta_GetCombatState,			idMeta::Event_GetCombatState)
-EVENT(EV_Meta_startpostgame,			idMeta::StartPostGame)
-EVENT(EV_Meta_GetAliveEnemies,			idMeta::Event_GetAliveEnemies)
-EVENT(EV_Meta_SetWorldBaffled,			idMeta::SetWorldBaffled)
-EVENT(EV_Meta_StartGlobalStunState,		idMeta::Event_StartGlobalStunState)
+EVENT(EV_Meta_SetLKP, idMeta::SetLKPVisible)
+EVENT(EV_Meta_GetLKP, idMeta::GetLKPPosition)
+EVENT(EV_Meta_GetLKPReachable, idMeta::Event_GetLKPReachable)
+EVENT(EV_Meta_GetEscalationLevel, idMeta::Event_GetEscalationLevel)
+EVENT(EV_Meta_GetSearchTimer, idMeta::Event_GetSearchTimer)
+EVENT(EV_Meta_SomeoneStartedSearching, idMeta::SomeoneStartedSearching)
+EVENT(EV_Meta_GetSignallampActive, idMeta::GetSignallampActive)
+EVENT(EV_Meta_SetCombatState, idMeta::Event_SetCombatState)
+EVENT(EV_Meta_GetCombatState, idMeta::Event_GetCombatState)
+EVENT(EV_Meta_startpostgame, idMeta::StartPostGame)
+EVENT(EV_Meta_GetAliveEnemies, idMeta::Event_GetAliveEnemies)
+EVENT(EV_Meta_SetWorldBaffled, idMeta::SetWorldBaffled)
+EVENT(EV_Meta_StartGlobalStunState, idMeta::Event_StartGlobalStunState)
 EVENT(EV_Meta_LaunchScriptedProjectile, idMeta::Event_LaunchScriptedProjectile)
+EVENT(EV_Meta_SetDebrisBurst, idMeta::Event_SetDebrisBurst)
 
-EVENT(EV_Meta_SetEnableTrash,			idMeta::SetEnableTrashchutes)
-EVENT(EV_Meta_SetEnableAirlocks,		idMeta::SetEnableAirlocks)
-EVENT(EV_Meta_SetEnableVents,			idMeta::SetEnableVents)
-EVENT(EV_Meta_SetEnableWindows,			idMeta::SetEnableWindows)
+EVENT(EV_Meta_SetEnableTrash, idMeta::SetEnableTrashchutes)
+EVENT(EV_Meta_SetEnableAirlocks, idMeta::SetEnableAirlocks)
+EVENT(EV_Meta_SetEnableVents, idMeta::SetEnableVents)
+EVENT(EV_Meta_SetEnableWindows, idMeta::SetEnableWindows)
 
-EVENT(EV_Meta_EnableRadiocheckin,		idMeta::SetEnableRadioCheckin)
+EVENT(EV_Meta_EnableRadiocheckin, idMeta::SetEnableRadioCheckin)
 
-EVENT(EV_Meta_SetMilestone,				idMeta::SetMilestone)
-EVENT(EV_Meta_SetExitVR,				idMeta::SetExitVR)
-
+EVENT(EV_Meta_SetMilestone, idMeta::SetMilestone)
+EVENT(EV_Meta_SetExitVR, idMeta::SetExitVR)
+EVENT(EV_Meta_DoHighlighter, idMeta::Event_DoHighlighter)
 
 
 
@@ -235,6 +240,23 @@ idMeta::idMeta()
 		nodePositions[0] = vec3_zero;
 	}
 	lastNodeSearchPos = idVec3(-1, -1, -1);
+
+	memset(pipeStatuses, 0, sizeof(bool)*MAX_PIPESTATUSES);
+	memset(mapguiBound, 0, sizeof(idVec2)*2);
+	memset(milestoneStartArray, 0, sizeof(bool)*MAXMILESTONES);
+
+	radioCheckinEnt = nullptr;
+	highlighterEnt = nullptr;
+
+	lkpEnt = nullptr;
+	lkpEnt_Eye = nullptr;
+
+	killcamCamera = nullptr;
+	lkpLocbox = nullptr;
+
+	beamLure = nullptr;
+	beamLureTarget = nullptr;
+	beamRectangle = nullptr;
 
 	combatMetastate = COMBATSTATE_IDLE;
 	lastCombatMetastate = COMBATSTATE_IDLE;
@@ -282,6 +304,7 @@ idMeta::idMeta()
 	signalkitDepletionCheckActive = true;
 
 	swordfishTimer = 0;
+	dispatchVoiceprint = VOICEPRINT_A;
 }
 
 void idMeta::Spawn()
@@ -305,6 +328,24 @@ void idMeta::Spawn()
     lkpEnt_Eye = (idStaticEntity *)gameLocal.SpawnEntityType(idStaticEntity::Type, &args);
     lkpEnt_Eye->Bind(lkpEnt, false);
     lkpEnt_Eye->Hide();
+
+
+	//BC 3-24-2025: lkp locbox
+	#define LOCBOXRADIUS 8
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_def_gameplay_lkp"));
+	args.SetVector("origin", idVec3(0, 0, 49));
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	args.SetFloat("locboxDistScale", 10.0f); //BC 4-3-2025: make lkp locbox range larger
+	lkpLocbox = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+	if (lkpLocbox)
+	{
+		lkpLocbox->Bind(lkpEnt, false);
+		lkpLocbox->Hide();
+	}
+
 
     totalEnemies = 0;
 	
@@ -641,6 +682,282 @@ void idMeta::Event_PostSpawn(void)
 		cmdSystem->BufferCommandText(CMD_EXEC_NOW, autoexecLine.c_str());
 	}
 #endif
+
+
+#ifdef DEMO
+	//Make the emails become forgotten, so that the game can continually be restarted in a demo booth setting.
+	int count = declManager->GetNumDecls(DECL_PDA); //total email count.
+	for (int i = 0; i < count; i++)
+	{
+		const idDeclPDA* pda = static_cast<const idDeclPDA*>(declManager->DeclByIndex(DECL_PDA, i));
+		pda->ResetEmails();
+	}
+
+	common->Printf("--------------------\n\n\n\nDEBUG EMAIL CLEAR\n\n\n\n--------------------\n");
+#endif
+}
+
+void idMeta:: Save(idSaveGame* savefile) const
+{
+	savefile->WriteVec3( beaconPosition ); //  idVec3 beaconPosition
+	savefile->WriteObject( GetFTLDrive ); //  idEntityPtr<idEntity> GetFTLDrive
+
+	savefile->WriteObject( lkpEnt ); // idEntity *lkpEnt
+
+	savefile->WriteObject( bossEnt ); //  idEntityPtr<idEntity> bossEnt
+	savefile->WriteObject( skyController ); //  idEntityPtr<idEntity> skyController
+
+	SaveFileWriteArray( nodePositions, MAX_LOS_NODES, WriteVec3 ); // idVec3 nodePositions[MAX_LOS_NODES]
+
+	savefile->WriteInt( nodePosArraySize ); //  int nodePosArraySize
+	savefile->WriteVec3( lastNodeSearchPos ); //  idVec3 lastNodeSearchPos
+
+	savefile->WriteInt( combatMetastate ); //  int combatMetastate
+
+	savefile->WriteObject( signallampEntity ); //  idEntityPtr<idEntity> signallampEntity
+
+	savefile->WriteInt( itemdropsTable.Num()) ; //  idHashTable<idStrList> itemdropsTable
+	for (int idx = 0; idx < itemdropsTable.Num(); idx++) {
+		idStr outKey;
+		idStrList outVal;
+		itemdropsTable.GetIndex(idx, &outKey, &outVal);
+		savefile->WriteString( outKey );
+		savefile->WriteListString( outVal );
+	}
+
+	savefile->WriteInt( totalSecuritycamerasAtGameStart ); //  int totalSecuritycamerasAtGameStart
+
+	savefile->WriteInt( dispatchVoiceprint ); //  int dispatchVoiceprint
+
+	savefile->WriteObject( radioCheckinEnt ); // class idRadioCheckin* radioCheckinEnt
+	savefile->WriteObject( highlighterEnt ); // class idHighlighter* highlighterEnt
+
+	savefile->WriteInt( reinforcementPhase ); //  int reinforcementPhase
+	savefile->WriteInt( reinforcementPhaseTimer ); //  int reinforcementPhaseTimer
+
+	savefile->WriteFloat( beaconAngle ); //  float beaconAngle
+
+	savefile->WriteFloat( lastSwordfishTime ); //  float lastSwordfishTime
+
+	SaveFileWriteArray(pipeStatuses, MAX_PIPESTATUSES, WriteBool); // bool pipeStatuses[MAX_PIPESTATUSES]
+
+	savefile->WriteObject( lkpEnt_Eye );
+
+	savefile->WriteVec3( lkpReachablePosition ); //  idVec3 lkpReachablePosition
+
+	savefile->WriteInt( escalationLevel ); //  int escalationLevel
+
+	savefile->WriteInt( currentNavnode ); //  int currentNavnode
+	savefile->WriteInt( nextNavnode ); //  int nextNavnode
+
+	savefile->WriteInt( searchTimer ); //  int searchTimer
+
+	savefile->WriteInt( lastCombatMetastate ); //  int lastCombatMetastate
+
+	savefile->WriteInt( repairmanagerTimer ); //  int repairmanagerTimer
+	savefile->WriteInt( repairVO_timer ); //  int repairVO_timer
+
+	savefile->WriteInt( ventpurgeState ); //  int ventpurgeState
+	savefile->WriteInt( ventpurgeTimer ); //  int ventpurgeTimer
+	savefile->WriteInt( allclearState ); //  int allclearState
+	savefile->WriteInt( allclearTimer ); //  int allclearTimer
+
+	savefile->WriteInt( escalationmeterAmount ); //  int escalationmeterAmount
+	savefile->WriteInt( escalationmeterTimer ); //  int escalationmeterTimer
+
+	savefile->WriteInt( idletaskTimer ); //  int idletaskTimer
+
+	savefile->WriteInt( totalEnemies ); //  int totalEnemies
+
+	savefile->WriteInt( metaState ); //  int metaState
+
+	savefile->WriteInt( enemydestroyedCheckTimer ); //  int enemydestroyedCheckTimer
+	savefile->WriteInt( enemydestroyedCheckState ); //  int enemydestroyedCheckState
+
+	savefile->WriteInt( killcamTimer ); //  int killcamTimer
+	savefile->WriteObject( killcamTarget ); //  idEntityPtr<idEntity> killcamTarget
+	savefile->WriteObject( killcamCamera ); //  idEntity * killcamCamera
+	savefile->WriteInt( lastKilltime ); //  int lastKilltime
+
+	savefile->WriteInt( combatstateStartTime ); //  int combatstateStartTime
+
+	SaveFileWriteArray(mapguiBound, 2, WriteVec2); // idVec2 mapguiBound[2]
+
+	savefile->WriteInt( cryoExitLocationEntnum ); //  int cryoExitLocationEntnum
+	savefile->WriteBool( playerHasExitedCryopod ); //  bool playerHasExitedCryopod
+	savefile->WriteInt( cryoExitTimer ); //  int cryoExitTimer
+
+	savefile->WriteInt( enemiesEliminatedInCurrentPhase ); //  int enemiesEliminatedInCurrentPhase
+
+	savefile->WriteObject( walkietalkieLureTask ); //  idEntityPtr<idEntity> walkietalkieLureTask
+	savefile->WriteObject( beamLure ); //  idBeam* beamLure
+	savefile->WriteObject( beamLureTarget ); //  idBeam* beamLureTarget
+	savefile->WriteObject( beamRectangle ); //  idEntity* beamRectangle
+
+	savefile->WriteObject( doorframeInfoEnt ); //  idEntityPtr<idEntity> doorframeInfoEnt
+	savefile->WriteBool( ftlGUIsAreOn ); //  bool ftlGUIsAreOn
+
+	savefile->WriteInt( glassdestroyTimer ); //  int glassdestroyTimer
+
+	savefile->WriteBool( enemyThinksPlayerIsInVentOrAirlock ); //  bool enemyThinksPlayerIsInVentOrAirlock
+
+	savefile->WriteBool( isWorldBaffled ); //  bool isWorldBaffled
+
+	savefile->WriteInt( combatstateDurationTime ); //  int combatstateDurationTime
+
+	savefile->WriteInt( totalCatCagesInLevel ); //  int totalCatCagesInLevel
+
+	savefile->WriteObject( catpodInterior ); //  idEntityPtr<idEntity> catpodInterior
+
+	SaveFileWriteArray(milestoneStartArray, MAXMILESTONES, WriteBool); // bool milestoneStartArray[MAXMILESTONES]
+
+	savefile->WriteBool( playerIsInSpace ); //  bool playerIsInSpace
+	savefile->WriteInt( playerSpaceTimerStart ); //  int playerSpaceTimerStart
+	savefile->WriteInt( playerSpaceTimerTotal ); //  int playerSpaceTimerTotal
+
+	savefile->WriteBool( playerHasEnteredCatpod ); //  bool playerHasEnteredCatpod
+
+	savefile->WriteBool( enemiesKnowOfNina ); //  bool enemiesKnowOfNina
+
+	savefile->WriteInt( signalkitDepletionTimer ); //  int signalkitDepletionTimer
+
+	savefile->WriteBool( signalkitDepletionCheckActive ); //  bool signalkitDepletionCheckActive
+
+	savefile->WriteInt( swordfishTimer ); //  int swordfishTimer
+
+	savefile->WriteObject( lkpLocbox ); // idEntity* lkpLocbox
+}
+
+void idMeta::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadVec3( beaconPosition ); //  idVec3 beaconPosition
+	savefile->ReadObject( GetFTLDrive ); //  idEntityPtr<idEntity> GetFTLDrive
+
+	savefile->ReadObject( lkpEnt ); // idEntity *lkpEnt
+
+	savefile->ReadObject( bossEnt ); //  idEntityPtr<idEntity> bossEnt
+	savefile->ReadObject( skyController ); //  idEntityPtr<idEntity> skyController
+
+	SaveFileReadArray( nodePositions, ReadVec3 ); // idVec3 nodePositions[MAX_LOS_NODES]
+
+	savefile->ReadInt( nodePosArraySize ); //  int nodePosArraySize
+	savefile->ReadVec3( lastNodeSearchPos ); //  idVec3 lastNodeSearchPos
+
+	savefile->ReadInt( combatMetastate ); //  int combatMetastate
+
+	savefile->ReadObject( signallampEntity ); //  idEntityPtr<idEntity> signallampEntity
+
+	int num;
+	savefile->ReadInt( num ); //  idHashTable<idStrList> itemdropsTable
+	for (int idx = 0; idx < num; idx++) {
+		idStr outKey;
+		idStrList outVal;
+		savefile->ReadString( outKey );
+		savefile->ReadListString( outVal );
+		itemdropsTable.Set( outKey, outVal );
+	}
+
+	savefile->ReadInt( totalSecuritycamerasAtGameStart ); //  int totalSecuritycamerasAtGameStart
+
+	savefile->ReadInt( dispatchVoiceprint ); //  int dispatchVoiceprint
+
+	savefile->ReadObject( CastClassPtrRef( radioCheckinEnt ) ); // class idRadioCheckin* radioCheckinEnt
+	savefile->ReadObject( CastClassPtrRef( highlighterEnt ) ); // class idHighlighter* highlighterEnt
+
+	savefile->ReadInt( reinforcementPhase ); //  int reinforcementPhase
+	savefile->ReadInt( reinforcementPhaseTimer ); //  int reinforcementPhaseTimer
+
+	savefile->ReadFloat( beaconAngle ); //  float beaconAngle
+
+	savefile->ReadFloat( lastSwordfishTime ); //  float lastSwordfishTime
+
+	SaveFileReadArray(pipeStatuses, ReadBool);  // bool pipeStatuses[MAX_PIPESTATUSES]
+
+	savefile->ReadObject( lkpEnt_Eye );
+
+	savefile->ReadVec3( lkpReachablePosition ); //  idVec3 lkpReachablePosition
+
+	savefile->ReadInt( escalationLevel ); //  int escalationLevel
+
+	savefile->ReadInt( currentNavnode ); //  int currentNavnode
+	savefile->ReadInt( nextNavnode ); //  int nextNavnode
+
+	savefile->ReadInt( searchTimer ); //  int searchTimer
+
+	savefile->ReadInt( lastCombatMetastate ); //  int lastCombatMetastate
+
+	savefile->ReadInt( repairmanagerTimer ); //  int repairmanagerTimer
+	savefile->ReadInt( repairVO_timer ); //  int repairVO_timer
+
+	savefile->ReadInt( ventpurgeState ); //  int ventpurgeState
+	savefile->ReadInt( ventpurgeTimer ); //  int ventpurgeTimer
+	savefile->ReadInt( allclearState ); //  int allclearState
+	savefile->ReadInt( allclearTimer ); //  int allclearTimer
+
+	savefile->ReadInt( escalationmeterAmount ); //  int escalationmeterAmount
+	savefile->ReadInt( escalationmeterTimer ); //  int escalationmeterTimer
+
+	savefile->ReadInt( idletaskTimer ); //  int idletaskTimer
+
+	savefile->ReadInt( totalEnemies ); //  int totalEnemies
+
+	savefile->ReadInt( metaState ); //  int metaState
+
+	savefile->ReadInt( enemydestroyedCheckTimer ); //  int enemydestroyedCheckTimer
+	savefile->ReadInt( enemydestroyedCheckState ); //  int enemydestroyedCheckState
+
+	savefile->ReadInt( killcamTimer ); //  int killcamTimer
+	savefile->ReadObject( killcamTarget ); //  idEntityPtr<idEntity> killcamTarget
+	savefile->ReadObject( killcamCamera ); //  idEntity * killcamCamera
+	savefile->ReadInt( lastKilltime ); //  int lastKilltime
+
+	savefile->ReadInt( combatstateStartTime ); //  int combatstateStartTime
+
+	SaveFileReadArray(mapguiBound, ReadVec2); // idVec2 mapguiBound[2]
+
+	savefile->ReadInt( cryoExitLocationEntnum ); //  int cryoExitLocationEntnum
+	savefile->ReadBool( playerHasExitedCryopod ); //  bool playerHasExitedCryopod
+	savefile->ReadInt( cryoExitTimer ); //  int cryoExitTimer
+
+	savefile->ReadInt( enemiesEliminatedInCurrentPhase ); //  int enemiesEliminatedInCurrentPhase
+
+	savefile->ReadObject( walkietalkieLureTask ); //  idEntityPtr<idEntity> walkietalkieLureTask
+	savefile->ReadObject( CastClassPtrRef( beamLure ) ); //  idBeam* beamLure
+	savefile->ReadObject( CastClassPtrRef( beamLureTarget ) ); //  idBeam* beamLureTarget
+	savefile->ReadObject( beamRectangle ); //  idEntity* beamRectangle
+
+	savefile->ReadObject( doorframeInfoEnt ); //  idEntityPtr<idEntity> doorframeInfoEnt
+	savefile->ReadBool( ftlGUIsAreOn ); //  bool ftlGUIsAreOn
+
+	savefile->ReadInt( glassdestroyTimer ); //  int glassdestroyTimer
+
+	savefile->ReadBool( enemyThinksPlayerIsInVentOrAirlock ); //  bool enemyThinksPlayerIsInVentOrAirlock
+
+	savefile->ReadBool( isWorldBaffled ); //  bool isWorldBaffled
+
+	savefile->ReadInt( combatstateDurationTime ); //  int combatstateDurationTime
+
+	savefile->ReadInt( totalCatCagesInLevel ); //  int totalCatCagesInLevel
+
+	savefile->ReadObject( catpodInterior ); //  idEntityPtr<idEntity> catpodInterior
+
+	SaveFileReadArray(milestoneStartArray, ReadBool); // bool milestoneStartArray[MAXMILESTONES]
+
+	savefile->ReadBool( playerIsInSpace ); //  bool playerIsInSpace
+	savefile->ReadInt( playerSpaceTimerStart ); //  int playerSpaceTimerStart
+	savefile->ReadInt( playerSpaceTimerTotal ); //  int playerSpaceTimerTotal
+
+	savefile->ReadBool( playerHasEnteredCatpod ); //  bool playerHasEnteredCatpod
+
+	savefile->ReadBool( enemiesKnowOfNina ); //  bool enemiesKnowOfNina
+
+	savefile->ReadInt( signalkitDepletionTimer ); //  int signalkitDepletionTimer
+
+	savefile->ReadBool( signalkitDepletionCheckActive ); //  bool signalkitDepletionCheckActive
+
+	savefile->ReadInt( swordfishTimer ); //  int swordfishTimer
+
+	savefile->ReadObject( lkpLocbox ); // idEntity* lkpLocbox
 }
 
 
@@ -958,7 +1275,7 @@ void idMeta::Think(void)
 
 		if (lastCombatMetastate == COMBATSTATE_COMBAT)
 		{
-			Event_StopSpeakers(SND_CHANNEL_VOICE2); //Stop the combat alarm on the speakers.
+			Event_StopSpeakers(SND_CHANNEL_BODY); //Stop the combat alarm on the speakers.
 			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->Event_ActivateSpeakers("snd_combatalarm_end", SND_CHANNEL_VOICE2);
 		}
 
@@ -1001,6 +1318,8 @@ void idMeta::Think(void)
 				{
 					//print message that acknowledges swordfish has spawned.
 					gameLocal.AddEventLog("#str_def_gameplay_alert_summonswordfish", gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin(), true, EL_ALERT);
+
+					gameLocal.GetLocalPlayer()->hud->HandleNamedEvent("exclamationAlarm");
 				}
 			}
 
@@ -1139,9 +1458,11 @@ void idMeta::Think(void)
 		DoSignalkitDepletionCheck();
 	}
 
+
+	idGlassPiece::LimitActiveGlassPieces();
+
 	//END THINK
 }
-
 
 void idMeta::ReinforcementEndgameCheck()
 {
@@ -1418,7 +1739,30 @@ void idMeta::StartPostGame()
 	if (metaState == METASTATE_POSTGAME)
 		return;
 
+	//Achievement for completing level.
 
+	if (common->g_SteamUtilities && common->g_SteamUtilities->IsSteamInitialized() && !gameLocal.GetLocalPlayer()->isInVignette)
+	{		
+		idStr mapname;
+		mapname = gameLocal.GetMapName();
+		mapname.StripPath();
+		mapname.StripFileExtension();
+		mapname.ToLower();
+
+		//Grab map def of current map.
+		const idDecl* mapDecl = declManager->FindType(DECL_MAPDEF, mapname, false);
+		const idDeclEntityDef* mapDef = static_cast<const idDeclEntityDef*>(mapDecl);
+		if (mapDef)
+		{
+			//found the map def.
+			idStr levelinternalname = mapDef->dict.GetString("internalname");
+			if (levelinternalname.Length() > 0)
+			{
+				idStr leveldoneAchievementName = idStr::Format("ach_leveldone_%s", levelinternalname.c_str());
+				common->g_SteamUtilities->SetAchievement(leveldoneAchievementName);
+			}
+		}		
+	}
 
 
 	metaState = METASTATE_POSTGAME;
@@ -1427,14 +1771,19 @@ void idMeta::StartPostGame()
 	{
 		//Vignette.
 		gameLocal.RunMapScript("_OnVictory");
-		return;
 	}
+	else
+	{
+		// SW 24th Feb 2025: Adding an extra script function here for the spectate postgame,
+		// so we can turn off certain annoying level behaviours
+		gameLocal.RunMapScript("_OnPostGame");
 
-	gameLocal.GetLocalPlayer()->SetSpectateVictoryFanfare();
-	gameLocal.GetLocalPlayer()->ServerSpectate(true);
+		gameLocal.GetLocalPlayer()->SetSpectateVictoryFanfare();
+		gameLocal.GetLocalPlayer()->ServerSpectate(true);
 
-	//Pause the world.
-	gameLocal.spectatePause = true;
+		//Pause the world.
+		gameLocal.spectatePause = true;
+	}
 }
 
 bool idMeta::SetupKillcam()
@@ -1875,7 +2224,8 @@ void idMeta::AlertAIFriends(idEntity *caller)
 	if (combatMetastate != COMBATSTATE_COMBAT)
 	{
 		//make the speakers do the combat alarm sound.
-		static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->Event_ActivateSpeakers("snd_combatalarm", SND_CHANNEL_VOICE2);
+		// SW 17th March 2025: Combat alarm shouldn't be on the voice channel, switching to body
+		static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->Event_ActivateSpeakers("snd_combatalarm", SND_CHANNEL_BODY);
 	}
 
 	//Reset the global combat state.
@@ -2138,6 +2488,7 @@ void idMeta::SetLKPVisible(bool visible)
 		//lkpEnt->SetOrigin(lkpEnt->GetPhysics()->GetOrigin());
 		lkpEnt->Show();
 		lkpEnt_Eye->Show();
+		lkpLocbox->Show(); //BC 3-24-2025: locbox.
 
 		// On shutdown, it's possible the local player is null. Just early-out in that case.
 		if ( !gameLocal.GetLocalPlayer() )
@@ -2151,7 +2502,7 @@ void idMeta::SetLKPVisible(bool visible)
 			gameLocal.AddEventLog("#str_def_gameplay_vent_seeninside", lkpEnt->GetPhysics()->GetOrigin(), true, EL_INTERESTPOINT);
 
 			gameLocal.GetLocalPlayer()->confinedStealthActive = false;
-			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge();
+			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge(nullptr); //We don't really track who saw the player, so just use generic voiceprint A...
 		}
 
 		//Check if LKP is inside an airlock. If so, start airlock purge.
@@ -2190,6 +2541,7 @@ void idMeta::SetLKPVisible(bool visible)
 
 		lkpEnt->Hide();
 		lkpEnt_Eye->Hide();
+		lkpLocbox->Hide(); //BC 3-24-2025: locbox.
 	}
 }
 
@@ -3494,20 +3846,54 @@ void idMeta::ActivateClosestRepairHatch(idEntity * repairableEnt)
 
 		if (entity->IsType(idDozerhatch::Type))
 		{
-			//First, check to see if it's in the same room. If it is the same room, prioritize it.
-
-			//Do location comparison check.
-			int distanceModifier = 0;
-			idLocationEntity* locHatchEnt = gameLocal.LocationForEntity(entity);
-			if (locRepairableEnt != nullptr && locHatchEnt != nullptr)
+			// SW 26th March 2025: adding functionality to exclude hatches in unreachable rooms (e.g. because of locked doors)
+			aasPath_t path;
+			if (!entity->GetPhysics() || !repairableEnt->GetPhysics())
 			{
-				if (locRepairableEnt->entityNumber == locHatchEnt->entityNumber)
-				{
-					//Hatch is in the same room. So, we give a distance "bonus" modifier to it, so that it gets prioritized.
-					distanceModifier = -3000;
-				}
+				continue; // this shouldn't happen, but it's better to fail silently than to crash
+			}
+			idLocationEntity* startLocation = gameLocal.LocationForPoint(entity->GetPhysics()->GetOrigin() + (entity->GetPhysics()->GetAxis() * idVec3(0, 0, -32)));
+			idLocationEntity* endLocation = locRepairableEnt;
+			
+			if (startLocation == NULL || endLocation == NULL)
+			{
+				gameLocal.Warning("Tried to dispatch a repairbot from hatch %s to entity %s, but one of them was not in a valid location.", entity->name.c_str(), repairableEnt->name.c_str());
+				continue; // One of these two things is not in a valid location (boooo)
 			}
 
+			int distanceModifier = 0;
+
+			// If the locations aren't the same, we need to test that one is actually reachable from the other
+			// If the locations *are* the same, we can safely skip this whole bloody palaver
+			if (startLocation != endLocation)
+			{
+				idAAS* aas = gameLocal.GetAAS("aas32_flybot");
+
+				if (!aas)
+				{
+					continue; // this shouldn't happen
+				}
+
+				int startArea = aas->PointAreaNum(startLocation->GetPhysics()->GetOrigin());
+				int endArea = aas->PointAreaNum(endLocation->GetPhysics()->GetOrigin());
+
+				if (startArea < 0 || endArea < 0)
+				{
+					continue; // this also shouldn't happen
+				}
+
+				idReachability* reachability;
+				int travelTime;
+				if (!gameLocal.GetAAS("aas32_flybot")->RouteToGoalArea(startArea, startLocation->GetPhysics()->GetOrigin(), endArea, TFL_WALK | TFL_AIR | TFL_FLY, travelTime, &reachability))
+				{
+					continue; // Couldn't find a path
+				}
+			}
+			else
+			{
+				//Hatch is in the same room. So, we give a distance "bonus" modifier to it, so that it gets prioritized.
+				distanceModifier = -3000;
+			}
 
 			spawnSpot_t newcandidate;
 			newcandidate.ent = entity;
@@ -3829,7 +4215,7 @@ bool idMeta::IsBotRepairingSomethingNearby(idEntity * repairableEnt)
 // - walkie talkie dispatch
 // - ventpurge chargeup
 // - ventpurge blast
-bool idMeta::StartVentPurge()
+bool idMeta::StartVentPurge(idEntity *interestpoint)
 {
 	if (ventpurgeState != VENTPURGESTATE_IDLE || !gameLocal.world->spawnArgs.GetBool("meta_ventpurge", "1"))
 		return false;
@@ -3838,7 +4224,34 @@ bool idMeta::StartVentPurge()
 	ventpurgeTimer = gameLocal.time + VENTPURGE_DISPATCHTIME;
 
 	//Make the dispatch say its line.
-	this->StartSound("snd_dispatch_ventpurge", SND_CHANNEL_VOICE);
+	//BC 2-15-2025: determine if there's a specific voiceprint we should use.
+	idStr soundCue = "snd_dispatch_a_ventpurge";
+	if (interestpoint != nullptr)
+	{
+		if (interestpoint->IsType(idInterestPoint::Type))
+		{
+			if (static_cast<idInterestPoint*>(interestpoint)->claimant.IsValid())
+			{
+				int _voiceprint = static_cast<idInterestPoint*>(interestpoint)->claimant.GetEntity()->spawnArgs.GetInt("voiceprint");
+				if (_voiceprint == VOICEPRINT_BOSS)
+				{
+					soundCue = "snd_dispatch_boss_ventpurge";
+				}
+				else if (_voiceprint == VOICEPRINT_B)
+				{
+					soundCue = "snd_dispatch_b_ventpurge";
+				}
+				else
+				{
+					soundCue = "snd_dispatch_a_ventpurge";
+				}
+
+				dispatchVoiceprint = _voiceprint;
+			}
+		}
+	}
+
+	this->StartSound(soundCue.c_str(), SND_CHANNEL_VOICE);
 
 	enemyThinksPlayerIsInVentOrAirlock = true;
 
@@ -4020,10 +4433,12 @@ void idMeta::UpdateVentpurge()
 
 
 //After a vent purge or airlock lockdown, we do an all-clear sequence where the enemy fictionally thinks "hey, the purge probably killed the player. Let's lift the security lockdown."
-void idMeta::StartAllClearSequence(int delayTime)
+void idMeta::StartAllClearSequence(int delayTime, int _voiceprint)
 {
 	allclearState = ALLCLEAR_DELAY;
 	allclearTimer = gameLocal.time + delayTime;
+
+	dispatchVoiceprint = _voiceprint;
 }
 
 //This gets called when the player uses the walkie talkie to call off a search.
@@ -4036,8 +4451,9 @@ bool idMeta::StartPlayerWalkietalkieSequence(int *_voLength)
 
 	allclearState = ALLCLEAR_PLAYERWALKIETALKIE;	
 
-	int len;
-	gameLocal.GetLocalPlayer()->StartSound( gameLocal.GetLocalPlayer()->GetInjured() ? "snd_vo_walkie_hijack_injured" : "snd_allclear", SND_CHANNEL_VOICE, 0, false, &len); //play VO line on player.
+	//BC 3-3-2025: checkin now uses vo system so that it doesnt get interrupted
+	int len = gameLocal.voManager.SayVO(gameLocal.GetLocalPlayer(), gameLocal.GetLocalPlayer()->GetInjured() ? "snd_vo_walkie_hijack_injured" : "snd_allclear", VO_CATEGORY_NARRATIVE);
+	//gameLocal.GetLocalPlayer()->StartSound( gameLocal.GetLocalPlayer()->GetInjured() ? "snd_vo_walkie_hijack_injured" : "snd_allclear", SND_CHANNEL_VOICE, 0, false, &len); //play VO line on player.
 	allclearTimer = gameLocal.time + len + ALLCLEAR_GAP_DURATION;
 
 	if (radioCheckinEnt != NULL)
@@ -4080,7 +4496,23 @@ void idMeta::UpdateAllClearSequence()
 			if (enemyThinksPlayerIsInVentOrAirlock)
 			{
 				allclearState = ALLCLEAR_ANNOUNCING;
-				this->StartSound("snd_dispatch_purgecomplete", SND_CHANNEL_VOICE2);
+
+				//BC 2-15-2025: purge complete dispatch vo now uses same voiceprint as the voiceprint who initially activated the purge.
+				idStr soundcue = "snd_dispatch_a_purgecomplete";
+				if (dispatchVoiceprint == VOICEPRINT_BOSS)
+				{
+					soundcue = "snd_dispatch_boss_purgecomplete";
+				}
+				else if (dispatchVoiceprint == VOICEPRINT_B)
+				{
+					soundcue = "snd_dispatch_b_purgecomplete";
+				}
+				else
+				{
+					soundcue = "snd_dispatch_a_purgecomplete";
+				}
+
+				this->StartSound(soundcue.c_str(), SND_CHANNEL_VOICE2);
 				allclearTimer = gameLocal.time + ALLCLEAR_ANNOUNCE_VO_TIME; //TODO: RENAME THIS
 			}
 			else
@@ -5541,7 +5973,7 @@ bool idMeta::SpawnPirateShip()
 
 	if (gameLocal.world->spawnArgs.GetBool("objectives", "1"))
 	{
-		gameLocal.GetLocalPlayer()->SetObjectiveText("Escape on the Boarding Ship\n-OR- Defeat all the Pirates");
+		gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_boardingship", true, "icon_obj_pirates");
 	}
 
 	return true;
@@ -5574,7 +6006,7 @@ void idMeta::UpdateCagecageObjectiveText()
 
 	if (gameLocal.world->spawnArgs.GetBool("objectives", "1") && (openedCages < totalcages))
 	{
-		gameLocal.GetLocalPlayer()->SetObjectiveText(idStr::Format("Release the cat crew (%d/%d)", openedCages, totalcages).c_str());
+		gameLocal.GetLocalPlayer()->SetObjectiveText(idStr::Format2(common->GetLanguageDict()->GetString("#str_obj_releasecatcrew"), openedCages, totalcages).c_str(), true, "icon_obj_releasecatcrew");
 	}
 }
 
@@ -5715,6 +6147,12 @@ bool idMeta::DoHighlighter(idEntity *ent1, idEntity *ent2)
 	return highlighterEnt->DoHighlight(ent1, ent2);
 }
 
+// SW 26th March 2025: chiefly for testing, but maybe someone will get some use out of it?
+void idMeta::Event_DoHighlighter(idEntity* e1, idEntity* e2)
+{
+	DoHighlighter(e1, e2);
+}
+
 bool idMeta::GetHightlighterActive()
 {
 	if (highlighterEnt == NULL)
@@ -5745,6 +6183,12 @@ void idMeta::SkipHighlighter()
 		return;
 
 	return highlighterEnt->DoSkip();
+}
+
+// SW 31st March 2025
+void idMeta::Event_SetDebrisBurst(const char* defName, idVec3 position, int count, float radius, float speed, idVec3 direction)
+{
+	gameLocal.SetDebrisBurst(defName, position, count, radius, speed, direction);
 }
 
 void idMeta::Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, const idVec3 &spawnPos, const idVec3 &spawnTrajectory)
@@ -6006,13 +6450,13 @@ void idMeta::GenerateKeypadcodes()
 					int systemIndex = fuseboxEnt->spawnArgs.GetInt("systemindex", "-1");
 					
 					if (systemIndex == SYS_TRASHCHUTES)
-						systemName = "Trash chutes fusebox";
+						systemName = "#str_gui_armstatsmenu_100328"; //trash fusebox
 					else if (systemIndex == SYS_AIRLOCKS)
-						systemName = "Airlock fusebox";
+						systemName = "#str_gui_armstatsmenu_100327"; //airlock fusebox
 					else if (systemIndex == SYS_VENTS)
-						systemName = "Vents fusebox";
+						systemName = "#str_gui_armstatsmenu_100325"; //vent fusebox
 					else if (systemIndex == SYS_WINDOWS)
-						systemName = "Windows fusebox";
+						systemName = "#str_gui_armstatsmenu_100326"; //windows fusebox
 					else
 					{
 						common->Warning("Note '%s' has invalid fusebox systemindex (%d)\n", ent->GetName(), systemIndex);
@@ -6174,6 +6618,15 @@ void idMeta::UpdatePlayerSpaceTimerStat()
 
 int idMeta::GetTotalTimeSpentInSpace()
 {
+	// SW 20th Feb 2025: If the player enters the postgame while in space,
+	// there will be some outstanding amount of time that needs to be added to the total
+	// before it is accurate.
+	if (playerIsInSpace)
+	{
+		int totalTimeToAddToStat = gameLocal.time - playerSpaceTimerStart;
+		playerSpaceTimerTotal += totalTimeToAddToStat;
+	}
+
 	return playerSpaceTimerTotal;
 }
 

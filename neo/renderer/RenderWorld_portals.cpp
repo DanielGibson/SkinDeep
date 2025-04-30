@@ -189,9 +189,22 @@ void idRenderWorldLocal::FloodViewThroughArea_r( const idVec3 origin, int areaNu
 
 		// make sure the portal isn't in our stack trace,
 		// which would cause an infinite loop
+		const int CRASH_THRESHOLD = 30;
+		int count = 0;
 		for ( check = ps; check; check = check->next ) {
 			if ( check->p == p ) {
 				break;		// don't recursively enter a stack
+			}
+
+			//BC 3-24-2025: added by Sanjay. If this function recurses infinitely, do a crash message instead of freeze/hang.
+			//This seems to happen due to certain visportal setups. For example, if a visportal cuts through dozens of small
+			//areas, it can sometimes create an infinite loop here.
+			count++;
+			if (count > CRASH_THRESHOLD)
+			{				
+				common->Warning("Infinite recursion detected in FloodViewThroughArea_r");
+				common->Warning("Check visportal setup at: %.1f %.1f %.1f", origin.x, origin.y, origin.z); //BC
+				*(int*)0 = 0x12345678;
 			}
 		}
 		if ( check ) {
