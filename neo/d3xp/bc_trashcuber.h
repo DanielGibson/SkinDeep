@@ -10,7 +10,7 @@ public:
 							idTrashcuber(void);
 	virtual					~idTrashcuber(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -19,9 +19,9 @@ public:
 
 private:
 
-	idLight *				interiorLight;
-	idLight *				exteriorLights[4];
-	idLight *				spotlight;
+	idLight *				interiorLight = nullptr;
+	idLight *				exteriorLights[4] = {};
+	idLight *				spotlight = nullptr;
 
 	int						stateTimer;
 	int						cuberState;
@@ -31,7 +31,7 @@ private:
 	void					UpdateSpotlightSize();
 
 	
-	const char *			targetAirlock;
+	idStr					targetAirlock;
 	void					SpawnTrashcube();
 	idVec3					FindValidPosition();
 };

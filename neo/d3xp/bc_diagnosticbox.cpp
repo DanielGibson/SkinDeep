@@ -165,10 +165,30 @@ void idDiagnosticBox::Event_PostSpawn(void)
 
 void idDiagnosticBox::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( currentCamIdx ); //  int currentCamIdx
+
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteInt( updateTimer ); //  int updateTimer
+
+	savefile->WriteObject( pillar ); //  idMover * pillar
+
+	savefile->WriteBool( isUpsideDown ); //  bool isUpsideDown
 }
 
 void idDiagnosticBox::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( currentCamIdx ); //  int currentCamIdx
+
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadInt( updateTimer ); //  int updateTimer
+
+	savefile->ReadObject( CastClassPtrRef(pillar) ); //  idMover * pillar
+
+	savefile->ReadBool( isUpsideDown ); //  bool isUpsideDown
 }
 
 void idDiagnosticBox::Think(void)

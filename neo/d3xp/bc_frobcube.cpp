@@ -28,10 +28,12 @@ void idFrobcube::Spawn(void)
 
 void idFrobcube::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt(index); // int index
 }
 
 void idFrobcube::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt(index); // int index
 }
 
 void idFrobcube::SetIndex(int value)

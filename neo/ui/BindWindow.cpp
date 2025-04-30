@@ -59,6 +59,25 @@ idBindWindow::~idBindWindow() {
 
 }
 
+void idBindWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	savefile->WriteBool( waitingOnKey ); // bool waitingOnKey
+	savefile->WriteBool( isGamepad ); // bool isGamepad
+
+	savefile->WriteCheckSizeMarker();
+}
+
+void idBindWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	savefile->ReadBool( waitingOnKey ); // bool waitingOnKey
+	savefile->ReadBool( isGamepad ); // bool isGamepad
+
+	savefile->ReadCheckSizeMarker();
+}
 
 const char *idBindWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) {
 	static char ret[ 256 ];
@@ -151,30 +170,46 @@ void idBindWindow::Draw(int time, float x, float y) {
 		hover = false;
 	}
 
-	if (!controllerBinding || forceShowText)
+	idStr btnName;
+	if (controllerBinding)
+	{
+		int controllerType = Sys_GetLastControllerType();
+		if (in_forceButtonPrompts.GetInteger() > 0)
+		{
+			controllerType = in_forceButtonPrompts.GetInteger() - 1;
+		}
+
+		btnName = gameLocal.controllerButtonDicts[controllerType].GetString(str);
+	}
+	else
+	{
+		btnName = gameLocal.mouseButtonDict.GetString(str);
+	}
+
+	if ((!controllerBinding && btnName.IsEmpty()) || forceShowText || btnName.IsEmpty())
 	{
 		dc->DrawText(str, textScale, textAlign, color, textRect, false, -1);
 	}
 	else
 	{
 		//Draw gamepad button.
-		idStr btnName = gameLocal.controllerButtonDicts[Sys_GetLastControllerType()].GetString(str);
 		const idMaterial* material = declManager->FindMaterial(btnName);
 		float lineSkip = dc->MaxCharHeight(textScale);
-		float imgSize = lineSkip * 1.1f;
+		float imgSize = lineSkip * 1.1f * buttonScale;
 		dc->EnableClipping(false);
 		idVec4 btnColor = colorWhite;
 		btnColor.w = foreColor.w();
 
-		float x = textRect.x;
-		if (textAlign == idDeviceContext::ALIGN_RIGHT) {
-			x = textRect.x + textRect.w - imgSize;
+		int alignment = buttonAlignOverride != -1 ? buttonAlignOverride : textAlign;
+		float x = textRect.x + buttonOffsetx;
+		if (alignment == idDeviceContext::ALIGN_RIGHT) {
+			x = textRect.x + textRect.w - imgSize + buttonOffsetx;
 		}
-		else if (textAlign == idDeviceContext::ALIGN_CENTER) {
-			x = textRect.x + (textRect.w - imgSize) / 2;
+		else if (alignment == idDeviceContext::ALIGN_CENTER) {
+			x = textRect.x + (textRect.w - imgSize) / 2 + buttonOffsetx;
 		}
 
-		dc->DrawMaterial(x, textRect.y, imgSize, imgSize * 1.33f, material, btnColor);
+		dc->DrawMaterial(x, textRect.y + buttonOffsety, imgSize, imgSize * 1.33f, material, btnColor);
 		dc->EnableClipping(true);
 	}
 }
@@ -218,6 +253,23 @@ idBindDisplayWindow::idBindDisplayWindow(idUserInterfaceLocal* g) : idWindow(g) 
 
 idBindDisplayWindow::~idBindDisplayWindow() {
 
+}
+
+void idBindDisplayWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	savefile->WriteBool(cursorAttachActive); // bool cursorAttachActive
+
+	savefile->WriteCheckSizeMarker();
+}
+void idBindDisplayWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	savefile->ReadBool(cursorAttachActive); // bool cursorAttachActive
+
+	savefile->ReadCheckSizeMarker();
 }
 
 idWinVar* idBindDisplayWindow::GetWinVarByName(const char* _name, bool fixup, drawWin_t** owner) {
@@ -273,7 +325,24 @@ void idBindDisplayWindow::Draw(int time, float x, float y)
 	}
 
 	idStr rawkey = gameLocal.GetKeyFromBinding(bindDisplay.c_str(), usingJoystick);
-	if (!usingJoystick || rawkey[0] == '<')
+	idStr btnName;
+
+	if (usingJoystick)
+	{
+		int controllerType = Sys_GetLastControllerType();
+		if (in_forceButtonPrompts.GetInteger() > 0)
+		{
+			controllerType = in_forceButtonPrompts.GetInteger() - 1;
+		}
+
+		btnName = gameLocal.controllerButtonDicts[controllerType].GetString(rawkey);
+	}
+	else
+	{
+		btnName = gameLocal.mouseButtonDict.GetString(rawkey);
+	}
+
+	if ((!usingJoystick && btnName.IsEmpty()) || rawkey[0] == '<' || btnName.IsEmpty())
 	{
 #if 0 // attempt at scaling text to window, busted due to textscale not linear scaling
 		float origTextScale = textScale;
@@ -298,29 +367,23 @@ void idBindDisplayWindow::Draw(int time, float x, float y)
 	else
 	{
 		//Draw gamepad button.
-		int controllerType = Sys_GetLastControllerType();
-		if (in_forceButtonPrompts.GetInteger() > 0)
-		{
-			controllerType = in_forceButtonPrompts.GetInteger() - 1;
-		}
-
-		idStr btnName = gameLocal.controllerButtonDicts[controllerType].GetString(rawkey);
 		const idMaterial* material = declManager->FindMaterial(btnName);
 		float lineSkip = dc->MaxCharHeight(textScale);
-		float imgSize = lineSkip * 1.1f;
+		float imgSize = lineSkip * 1.1f * buttonScale;
 		dc->EnableClipping(false);
 		idVec4 btnColor = colorWhite;
 		btnColor.w = foreColor.w();
 
-		float x = textRect.x;
-		if (textAlign == idDeviceContext::ALIGN_RIGHT) {
-			x = textRect.x + textRect.w - imgSize;
+		int alignment = buttonAlignOverride != -1 ? buttonAlignOverride : textAlign;
+		float x = textRect.x + buttonOffsetx;
+		if (alignment == idDeviceContext::ALIGN_RIGHT) {
+			x = textRect.x + textRect.w - imgSize + buttonOffsetx;
 		}
-		else if (textAlign == idDeviceContext::ALIGN_CENTER) {
-			x = textRect.x + (textRect.w - imgSize) / 2;
+		else if (alignment == idDeviceContext::ALIGN_CENTER) {
+			x = textRect.x + (textRect.w - imgSize) / 2 + buttonOffsetx;
 		}
-		
-		dc->DrawMaterial(x, textRect.y, imgSize, imgSize * 1.33f, material, btnColor);
+
+		dc->DrawMaterial(x, textRect.y + buttonOffsety, imgSize, imgSize * 1.33f, material, btnColor);
 		dc->EnableClipping(true);
 	}
 }
@@ -339,7 +402,14 @@ void idBindDisplayWindow::DrawBackground(const idRectangle& drawRect)
 		usingJoystick = true;
 	}
 
-	if (!usingJoystick && strlen(bindName.c_str()) != 0)
+	idStr rawkey = gameLocal.GetKeyFromBinding(bindName.c_str(), usingJoystick);
+	idStr btnName;
+	if (!usingJoystick)
+	{
+		btnName = gameLocal.mouseButtonDict.GetString(rawkey);
+	}
+
+	if (!usingJoystick && strlen(bindName.c_str()) != 0 && btnName.Length() == 0)
 	{
 		idWindow::DrawBackground(drawRect);
 	}

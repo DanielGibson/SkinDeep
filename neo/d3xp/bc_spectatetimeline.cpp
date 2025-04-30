@@ -30,13 +30,13 @@ void idSpectateTimeline::Spawn(void)
 
 	for (int i = 0; i < gameLocal.eventLogList.Num(); i++)
 	{
-		if (gameLocal.eventLogList[i].eventType == EL_DEATH)
+		if (gameLocal.eventLogList[i].eventType == EL_DEATH || gameLocal.eventLogList[i].eventType == EL_DESTROYED)
 		{
 			//Spawn an event node.
 
 			idEntity* newNode = NULL;
 			idDict args;
-			args.Set("classname", "env_spectatenode");
+			args.Set("classname", gameLocal.eventLogList[i].eventType == EL_DEATH ? "env_spectatenode" : "env_spectatenode_destroy");
 			args.SetVector("origin", gameLocal.eventLogList[i].position);
 			args.Set("text", gameLocal.eventLogList[i].name);
 			args.SetInt("time", gameLocal.eventLogList[i].timestamp);
@@ -47,6 +47,15 @@ void idSpectateTimeline::Spawn(void)
 			}
 		}
 	}
+}
+
+void idSpectateTimeline::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( rolloverDebounceIdx ); // int rolloverDebounceIdx
+}
+void idSpectateTimeline::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( rolloverDebounceIdx ); // int rolloverDebounceIdx
 }
 
 void idSpectateTimeline::Think(void)

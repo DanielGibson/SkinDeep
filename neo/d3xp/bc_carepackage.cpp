@@ -45,12 +45,38 @@ idCarepackage::~idCarepackage(void)
 
 void idCarepackage::Save( idSaveGame *savefile ) const
 {
-	//savefile->WriteInt(state);
+	savefile->WriteInt( state ); //  carepackage_state_t state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteObject( idleSmoke ); //  idFuncEmitter * idleSmoke
+
+	savefile->WriteRenderLight( boatlight ); //  renderLight_t boatlight
+	savefile->WriteInt( boatlightHandle ); //  int boatlightHandle
+
+
+	savefile->WriteObject( packageMini ); //  idEntity * packageMini
+
+	SaveFileWriteArray(wireOrigin, 2, WriteObject); // idBeam* wireOrigin[2];
+	SaveFileWriteArray(wireTarget, 2, WriteObject); // idBeam* wireTarget[2];
 }
 
 void idCarepackage::Restore( idRestoreGame *savefile )
 {
-	//savefile->ReadInt(state);
+	savefile->ReadInt( (int&)state ); //  carepackage_state_t state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); //  idFuncEmitter * idleSmoke
+
+	savefile->ReadRenderLight( boatlight ); //  renderLight_t boatlight
+	savefile->ReadInt( boatlightHandle ); //  int boatlightHandle
+	if ( boatlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( boatlightHandle, &boatlight );
+	}
+
+	savefile->ReadObject( packageMini ); //  idEntity * packageMini
+
+	SaveFileReadArrayCast(wireOrigin, ReadObject, idClass*&); // idBeam* wireOrigin[2];
+	SaveFileReadArrayCast(wireTarget, ReadObject, idClass*&); // idBeam* wireOrigin[2];
 }
 
 void idCarepackage::Spawn( void )
@@ -478,6 +504,7 @@ void idCarepackage::Think(void)
 			packageMini->GetPhysics()->SetContents(0);
 			packageMini->Hide();
 			packageMini->PostEventMS(&EV_Remove, 0); //delete the mini package.
+			packageMini = nullptr;
 			
 			DeployPackage(packagePos, packageRot);
 		}

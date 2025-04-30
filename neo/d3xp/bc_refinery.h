@@ -12,7 +12,7 @@ public:
 							idRefinery(void);
 	virtual					~idRefinery(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -33,14 +33,14 @@ private:
 	idEntityPtr<idEntity>	pathEnt;
 	int						rotationCounter;
 
-	idFuncEmitter			*smokeEmitters[4];
-	const idDeclSkin		*skins[2];
+	idFuncEmitter			*smokeEmitters[4] = {};
+	const idDeclSkin		*skins[2] = {};
 
 
-	idFuncEmitter			*algaeEmitter;
-	idFuncEmitter			*splashEmitter;
+	idFuncEmitter			*algaeEmitter = nullptr;
+	idFuncEmitter			*splashEmitter = nullptr;
 
-	idLight *				sirenLight;
+	idLight *				sirenLight = nullptr;
 
 	int						splashTimer;
 

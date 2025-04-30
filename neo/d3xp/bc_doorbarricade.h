@@ -10,7 +10,7 @@ public:
 							idDoorBarricade(void);
 	virtual					~idDoorBarricade(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -37,11 +37,13 @@ private:
 	bool					DoProxCheckGround();
 	bool					DoProxCheckAI();
 
-	idBeam*					beamOrigin;
-	idBeam*					beamTarget;
+	idBeam*					beamOrigin = nullptr;
+	idBeam*					beamTarget = nullptr;
 	void					UpdateLaserPosition(idVec3 targetPos);
 
 	bool					particleDone;
 
+	//BC 4-12-2025: locbox
+	idEntity*				locboxes[2] = {};
 };
 //#pragma once

@@ -93,6 +93,7 @@ typedef struct glconfig_s {
 	bool				isBorderless;
 
 	bool				allowGLSLPath;
+	bool				isBrokenAMDR7200;
 
 	bool				isInitialized;
 } glconfig_t;
@@ -279,6 +280,8 @@ public:
 	virtual bool			UseBlendoAmbience() const = 0;
 	virtual void			SetUseBlendoAmbience( bool setting ) = 0;
 	virtual float			GetBlendoAmbienceScale() const = 0;
+
+	virtual void			UpdateScreenWidth() = 0;
 };
 
 extern idRenderSystem *			renderSystem;

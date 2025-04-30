@@ -54,8 +54,8 @@ public:
 						BSEntity(idGameBearShootWindow* _game);
 	virtual				~BSEntity();
 
-	virtual void		WriteToSaveGame( idFile *savefile );
-	virtual void		ReadFromSaveGame( idFile *savefile, idGameBearShootWindow* _game );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile, idGameBearShootWindow* _game );
 
 	void				SetMaterial(const char* name);
 	void				SetSize( float _width, float _height );
@@ -74,10 +74,11 @@ public:
 	idGameBearShootWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	~idGameBearShootWindow();
 
-	virtual void		WriteToSaveGame( idFile *savefile );
-	virtual void		ReadFromSaveGame( idFile *savefile );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile );
 
 	virtual const char*	HandleEvent(const sysEvent_t *event, bool *updateVisuals);
+	virtual void		RunNamedEvent(const char* namedEvent);
 	virtual void		PostParse();
 	virtual void		Draw(int time, float x, float y);
 	virtual idWinVar *	GetWinVarByName	(const char *_name, bool winLookup = false, drawWin_t** owner = NULL);

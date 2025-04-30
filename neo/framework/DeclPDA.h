@@ -175,7 +175,7 @@ public:
 	const char* GetDescription() const { return description; } //BC
 	const char* GetSenderModel() const { return sendermodel; }
 
-	void					DebugReset() const;
+	void					ResetEmails() const;
 
 private:
 	mutable idStrList		videos;

@@ -50,6 +50,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ui/DeviceContext.h"
 #include "ui/Window.h"
 #include "ui/UserInterfaceLocal.h"
+#include "idlib/LangDict.h"
 
 #include "ui/GameBustOutWindow.h"
 
@@ -103,11 +104,13 @@ BOEntity::~BOEntity() {
 BOEntity::WriteToSaveGame
 ======================
 */
-void BOEntity::WriteToSaveGame( idFile *savefile ) {
+void BOEntity::WriteToSaveGame( idSaveGame *savefile ) const {
+	savefile->WriteMiscPtr( CastWriteVoidPtrPtr(game) );
 
 	savefile->Write( &visible, sizeof(visible) );
 
-	game->WriteSaveGameString( materialName, savefile );
+	savefile->WriteString( materialName );
+	savefile->WriteMaterial( material );
 
 	savefile->Write( &width, sizeof(width) );
 	savefile->Write( &height, sizeof(height) );
@@ -126,13 +129,15 @@ void BOEntity::WriteToSaveGame( idFile *savefile ) {
 BOEntity::ReadFromSaveGame
 ======================
 */
-void BOEntity::ReadFromSaveGame( idFile *savefile, idGameBustOutWindow* _game ) {
+void BOEntity::ReadFromSaveGame( idRestoreGame *savefile, idGameBustOutWindow* _game ) {
+	savefile->ReadMiscPtr( CastReadVoidPtrPtr(game) );
+
 	game = _game;
 
 	savefile->Read( &visible, sizeof(visible) );
 
-	game->ReadSaveGameString( materialName, savefile );
-	SetMaterial( materialName );
+	savefile->ReadString( materialName );
+	savefile->ReadMaterial( material );
 
 	savefile->Read( &width, sizeof(width) );
 	savefile->Read( &height, sizeof(height) );
@@ -262,7 +267,7 @@ BOBrick::~BOBrick( void ) {
 BOBrick::WriteToSaveGame
 ======================
 */
-void BOBrick::WriteToSaveGame( idFile *savefile ) {
+void BOBrick::WriteToSaveGame( idSaveGame *savefile ) const {
 	savefile->Write( &x, sizeof(x) );
 	savefile->Write( &y, sizeof(y) );
 	savefile->Write( &width, sizeof(width) );
@@ -280,7 +285,7 @@ void BOBrick::WriteToSaveGame( idFile *savefile ) {
 BOBrick::ReadFromSaveGame
 ======================
 */
-void BOBrick::ReadFromSaveGame( idFile *savefile, idGameBustOutWindow *game ) {
+void BOBrick::ReadFromSaveGame( idRestoreGame *savefile, idGameBustOutWindow *game ) {
 	savefile->Read( &x, sizeof(x) );
 	savefile->Read( &y, sizeof(y) );
 	savefile->Read( &width, sizeof(width) );
@@ -462,72 +467,82 @@ idGameBustOutWindow::~idGameBustOutWindow() {
 idGameBustOutWindow::WriteToSaveGame
 =============================
 */
-void idGameBustOutWindow::WriteToSaveGame( idFile *savefile ) {
+void idGameBustOutWindow::WriteToSaveGame( idSaveGame *savefile ) const {
 	idWindow::WriteToSaveGame( savefile );
 
-	gamerunning.WriteToSaveGame( savefile );
-	onFire.WriteToSaveGame( savefile );
-	onContinue.WriteToSaveGame( savefile );
-	onNewGame.WriteToSaveGame( savefile );
-	onNewLevel.WriteToSaveGame( savefile );
-
-	savefile->Write( &timeSlice, sizeof(timeSlice) );
-	savefile->Write( &gameOver, sizeof(gameOver) );
-	savefile->Write( &numLevels, sizeof(numLevels) );
-
-	// Board Data is loaded when GUI is loaded, don't need to save
-
-	savefile->Write( &numBricks, sizeof(numBricks) );
-	savefile->Write( &currentLevel, sizeof(currentLevel) );
-
-	savefile->Write( &updateScore, sizeof(updateScore) );
-	savefile->Write( &gameScore, sizeof(gameScore) );
-	savefile->Write( &nextBallScore, sizeof(nextBallScore) );
-
-	savefile->Write( &bigPaddleTime, sizeof(bigPaddleTime) );
-	savefile->Write( &paddleVelocity, sizeof(paddleVelocity) );
-
-	savefile->Write( &ballSpeed, sizeof(ballSpeed) );
-	savefile->Write( &ballsRemaining, sizeof(ballsRemaining) );
-	savefile->Write( &ballsInPlay, sizeof(ballsInPlay) );
-	savefile->Write( &ballHitCeiling, sizeof(ballHitCeiling) );
-
-	// Write Entities
-	int i;
 	int numberOfEnts = entities.Num();
-	savefile->Write( &numberOfEnts, sizeof(numberOfEnts) );
-	for ( i=0; i<numberOfEnts; i++ ) {
+	savefile->WriteInt( numberOfEnts ); // idList<BOEntity*> entities
+	for (int i=0; i<numberOfEnts; i++ ) {
 		entities[i]->WriteToSaveGame( savefile );
 	}
 
-	// Write Balls
-	numberOfEnts = balls.Num();
-	savefile->Write( &numberOfEnts, sizeof(numberOfEnts) );
-	for ( i=0; i<numberOfEnts; i++ ) {
-		int ballIndex = entities.FindIndex( balls[i] );
-		savefile->Write( &ballIndex, sizeof(ballIndex) );
+	gamerunning.WriteToSaveGame( savefile ); // idWinBool gamerunning
+	onFire.WriteToSaveGame( savefile ); // idWinBool onFire
+	onContinue.WriteToSaveGame( savefile ); // idWinBool onContinue
+	onNewGame.WriteToSaveGame( savefile ); // idWinBool onNewGame
+	onNewLevel.WriteToSaveGame( savefile ); // idWinBool onNewLevel
+
+	savefile->WriteFloat( timeSlice ); // float timeSlice
+	savefile->WriteBool( gameOver ); // bool gameOver
+
+	savefile->WriteInt( numLevels ); // int numLevels
+	//boardDataLoaded = false; LoadBoardFiles();  //byte * levelBoardData 
+	savefile->WriteBool( boardDataLoaded ); // bool boardDataLoaded
+
+	savefile->WriteInt( numBricks ); // int numBricks
+	savefile->WriteInt( currentLevel ); // int currentLevel
+
+	savefile->WriteBool( updateScore ); // bool updateScore
+	savefile->WriteInt( gameScore ); // int gameScore
+	savefile->WriteInt( nextBallScore ); // int nextBallScore
+
+	savefile->WriteInt( bigPaddleTime ); // int bigPaddleTime
+	savefile->WriteFloat( paddleVelocity ); // float paddleVelocity
+
+	savefile->WriteFloat( ballSpeed ); // float ballSpeed
+	savefile->WriteInt( ballsRemaining ); // int ballsRemaining
+	savefile->WriteInt( ballsInPlay ); // int ballsInPlay
+	savefile->WriteBool( ballHitCeiling ); // bool ballHitCeiling
+
+	numberOfEnts = balls.Num(); // idList<BOEntity*> balls
+	savefile->WriteInt( numberOfEnts );
+	for (int i=0; i<numberOfEnts; i++ ) {
+		int entIdx = entities.FindIndex( balls[i] );
+		savefile->WriteInt( entIdx );
 	}
 
-	// Write Powerups
-	numberOfEnts = powerUps.Num();
-	savefile->Write( &numberOfEnts, sizeof(numberOfEnts) );
-	for ( i=0; i<numberOfEnts; i++ ) {
-		int powerIndex = entities.FindIndex( powerUps[i] );
-		savefile->Write( &powerIndex, sizeof(powerIndex) );
+	numberOfEnts = powerUps.Num(); // idList<BOEntity*> powerUps
+	savefile->WriteInt( numberOfEnts );
+	for (int i=0; i<numberOfEnts; i++ ) {
+		int entIdx = entities.FindIndex( powerUps[i] );
+		savefile->WriteInt( entIdx );
 	}
 
-	// Write paddle
-	paddle->WriteToSaveGame( savefile );
+	paddle->WriteToSaveGame( savefile );// BOBrick * paddle
 
-	// Write Bricks
-	int row;
-	for ( row=0; row<BOARD_ROWS; row++ ) {
+	savefile->WriteInt(BOARD_ROWS); // idList<BOBrick*> board[BOARD_ROWS]
+	for (int row=0; row<BOARD_ROWS; row++ ) {
 		numberOfEnts = board[row].Num();
-		savefile->Write( &numberOfEnts, sizeof(numberOfEnts) );
-		for ( i=0; i<numberOfEnts; i++ ) {
+		savefile->WriteInt( numberOfEnts );
+		for (int i=0; i<numberOfEnts; i++ ) {
 			board[row][i]->WriteToSaveGame( savefile );
 		}
 	}
+
+	savefile->WriteInt( nextTurboMultiballTime ); // int nextTurboMultiballTime
+	savefile->WriteInt( smallPaddleTime ); // int smallPaddleTime
+	savefile->WriteInt( curseCounter ); // int curseCounter
+	savefile->WriteInt( curseMaxCounter ); // int curseMaxCounter
+	savefile->WriteInt( gemCounter ); // int gemCounter
+	savefile->WriteInt( multiGemCounter ); // int multiGemCounter
+	savefile->WriteBool( bigpaddleEligible ); // bool bigpaddleEligible
+	savefile->WriteInt( dialBlinktimer ); // int dialBlinktimer
+
+	dial->WriteToSaveGame( savefile );// BOBrick * dial
+
+	savefile->WriteInt( highScore ); // int highScore
+
+	savefile->WriteCheckSizeMarker();
 }
 
 /*
@@ -535,83 +550,91 @@ void idGameBustOutWindow::WriteToSaveGame( idFile *savefile ) {
 idGameBustOutWindow::ReadFromSaveGame
 =============================
 */
-void idGameBustOutWindow::ReadFromSaveGame( idFile *savefile ) {
+void idGameBustOutWindow::ReadFromSaveGame( idRestoreGame *savefile ) {
 	idWindow::ReadFromSaveGame( savefile );
 
-	// Clear out existing paddle and entities from GUI load
-	delete paddle;
-	entities.DeleteContents( true );
-
-	gamerunning.ReadFromSaveGame( savefile );
-	onFire.ReadFromSaveGame( savefile );
-	onContinue.ReadFromSaveGame( savefile );
-	onNewGame.ReadFromSaveGame( savefile );
-	onNewLevel.ReadFromSaveGame( savefile );
-
-	savefile->Read( &timeSlice, sizeof(timeSlice) );
-	savefile->Read( &gameOver, sizeof(gameOver) );
-	savefile->Read( &numLevels, sizeof(numLevels) );
-
-	// Board Data is loaded when GUI is loaded, don't need to save
-
-	savefile->Read( &numBricks, sizeof(numBricks) );
-	savefile->Read( &currentLevel, sizeof(currentLevel) );
-
-	savefile->Read( &updateScore, sizeof(updateScore) );
-	savefile->Read( &gameScore, sizeof(gameScore) );
-	savefile->Read( &nextBallScore, sizeof(nextBallScore) );
-
-	savefile->Read( &bigPaddleTime, sizeof(bigPaddleTime) );
-	savefile->Read( &paddleVelocity, sizeof(paddleVelocity) );
-
-	savefile->Read( &ballSpeed, sizeof(ballSpeed) );
-	savefile->Read( &ballsRemaining, sizeof(ballsRemaining) );
-	savefile->Read( &ballsInPlay, sizeof(ballsInPlay) );
-	savefile->Read( &ballHitCeiling, sizeof(ballHitCeiling) );
-
-	int i;
 	int numberOfEnts;
-
-	// Read entities
-	savefile->Read( &numberOfEnts, sizeof(numberOfEnts) );
-	for ( i=0; i<numberOfEnts; i++ ) {
-		BOEntity *ent;
-
-		ent = new BOEntity( this );
-		ent->ReadFromSaveGame( savefile, this );
-		entities.Append( ent );
+	savefile->ReadInt( numberOfEnts ); // idList<BOEntity*> entities
+	entities.SetNum(numberOfEnts);
+	for (int i=0; i<numberOfEnts; i++ ) {
+		entities[i]= new BOEntity(this);
+		entities[i]->ReadFromSaveGame( savefile, this );
 	}
 
-	// Read balls
-	savefile->Read( &numberOfEnts, sizeof(numberOfEnts) );
-	for ( i=0; i<numberOfEnts; i++ ) {
-		int ballIndex;
-		savefile->Read( &ballIndex, sizeof(ballIndex) );
-		balls.Append( entities[ballIndex] );
+	gamerunning.ReadFromSaveGame( savefile ); // idWinBool gamerunning
+	onFire.ReadFromSaveGame( savefile ); // idWinBool onFire
+	onContinue.ReadFromSaveGame( savefile ); // idWinBool onContinue
+	onNewGame.ReadFromSaveGame( savefile ); // idWinBool onNewGame
+	onNewLevel.ReadFromSaveGame( savefile ); // idWinBool onNewLevel
+
+	savefile->ReadFloat( timeSlice ); // float timeSlice
+	savefile->ReadBool( gameOver ); // bool gameOver
+
+	savefile->ReadInt( numLevels ); // int numLevels
+	//boardDataLoaded = false; LoadBoardFiles();  //byte * levelBoardData 
+	savefile->ReadBool( boardDataLoaded ); // bool boardDataLoaded
+
+	savefile->ReadInt( numBricks ); // int numBricks
+	savefile->ReadInt( currentLevel ); // int currentLevel
+
+	savefile->ReadBool( updateScore ); // bool updateScore
+	savefile->ReadInt( gameScore ); // int gameScore
+	savefile->ReadInt( nextBallScore ); // int nextBallScore
+
+	savefile->ReadInt( bigPaddleTime ); // int bigPaddleTime
+	savefile->ReadFloat( paddleVelocity ); // float paddleVelocity
+
+	savefile->ReadFloat( ballSpeed ); // float ballSpeed
+	savefile->ReadInt( ballsRemaining ); // int ballsRemaining
+	savefile->ReadInt( ballsInPlay ); // int ballsInPlay
+	savefile->ReadBool( ballHitCeiling ); // bool ballHitCeiling
+
+	savefile->ReadInt( numberOfEnts ); // idList<BOEntity*> balls
+	balls.SetNum( numberOfEnts );
+	for (int i=0; i<numberOfEnts; i++ ) {
+		int entIdx;
+		savefile->ReadInt( entIdx );
+		balls[i] = entities[entIdx];
+		balls[i]->ReadFromSaveGame( savefile, this );
 	}
 
-	// Read powerups
-	savefile->Read( &numberOfEnts, sizeof(numberOfEnts) );
-	for ( i=0; i<numberOfEnts; i++ ) {
-		int powerIndex;
-		savefile->Read( &powerIndex, sizeof(powerIndex) );
-		balls.Append( entities[powerIndex] );
+	savefile->ReadInt( numberOfEnts ); // idList<BOEntity*> powerUps
+	powerUps.SetNum(numberOfEnts);
+	for (int i=0; i<numberOfEnts; i++ ) {
+		int entIdx;
+		savefile->ReadInt( entIdx );
+		powerUps[i] = entities[entIdx];
+		powerUps[i]->ReadFromSaveGame( savefile, this );
 	}
 
-	// Read paddle
-	paddle = new BOBrick();
-	paddle->ReadFromSaveGame( savefile, this );
+	paddle->ReadFromSaveGame( savefile, this );// BOBrick * paddle
 
-	// Read board
-	int row;
-	for ( row=0; row<BOARD_ROWS; row++ ) {
-		savefile->Read( &numberOfEnts, sizeof(numberOfEnts) );
-		for ( i=0; i<numberOfEnts; i++ ) {
+	int rowNum; // idList<BOBrick*> board[BOARD_ROWS]
+	savefile->ReadInt(rowNum);
+	for ( int row=0 ; row<rowNum ; row++ ) {
+		savefile->ReadInt( numberOfEnts );
+		for (int i=0; i<numberOfEnts; i++ ) {
+
 			BOBrick *brick = new BOBrick();
 			brick->ReadFromSaveGame( savefile, this );
 			board[row].Append( brick );
 		}
 	}
+
+	savefile->ReadInt( nextTurboMultiballTime ); // int nextTurboMultiballTime
+	savefile->ReadInt( smallPaddleTime ); // int smallPaddleTime
+	savefile->ReadInt( curseCounter ); // int curseCounter
+	savefile->ReadInt( curseMaxCounter ); // int curseMaxCounter
+	savefile->ReadInt( gemCounter ); // int gemCounter
+	savefile->ReadInt( multiGemCounter ); // int multiGemCounter
+	savefile->ReadBool( bigpaddleEligible ); // bool bigpaddleEligible
+	savefile->ReadInt( dialBlinktimer ); // int dialBlinktimer
+
+	dial->ReadFromSaveGame( savefile, this );// BOBrick * dial
+
+	savefile->ReadInt( highScore ); // int highScore
+
+	savefile->ReadCheckSizeMarker();
 }
 
 /*
@@ -704,6 +727,19 @@ void idGameBustOutWindow::CommonInit() {
 	dial->ent->SetMaterial("game/bustout/dial0");
 
 	
+}
+
+// SW 3rd March 2025:
+// We pass through a special event from idGameBlock::Think so that the game only updates when the game block is capable of thinking.
+// This means that the game should pause correctly whenever the world is paused.
+void idGameBustOutWindow::RunNamedEvent(const char* namedEvent)
+{
+	idWindow::RunNamedEvent(namedEvent);
+
+	if (idStr::Icmp(namedEvent, "updateGame") == 0)
+	{
+		UpdateGame();
+	}
 }
 
 /*
@@ -831,9 +867,6 @@ idGameBustOutWindow::Draw
 void idGameBustOutWindow::Draw(int time, float x, float y) {
 	int i;
 
-	//Update the game every frame before drawing
-	UpdateGame();
-
 	for( i = entities.Num()-1; i >= 0; i-- ) {
 		entities[i]->Draw(dc);
 	}
@@ -857,12 +890,12 @@ void idGameBustOutWindow::UpdateScore() {
 		if (gemCounter > highScore)
 		{
 			//Player has a new high score.
-			highscorestringToDisplay = "NEW HIGH SCORE!";
+			highscorestringToDisplay = common->GetLanguageDict()->GetString("#str_gui_arcade_newhighscore");
 			highScore = gemCounter;
 		}
 		else
 		{
-			highscorestringToDisplay = idStr::Format("Current high score: %d", highScore);
+			highscorestringToDisplay =  idStr::Format(common->GetLanguageDict()->GetString("#str_gui_arcade_currenthighscore"), highScore);
 		}
 
 		gui->SetStateString("highscoretext", highscorestringToDisplay.c_str());
@@ -1241,7 +1274,10 @@ void idGameBustOutWindow::UpdatePowerups( void ) {
 
 					session->sw->PlayShaderDirectly("arcade_getgem", S_UNIQUE_CHANNEL);
 
-
+					if (gemCounter >= 50 && common->g_SteamUtilities && common->g_SteamUtilities->IsSteamInitialized())
+					{
+						common->g_SteamUtilities->SetAchievement("ach_gemcat");
+					}
 
 					break;
 				default:

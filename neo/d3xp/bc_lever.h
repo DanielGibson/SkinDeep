@@ -9,7 +9,7 @@ public:
 							idLever();
 	virtual					~idLever(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 	virtual void			Think( void );
@@ -33,7 +33,7 @@ private:
 
 	bool					isActive;
 
-	idFuncEmitter			*soundParticle;
+	idFuncEmitter			*soundParticle = nullptr;
 
 	
 };

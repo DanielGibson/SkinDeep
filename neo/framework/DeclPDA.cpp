@@ -355,7 +355,7 @@ const int idDeclPDA::GetNumEmails() const {
 	return emails.Num();
 }
 
-void idDeclPDA::DebugReset() const {
+void idDeclPDA::ResetEmails() const {
 	emails.Resize(originalEmails);
 	emailsReplied.Clear();
 	emailsRead.Clear();

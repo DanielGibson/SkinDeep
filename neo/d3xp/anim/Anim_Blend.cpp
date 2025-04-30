@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "idlib/geometry/JointTransform.h"
 #include "idlib/math/Quat.h"
 #include "renderer/ModelManager.h"
+#include "renderer/tr_local.h"
 
 #include "gamesys/SysCvar.h"
 #include "ai/AI.h"
@@ -1519,26 +1520,23 @@ archives object for save game file
 =====================
 */
 void idAnimBlend::Save( idSaveGame *savefile ) const {
-	int i;
+	savefile->WriteModelDef( modelDef ); // class idDeclModelDef * modelDef
+	savefile->WriteInt( starttime ); // int starttime
+	savefile->WriteInt( endtime ); // int endtime
+	savefile->WriteInt( timeOffset ); // int timeOffset
+	savefile->WriteFloat( rate ); // float rate
 
-	savefile->WriteInt( starttime );
-	savefile->WriteInt( endtime );
-	savefile->WriteInt( timeOffset );
-	savefile->WriteFloat( rate );
+	savefile->WriteInt( blendStartTime ); // int blendStartTime
+	savefile->WriteInt( blendDuration ); // int blendDuration
+	savefile->WriteFloat( blendStartValue ); // float blendStartValue
+	savefile->WriteFloat( blendEndValue ); // float blendEndValue
 
-	savefile->WriteInt( blendStartTime );
-	savefile->WriteInt( blendDuration );
-	savefile->WriteFloat( blendStartValue );
-	savefile->WriteFloat( blendEndValue );
-
-	for( i = 0; i < ANIM_MaxSyncedAnims; i++ ) {
-		savefile->WriteFloat( animWeights[ i ] );
-	}
-	savefile->WriteShort( cycle );
-	savefile->WriteShort( frame );
-	savefile->WriteShort( animNum );
-	savefile->WriteBool( allowMove );
-	savefile->WriteBool( allowFrameCommands );
+	SaveFileWriteArray( animWeights, ANIM_MaxSyncedAnims, WriteFloat ); // float animWeights[ANIM_MaxSyncedAnims]
+	savefile->WriteShort( cycle ); // short cycle
+	savefile->WriteShort( frame ); // short frame
+	savefile->WriteShort( animNum ); // short animNum
+	savefile->WriteBool( allowMove ); // bool allowMove
+	savefile->WriteBool( allowFrameCommands ); // bool allowFrameCommands
 }
 
 /*
@@ -1549,34 +1547,30 @@ unarchives object from save game file
 =====================
 */
 void idAnimBlend::Restore( idRestoreGame *savefile, const idDeclModelDef *modelDef ) {
-	int	i;
+	savefile->ReadModelDef( this->modelDef ); // class idDeclModelDef * modelDef
+	savefile->ReadInt( starttime ); // int starttime
+	savefile->ReadInt( endtime ); // int endtime
+	savefile->ReadInt( timeOffset ); // int timeOffset
+	savefile->ReadFloat( rate ); // float rate
 
-	this->modelDef = modelDef;
+	savefile->ReadInt( blendStartTime ); // int blendStartTime
+	savefile->ReadInt( blendDuration ); // int blendDuration
+	savefile->ReadFloat( blendStartValue ); // float blendStartValue
+	savefile->ReadFloat( blendEndValue ); // float blendEndValue
 
-	savefile->ReadInt( starttime );
-	savefile->ReadInt( endtime );
-	savefile->ReadInt( timeOffset );
-	savefile->ReadFloat( rate );
+	SaveFileReadArray( animWeights, ReadFloat ); // float animWeights[ANIM_MaxSyncedAnims]
+	savefile->ReadShort( cycle ); // short cycle
+	savefile->ReadShort( frame ); // short frame
+	savefile->ReadShort( animNum ); // short animNum
+	savefile->ReadBool( allowMove ); // bool allowMove
+	savefile->ReadBool( allowFrameCommands ); // bool allowFrameCommands
 
-	savefile->ReadInt( blendStartTime );
-	savefile->ReadInt( blendDuration );
-	savefile->ReadFloat( blendStartValue );
-	savefile->ReadFloat( blendEndValue );
-
-	for( i = 0; i < ANIM_MaxSyncedAnims; i++ ) {
-		savefile->ReadFloat( animWeights[ i ] );
-	}
-	savefile->ReadShort( cycle );
-	savefile->ReadShort( frame );
-	savefile->ReadShort( animNum );
 	if ( !modelDef ) {
 		animNum = 0;
 	} else if ( ( animNum < 0 ) || ( animNum > modelDef->NumAnims() ) ) {
 		gameLocal.Warning( "Anim number %d out of range for model '%s' during save game", animNum, modelDef->GetModelName() );
 		animNum = 0;
 	}
-	savefile->ReadBool( allowMove );
-	savefile->ReadBool( allowFrameCommands );
 }
 
 /*
@@ -3677,11 +3671,11 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 	int i;
 	int j;
 
-	savefile->WriteModelDef( modelDef );
-	savefile->WriteObject( entity );
+	savefile->WriteModelDef( modelDef ); // const  idDeclModelDef * modelDef
+	savefile->WriteObject( entity ); //  idEntity * entity
 
 	savefile->WriteInt( jointMods.Num() );
-	for( i = 0; i < jointMods.Num(); i++ ) {
+	for( i = 0; i < jointMods.Num(); i++ ) { //  idList<jointMod_t *> jointMods
 		savefile->WriteInt( jointMods[ i ]->jointnum );
 		savefile->WriteMat3( jointMods[ i ]->mat );
 		savefile->WriteVec3( jointMods[ i ]->pos );
@@ -3689,34 +3683,36 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 		savefile->WriteInt( (int&)jointMods[ i ]->transform_axis );
 	}
 
-	savefile->WriteInt( numJoints );
-	for ( i = 0; i < numJoints; i++ ) {
+	savefile->WriteInt( numJoints ); //  int numJoints
+	for ( i = 0; i < numJoints; i++ ) { //  idJointMat * joints
 		float *data = joints[i].ToFloatPtr();
 		for ( j = 0; j < 12; j++ ) {
 			savefile->WriteFloat( data[j] );
 		}
 	}
 
-	savefile->WriteInt( lastTransformTime );
-	savefile->WriteBool( stoppedAnimatingUpdate );
-	savefile->WriteBool( forceUpdate );
-	savefile->WriteBounds( frameBounds );
+	savefile->WriteInt( lastTransformTime ); // mutable  int lastTransformTime
+	savefile->WriteBool( stoppedAnimatingUpdate ); // mutable  bool stoppedAnimatingUpdate
+	savefile->WriteBool( removeOriginOffset ); //  bool removeOriginOffset
+	savefile->WriteBool( forceUpdate );  //  bool forceUpdate
 
-	savefile->WriteFloat( AFPoseBlendWeight );
+	savefile->WriteBounds( frameBounds ); //  idBounds frameBounds
 
-	savefile->WriteInt( AFPoseJoints.Num() );
+	savefile->WriteFloat( AFPoseBlendWeight ); //  float AFPoseBlendWeight
+
+	savefile->WriteInt( AFPoseJoints.Num() ); //  idList<int> AFPoseJoints
 	for ( i = 0; i < AFPoseJoints.Num(); i++ ) {
 		savefile->WriteInt( AFPoseJoints[i] );
 	}
 
-	savefile->WriteInt( AFPoseJointMods.Num() );
+	savefile->WriteInt( AFPoseJointMods.Num() ); //  idList<idAFPoseJointMod> AFPoseJointMods
 	for ( i = 0; i < AFPoseJointMods.Num(); i++ ) {
 		savefile->WriteInt( (int&)AFPoseJointMods[i].mod );
 		savefile->WriteMat3( AFPoseJointMods[i].axis );
 		savefile->WriteVec3( AFPoseJointMods[i].origin );
 	}
 
-	savefile->WriteInt( AFPoseJointFrame.Num() );
+	savefile->WriteInt( AFPoseJointFrame.Num() );  //  idList<idJointQuat> AFPoseJointFrame
 	for ( i = 0; i < AFPoseJointFrame.Num(); i++ ) {
 		savefile->WriteFloat( AFPoseJointFrame[i].q.x );
 		savefile->WriteFloat( AFPoseJointFrame[i].q.y );
@@ -3725,11 +3721,10 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 		savefile->WriteVec3( AFPoseJointFrame[i].t );
 	}
 
-	savefile->WriteBounds( AFPoseBounds );
-	savefile->WriteInt( AFPoseTime );
+	savefile->WriteBounds( AFPoseBounds );  //  idBounds AFPoseBounds
+	savefile->WriteInt( AFPoseTime );  //  int AFPoseTime
 
-	savefile->WriteBool( removeOriginOffset );
-
+	// idAnimBlend channels[ ANIM_NumAnimChannels ][ ANIM_MaxAnimsPerChannel ];
 	for( i = ANIMCHANNEL_ALL; i < ANIM_NumAnimChannels; i++ ) {
 		for( j = 0; j < ANIM_MaxAnimsPerChannel; j++ ) {
 			channels[ i ][ j ].Save( savefile );
@@ -3749,11 +3744,11 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	int j;
 	int num;
 
-	savefile->ReadModelDef( modelDef );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( entity ) );
+	savefile->ReadModelDef( modelDef ); // const  idDeclModelDef * modelDef
+	savefile->ReadObject( reinterpret_cast<idClass *&>( entity ) ); //  idEntity * entity
 
 	savefile->ReadInt( num );
-	jointMods.SetNum( num );
+	jointMods.SetNum( num ); //  idList<jointMod_t *> jointMods
 	for( i = 0; i < num; i++ ) {
 		jointMods[ i ] = new jointMod_t;
 		savefile->ReadInt( (int&)jointMods[ i ]->jointnum );
@@ -3763,31 +3758,33 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 		savefile->ReadInt( (int&)jointMods[ i ]->transform_axis );
 	}
 
-	savefile->ReadInt( numJoints );
+	savefile->ReadInt( numJoints ); //  int numJoints
 	joints = (idJointMat *) Mem_Alloc16( numJoints * sizeof( joints[0] ) );
-	for ( i = 0; i < numJoints; i++ ) {
+	for ( i = 0; i < numJoints; i++ ) {  //  idJointMat * joints
 		float *data = joints[i].ToFloatPtr();
 		for ( j = 0; j < 12; j++ ) {
 			savefile->ReadFloat( data[j] );
 		}
 	}
 
-	savefile->ReadInt( lastTransformTime );
-	savefile->ReadBool( stoppedAnimatingUpdate );
-	savefile->ReadBool( forceUpdate );
-	savefile->ReadBounds( frameBounds );
+	savefile->ReadInt( lastTransformTime ); // mutable  int lastTransformTime
+	savefile->ReadBool( stoppedAnimatingUpdate ); // mutable  bool stoppedAnimatingUpdate
+	savefile->ReadBool( removeOriginOffset ); //  bool removeOriginOffset
+	savefile->ReadBool( forceUpdate ); //  bool forceUpdate
 
-	savefile->ReadFloat( AFPoseBlendWeight );
+	savefile->ReadBounds( frameBounds ); //  idBounds frameBounds
+
+	savefile->ReadFloat( AFPoseBlendWeight ); //  float AFPoseBlendWeight
 
 	savefile->ReadInt( num );
-	AFPoseJoints.SetGranularity( 1 );
+	AFPoseJoints.SetGranularity( 1 );  //  idList<int> AFPoseJoints
 	AFPoseJoints.SetNum( num );
 	for ( i = 0; i < AFPoseJoints.Num(); i++ ) {
 		savefile->ReadInt( AFPoseJoints[i] );
 	}
 
 	savefile->ReadInt( num );
-	AFPoseJointMods.SetGranularity( 1 );
+	AFPoseJointMods.SetGranularity( 1 );  //  idList<idAFPoseJointMod> AFPoseJointMods
 	AFPoseJointMods.SetNum( num );
 	for ( i = 0; i < AFPoseJointMods.Num(); i++ ) {
 		savefile->ReadInt( (int&)AFPoseJointMods[i].mod );
@@ -3796,7 +3793,7 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	}
 
 	savefile->ReadInt( num );
-	AFPoseJointFrame.SetGranularity( 1 );
+	AFPoseJointFrame.SetGranularity( 1 ); //  idList<idJointQuat> AFPoseJointFrame
 	AFPoseJointFrame.SetNum( num );
 	for ( i = 0; i < AFPoseJointFrame.Num(); i++ ) {
 		savefile->ReadFloat( AFPoseJointFrame[i].q.x );
@@ -3806,11 +3803,10 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 		savefile->ReadVec3( AFPoseJointFrame[i].t );
 	}
 
-	savefile->ReadBounds( AFPoseBounds );
-	savefile->ReadInt( AFPoseTime );
+	savefile->ReadBounds( AFPoseBounds ); //  idBounds AFPoseBounds
+	savefile->ReadInt( AFPoseTime ); //  int AFPoseTime
 
-	savefile->ReadBool( removeOriginOffset );
-
+	// idAnimBlend channels[ ANIM_NumAnimChannels ][ ANIM_MaxAnimsPerChannel ];
 	for( i = ANIMCHANNEL_ALL; i < ANIM_NumAnimChannels; i++ ) {
 		for( j = 0; j < ANIM_MaxAnimsPerChannel; j++ ) {
 			channels[ i ][ j ].Restore( savefile, modelDef );
@@ -4798,8 +4794,6 @@ bool idAnimator::CreateFrame( int currentTime, bool force ) {
 	const jointMod_t *	jointMod;
 	const idJointQuat *	defaultPose;
 
-	static idCVar		r_showSkel( "r_showSkel", "0", CVAR_RENDERER | CVAR_INTEGER, "", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
-
 	if ( gameLocal.inCinematic && gameLocal.skipCinematic ) {
 		return false;
 	}
@@ -4809,7 +4803,7 @@ bool idAnimator::CreateFrame( int currentTime, bool force ) {
 	}
 
 	// SM: We only want to disable this if r_showSkel is 2
-	if ( !force && r_showSkel.GetInteger() < 2 ) {
+	if ( !force && r_showSkel.GetInteger() != 2 ) {
 	//if ( !force && !r_showSkel.GetInteger() ) {
 		if ( lastTransformTime == currentTime ) {
 			return false;
@@ -5557,7 +5551,7 @@ void idGameEdit::ANIM_CreateAnimFrame( const idRenderModel *model, const idMD5An
 	}
 
 	if ( numJoints != anim->NumJoints() ) {
-		gameLocal.Warning( "Model '%s' has different # of joints than anim '%s'", model->Name(), anim->Name() );
+		gameLocal.Warning( "Model '%s' has different # of joints (%d) than anim '%s' (%d)", model->Name(), numJoints, anim->Name(), anim->NumJoints() );
 		for( i = 0; i < numJoints; i++ ) {
 			joints[i].SetRotation( mat3_identity );
 			joints[i].SetTranslation( offset );

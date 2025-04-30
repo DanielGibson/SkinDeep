@@ -100,32 +100,28 @@ idGrabber::Save
 ==============
 */
 void idGrabber::Save( idSaveGame *savefile ) const {
+	savefile->WriteObject( dragEnt ); // idEntityPtr<idEntity> dragEnt
+	savefile->WriteStaticObject( idGrabber::drag ); // idForce_Grab drag
+	savefile->WriteVec3( saveGravity ); // idVec3 saveGravity
 
-	dragEnt.Save( savefile );
-	savefile->WriteStaticObject( drag );
+	savefile->WriteInt( id ); // int id
+	savefile->WriteVec3( localPlayerPoint ); // idVec3 localPlayerPoint
+	owner.Save( savefile ); // idEntityPtr<idPlayer> owner
+	savefile->WriteInt( oldUcmdFlags ); // int oldUcmdFlags
+	savefile->WriteBool( holdingAF ); // bool holdingAF
+	savefile->WriteBool( shakeForceFlip ); // bool shakeForceFlip
+	savefile->WriteInt( endTime ); // int endTime
+	savefile->WriteInt( lastFiredTime ); // int lastFiredTime
+	savefile->WriteInt( dragFailTime ); // int dragFailTime
+	savefile->WriteInt( startDragTime ); // int startDragTime
+	savefile->WriteFloat( dragTraceDist ); // float dragTraceDist
+	savefile->WriteInt( savedContents ); // int savedContents
+	savefile->WriteInt( savedClipmask ); // int savedClipmask
 
-	savefile->WriteVec3( saveGravity );
-	savefile->WriteInt( id );
+	savefile->WriteObject( beam ); // idBeam* beam
+	savefile->WriteObject( beamTarget ); // idBeam* beamTarget
 
-	savefile->WriteVec3( localPlayerPoint );
-
-	owner.Save( savefile );
-
-	savefile->WriteBool( holdingAF );
-	savefile->WriteBool( shakeForceFlip );
-
-	savefile->WriteInt( endTime );
-	savefile->WriteInt( lastFiredTime );
-	savefile->WriteInt( dragFailTime );
-	savefile->WriteInt( startDragTime );
-	savefile->WriteFloat( dragTraceDist );
-	savefile->WriteInt( savedContents );
-	savefile->WriteInt( savedClipmask );
-
-	savefile->WriteObject( beam );
-	savefile->WriteObject( beamTarget );
-
-	savefile->WriteInt( warpId );
+	savefile->WriteInt( warpId ); // int warpId
 }
 
 /*
@@ -134,39 +130,28 @@ idGrabber::Restore
 ==============
 */
 void idGrabber::Restore( idRestoreGame *savefile ) {
-	//Spawn the beams
-	Initialize();
+	savefile->ReadObject( dragEnt ); // idEntityPtr<idEntity> dragEnt
+	savefile->ReadStaticObject( drag ); // idForce_Grab drag
+	savefile->ReadVec3( saveGravity ); // idVec3 saveGravity
 
-	dragEnt.Restore( savefile );
-	savefile->ReadStaticObject( drag );
+	savefile->ReadInt( id ); // int id
+	savefile->ReadVec3( localPlayerPoint ); // idVec3 localPlayerPoint
+	owner.Restore( savefile ); // idEntityPtr<idPlayer> owner
+	savefile->ReadInt( oldUcmdFlags ); // int oldUcmdFlags
+	savefile->ReadBool( holdingAF ); // bool holdingAF
+	savefile->ReadBool( shakeForceFlip ); // bool shakeForceFlip
+	savefile->ReadInt( endTime ); // int endTime
+	savefile->ReadInt( lastFiredTime ); // int lastFiredTime
+	savefile->ReadInt( dragFailTime ); // int dragFailTime
+	savefile->ReadInt( startDragTime ); // int startDragTime
+	savefile->ReadFloat( dragTraceDist ); // float dragTraceDist
+	savefile->ReadInt( savedContents ); // int savedContents
+	savefile->ReadInt( savedClipmask ); // int savedClipmask
 
-	savefile->ReadVec3( saveGravity );
-	savefile->ReadInt( id );
+	savefile->ReadObject( CastClassPtrRef(beam) ); // idBeam* beam
+	savefile->ReadObject( CastClassPtrRef(beamTarget) ); // idBeam* beamTarget
 
-	// Restore the drag force's physics object
-	if ( dragEnt.IsValid() ) {
-		drag.SetPhysics( dragEnt.GetEntity()->GetPhysics(), id, dragEnt.GetEntity()->GetPhysics()->GetOrigin() );
-	}
-
-	savefile->ReadVec3( localPlayerPoint );
-
-	owner.Restore( savefile );
-
-	savefile->ReadBool( holdingAF );
-	savefile->ReadBool( shakeForceFlip );
-
-	savefile->ReadInt( endTime );
-	savefile->ReadInt( lastFiredTime );
-	savefile->ReadInt( dragFailTime );
-	savefile->ReadInt( startDragTime );
-	savefile->ReadFloat( dragTraceDist );
-	savefile->ReadInt( savedContents );
-	savefile->ReadInt( savedClipmask );
-
-	savefile->ReadObject( reinterpret_cast<idClass *&>(beam) );
-	savefile->ReadObject( reinterpret_cast<idClass *&>(beamTarget) );
-
-	savefile->ReadInt( warpId );
+	savefile->ReadInt( warpId ); // int warpId
 }
 
 /*

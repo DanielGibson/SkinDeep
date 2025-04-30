@@ -744,6 +744,8 @@ void idEvent::Save( idSaveGame *savefile ) {
 
 	event = EventQueue.Next();
 	while( event != NULL ) {
+		assert(event->initialized);
+
 		savefile->WriteInt( event->time );
 		savefile->WriteString( event->eventdef->GetName() );
 		savefile->WriteString( event->typeinfo->classname );
@@ -779,25 +781,31 @@ void idEvent::Save( idSaveGame *savefile ) {
 				case D_EVENT_TRACE :
 					validTrace = *reinterpret_cast<bool *>( dataPtr );
 					savefile->WriteBool( validTrace );
-					size += sizeof( bool );
 					if ( validTrace ) {
-						size += sizeof( trace_t );
 						const trace_t &t = *reinterpret_cast<trace_t *>( dataPtr + sizeof( bool ) );
 						SaveTrace( savefile, t );
 						if ( t.c.material ) {
-							size += MAX_STRING_LEN;
 							str = reinterpret_cast<char *>( dataPtr + sizeof( bool ) + sizeof( trace_t ) );
 							savefile->Write( str, MAX_STRING_LEN );
 						}
 					}
+					// blendo eric: always add to size, even if not written
+					// as this is only for verification
+					size += sizeof( bool ) + sizeof( trace_t ) + MAX_STRING_LEN;
 					break;
 				default:
+					gameLocal.Warning(" No event def found for arg %c ", format[i]);
 					break;
 			}
+			savefile->WriteCheckSizeMarker();
 		}
 		assert( size == event->eventdef->GetArgSize() );
 		event = event->eventNode.Next();
+
+		savefile->WriteCheckSizeMarker();
 	}
+
+	savefile->WriteCheckSizeMarker();
 
 #ifdef _D3XP
 	// Save the Fast EventQueue
@@ -813,7 +821,11 @@ void idEvent::Save( idSaveGame *savefile ) {
 		savefile->Write( event->data, event->eventdef->GetArgSize() );
 
 		event = event->eventNode.Next();
+
+		savefile->WriteCheckSizeMarker();
 	}
+
+	savefile->WriteCheckSizeMarker();
 #endif
 }
 
@@ -896,27 +908,40 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 						break;
 					case D_EVENT_TRACE :
 						savefile->ReadBool( *reinterpret_cast<bool *>( dataPtr ) );
-						size += sizeof( bool );
 						if ( *reinterpret_cast<bool *>( dataPtr ) ) {
-							size += sizeof( trace_t );
 							trace_t &t = *reinterpret_cast<trace_t *>( dataPtr + sizeof( bool ) );
 							RestoreTrace( savefile,  t) ;
 							if ( t.c.material ) {
-								size += MAX_STRING_LEN;
 								str = reinterpret_cast<char *>( dataPtr + sizeof( bool ) + sizeof( trace_t ) );
-								savefile->Read( str, MAX_STRING_LEN );
+								savefile->Read(str, MAX_STRING_LEN);
+
+								// blendo eric: likely a bug that the str wasn't used to make a material
+								//				but might be unused anyways?
+								if ( strlen(str) > 0 ) {
+									t.c.material = declManager->FindMaterial( name );
+								} else {
+									t.c.material = NULL;
+								}
 							}
 						}
+						// blendo eric: always add to size, even if not written
+						// as this is only for verification
+						size += sizeof( bool ) + sizeof( trace_t ) + MAX_STRING_LEN;
 						break;
 					default:
 						break;
 				}
+
+				savefile->ReadCheckSizeMarker();
 			}
 			assert( size == event->eventdef->GetArgSize() );
 		} else {
 			event->data = NULL;
 		}
+		savefile->ReadCheckSizeMarker();
 	}
+
+	savefile->ReadCheckSizeMarker();
 
 #ifdef _D3XP
 	// Restore the Fast EventQueue
@@ -960,7 +985,11 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 		} else {
 			event->data = NULL;
 		}
+
+		savefile->ReadCheckSizeMarker();
 	}
+
+	savefile->ReadCheckSizeMarker();
 #endif
 }
 
@@ -981,7 +1010,7 @@ void idEvent::RestoreTrace( idRestoreGame *savefile, trace_t &trace ) {
 	savefile->ReadVec3( trace.c.normal );
 	savefile->ReadFloat( trace.c.dist );
 	savefile->ReadInt( trace.c.contents );
-	savefile->ReadInt( (int&)trace.c.material );
+	savefile->ReadInt( (int&)trace.c.material ); // blendo eric: as noted above, don't save out material due to event data being altered
 	savefile->ReadInt( trace.c.contents );
 	savefile->ReadInt( trace.c.modelFeature );
 	savefile->ReadInt( trace.c.trmFeature );
@@ -1005,7 +1034,7 @@ void idEvent::SaveTrace( idSaveGame *savefile, const trace_t &trace ) {
 	savefile->WriteVec3( trace.c.normal );
 	savefile->WriteFloat( trace.c.dist );
 	savefile->WriteInt( trace.c.contents );
-	savefile->WriteInt( (int&)trace.c.material );
+	savefile->WriteInt( (int&)trace.c.material ); // blendo eric: as noted above, don't save out material due to event data being altered
 	savefile->WriteInt( trace.c.contents );
 	savefile->WriteInt( trace.c.modelFeature );
 	savefile->WriteInt( trace.c.trmFeature );

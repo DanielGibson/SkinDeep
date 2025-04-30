@@ -146,7 +146,24 @@ void idWorldspawn::Spawn( void ) {
 idWorldspawn::Save
 =================
 */
-void idWorldspawn::Save( idRestoreGame *savefile ) {
+void idWorldspawn::Save( idSaveGame *savefile ) const {
+	savefile->WriteInt( spawnfilterTable.Num() ); // idHashTable<idStrList> spawnfilterTable
+	for (int idx = 0; idx < spawnfilterTable.Num(); idx++)
+	{
+		idStr outKey;
+		idStrList outVal;
+		spawnfilterTable.GetIndex( idx, &outKey, &outVal );
+		savefile->WriteString( outKey );
+		SaveFileWriteArray( outVal, outVal.Num(), WriteString );
+	}
+
+	savefile->WriteBool( showEventLogInfoFeed ); // bool showEventLogInfoFeed
+	savefile->WriteBool( doSpacePush ); // bool doSpacePush
+
+	// blendo eric: set in gamelocal, but we can just write it out here
+	savefile->WriteBool( g_enableSlowmo.GetBool() ); // g_enableSlowmo
+	savefile->WriteBool( g_hideHudInternal.GetBool() ); // g_hideHudInternal
+
 }
 
 /*
@@ -157,12 +174,43 @@ idWorldspawn::Restore
 void idWorldspawn::Restore( idRestoreGame *savefile ) {
 	assert( gameLocal.world == this );
 
+#if 0
+	// blendo eric: this might be more accurate than grabbing from spawnargs?
+	float fval;
+	savefile->ReadFloat( fval );
+	g_gravity.SetFloat( fval );
+#else
 	g_gravity.SetFloat( spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY ) ) );
+#endif
 
+#if 0 // blendo eric: this is set in player
 	// disable stamina on hell levels
 	if ( spawnArgs.GetBool( "no_stamina" ) ) {
 		pm_stamina.SetFloat( 0.0f );
 	}
+#endif
+
+	int num;
+	savefile->ReadInt( num ); // idHashTable<idStrList> spawnfilterTable
+	for (int idx = 0; idx < num; idx++) {
+		idStrList outVal;
+		idStr outKey;
+		savefile->ReadString( outKey );
+		SaveFileReadList( outVal, ReadString ); 
+		spawnfilterTable.Set( outKey, outVal );
+	}
+
+	savefile->ReadBool( showEventLogInfoFeed ); // bool showEventLogInfoFeed
+	savefile->ReadBool( doSpacePush ); // bool doSpacePush
+
+	// blendo eric: set in gamelocal, but we can just write it out here
+	bool bVal;
+	savefile->ReadBool( bVal ); // g_enableSlowmo
+	g_enableSlowmo.SetBool( bVal );
+	savefile->ReadBool( bVal ); // g_hideHudInternal
+	g_hideHudInternal.SetBool( bVal );
+
+
 }
 
 /*

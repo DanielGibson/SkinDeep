@@ -9,6 +9,8 @@ public:
 	virtual				~idTrigger_healcloud(void);
 	
 	void				Spawn();
+	void				Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void				Restore(idRestoreGame *savefile);
 
 	//virtual void		Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType = SURFTYPE_NONE);
 
@@ -21,7 +23,7 @@ private:
 
 	void				Event_Touch(idEntity* other, trace_t* trace);
 
-	idFuncEmitter		*particleEmitter;
+	idFuncEmitter		*particleEmitter = nullptr;
 
 	int					maxlifetime;
 };

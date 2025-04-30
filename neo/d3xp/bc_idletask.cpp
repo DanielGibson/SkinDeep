@@ -42,10 +42,16 @@ idIdleTask::~idIdleTask(void)
 
 void idIdleTask::Save(idSaveGame *savefile) const
 {
+	assignedActor.Save( savefile ); // idEntityPtr<idAI> assignedActor
+	savefile->WriteObject( assignedOwner ); // idEntityPtr<idEntity> assignedOwner
+	savefile->WriteString( idleAnim ); // idStr idleAnim
 }
 
 void idIdleTask::Restore(idRestoreGame *savefile)
 {
+	assignedActor.Restore( savefile ); // idEntityPtr<idAI> assignedActor
+	savefile->ReadObject( assignedOwner ); // idEntityPtr<idEntity> assignedOwner
+	savefile->ReadString( idleAnim ); // idStr idleAnim
 }
 
 //Assign an actor to this task. TRUE = successful move order. FALSE = failed to do move order.

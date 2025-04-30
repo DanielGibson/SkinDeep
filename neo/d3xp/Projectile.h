@@ -52,7 +52,7 @@ public :
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Create( idEntity *owner, const idVec3 &start, const idVec3 &dir );
@@ -163,7 +163,7 @@ public :
 							idGuidedProjectile( void );
 							~idGuidedProjectile( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -199,7 +199,7 @@ class idSoulCubeMissile : public idGuidedProjectile {
 public:
 	CLASS_PROTOTYPE ( idSoulCubeMissile );
 	~idSoulCubeMissile();
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -238,7 +238,7 @@ public :
 							idBFGProjectile();
 							~idBFGProjectile();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -274,8 +274,8 @@ public :
 							~idDebris();
 
 	// save games
-	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
-	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
 
@@ -300,7 +300,7 @@ private:
 	void					Event_Fizzle( void );
 
 	//BC debris
-	const char				*splat;
+	idStr					splat;
 	int						suspiciousNoiseTimer;
 
 	int						nextBounceFX;

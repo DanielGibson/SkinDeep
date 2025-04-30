@@ -73,10 +73,44 @@ void idSonar::Spawn(void)
 
 void idSonar::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( maxHealth ); // int maxHealth
+
+	savefile->WriteInt( timer ); // int timer
+
+	savefile->WriteObject( particleEmitter ); // idFuncEmitter * particleEmitter
+
+	savefile->WriteInt( sonarPingTime ); // int sonarPingTime
+
+	savefile->WriteBool( hasPlayedPingSound ); // bool hasPlayedPingSound
+
+	SaveFileWriteArray( offsets, 256, WriteInt ); // int offsets[256]
+
+	savefile->WriteInt( offsetIndex ); // int offsetIndex
+	savefile->WriteInt( glitchTimer ); // int glitchTimer
+
+	savefile->WriteBool( damageParticles ); // bool damageParticles
 }
 
 void idSonar::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( maxHealth ); // int maxHealth
+
+	savefile->ReadInt( timer ); // int timer
+
+	savefile->ReadObject( CastClassPtrRef(particleEmitter) ); // idFuncEmitter * particleEmitter
+
+	savefile->ReadInt( sonarPingTime ); // int sonarPingTime
+
+	savefile->ReadBool( hasPlayedPingSound ); // bool hasPlayedPingSound
+
+	SaveFileReadArray( offsets, ReadInt ); // int offsets[256]
+
+	savefile->ReadInt( offsetIndex ); // int offsetIndex
+	savefile->ReadInt( glitchTimer ); // int glitchTimer
+
+	savefile->ReadBool( damageParticles ); // bool damageParticles
 }
 
 void idSonar::Think(void)

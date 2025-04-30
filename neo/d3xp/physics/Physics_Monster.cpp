@@ -271,12 +271,12 @@ idPhysics_Monster_SavePState
 ================
 */
 void idPhysics_Monster_SavePState( idSaveGame *savefile, const monsterPState_t &state ) {
-	savefile->WriteVec3( state.origin );
-	savefile->WriteVec3( state.velocity );
-	savefile->WriteVec3( state.localOrigin );
-	savefile->WriteVec3( state.pushVelocity );
-	savefile->WriteBool( state.onGround );
-	savefile->WriteInt( state.atRest );
+	savefile->WriteInt( state.atRest ); // int atRest
+	savefile->WriteBool( state.onGround ); // bool onGround
+	savefile->WriteVec3( state.origin ); // idVec3 origin
+	savefile->WriteVec3( state.velocity ); // idVec3 velocity
+	savefile->WriteVec3( state.localOrigin ); // idVec3 localOrigin
+	savefile->WriteVec3( state.pushVelocity ); // idVec3 pushVelocity
 }
 
 /*
@@ -285,12 +285,12 @@ idPhysics_Monster_RestorePState
 ================
 */
 void idPhysics_Monster_RestorePState( idRestoreGame *savefile, monsterPState_t &state ) {
-	savefile->ReadVec3( state.origin );
-	savefile->ReadVec3( state.velocity );
-	savefile->ReadVec3( state.localOrigin );
-	savefile->ReadVec3( state.pushVelocity );
-	savefile->ReadBool( state.onGround );
-	savefile->ReadInt( state.atRest );
+	savefile->ReadInt( state.atRest ); // int atRest
+	savefile->ReadBool( state.onGround ); // bool onGround
+	savefile->ReadVec3( state.origin ); // idVec3 origin
+	savefile->ReadVec3( state.velocity ); // idVec3 velocity
+	savefile->ReadVec3( state.localOrigin ); // idVec3 localOrigin
+	savefile->ReadVec3( state.pushVelocity ); // idVec3 pushVelocity
 }
 
 /*
@@ -299,21 +299,20 @@ idPhysics_Monster::Save
 ================
 */
 void idPhysics_Monster::Save( idSaveGame *savefile ) const {
+	idPhysics_Monster_SavePState( savefile, current ); //  monsterPState_t current
+	idPhysics_Monster_SavePState( savefile, saved ); //  monsterPState_t saved
 
-	idPhysics_Monster_SavePState( savefile, current );
-	idPhysics_Monster_SavePState( savefile, saved );
+	savefile->WriteFloat( maxStepHeight ); //  float maxStepHeight
+	savefile->WriteFloat( minFloorCosine ); //  float minFloorCosine
+	savefile->WriteVec3( delta ); //  idVec3 delta
 
-	savefile->WriteFloat( maxStepHeight );
-	savefile->WriteFloat( minFloorCosine );
-	savefile->WriteVec3( delta );
+	savefile->WriteBool( forceDeltaMove ); //  bool forceDeltaMove
+	savefile->WriteBool( fly ); //  bool fly
+	savefile->WriteBool( useVelocityMove ); //  bool useVelocityMove
+	savefile->WriteBool( noImpact ); //  bool noImpact
 
-	savefile->WriteBool( forceDeltaMove );
-	savefile->WriteBool( fly );
-	savefile->WriteBool( useVelocityMove );
-	savefile->WriteBool( noImpact );
-
-	savefile->WriteInt( (int)moveResult );
-	savefile->WriteObject( blockingEntity );
+	savefile->WriteInt( moveResult ); //  monsterMoveResult_t moveResult
+	savefile->WriteObject( blockingEntity ); //  idEntity * blockingEntity
 }
 
 /*
@@ -323,20 +322,20 @@ idPhysics_Monster::Restore
 */
 void idPhysics_Monster::Restore( idRestoreGame *savefile ) {
 
-	idPhysics_Monster_RestorePState( savefile, current );
-	idPhysics_Monster_RestorePState( savefile, saved );
+	idPhysics_Monster_RestorePState( savefile, current ); //  monsterPState_t current
+	idPhysics_Monster_RestorePState( savefile, saved ); //  monsterPState_t saved
 
-	savefile->ReadFloat( maxStepHeight );
-	savefile->ReadFloat( minFloorCosine );
-	savefile->ReadVec3( delta );
+	savefile->ReadFloat( maxStepHeight ); //  float maxStepHeight
+	savefile->ReadFloat( minFloorCosine ); //  float minFloorCosine
+	savefile->ReadVec3( delta ); //  idVec3 delta
 
-	savefile->ReadBool( forceDeltaMove );
-	savefile->ReadBool( fly );
-	savefile->ReadBool( useVelocityMove );
-	savefile->ReadBool( noImpact );
+	savefile->ReadBool( forceDeltaMove ); //  bool forceDeltaMove
+	savefile->ReadBool( fly ); //  bool fly
+	savefile->ReadBool( useVelocityMove ); //  bool useVelocityMove
+	savefile->ReadBool( noImpact ); //  bool noImpact
 
-	savefile->ReadInt( (int &)moveResult );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( blockingEntity ) );
+	savefile->ReadInt( (int&)moveResult ); //  monsterMoveResult_t moveResult
+	savefile->ReadObject( blockingEntity ); //  idEntity * blockingEntity
 }
 
 /*

@@ -40,7 +40,7 @@ void idFoldingchair::Spawn(void)
 	this->GetPhysics()->GetAxis().ToAngles().ToVectors(NULL, NULL, &upDir);
 	args.Clear();
 	args.Set("model", "models/objects/frobcube/cube4x4.ase");
-	args.Set("displayname", "Jumpseat");
+	args.Set("displayname", "#str_gameplay_jumpseat");
 	args.SetVector("origin", jointPos + (upDir * -2));
 	frobCube = gameLocal.SpawnEntityType(idFrobcube::Type, &args);
 	frobCube->GetPhysics()->GetClipModel()->SetOwner(this);
@@ -73,10 +73,24 @@ void idFoldingchair::Spawn(void)
 
 void idFoldingchair::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+	savefile->WriteObject( frobCube ); //  idEntity* frobCube
+
+	savefile->WriteObject( seatMover ); //  idMover* seatMover
+	savefile->WriteVec3( seatPos_open ); //  idVec3 seatPos_open
 }
 
 void idFoldingchair::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+	savefile->ReadObject( frobCube ); //  idEntity* frobCube
+
+	savefile->ReadObject( CastClassPtrRef(seatMover) ); //  idMover* seatMover
+	savefile->ReadVec3( seatPos_open ); //  idVec3 seatPos_open
 }
 
 void idFoldingchair::Think(void)
@@ -102,6 +116,9 @@ bool idFoldingchair::DoFrob(int index, idEntity * frobber)
 		seatMover->SetOrigin(GetPhysics()->GetOrigin());
 		seatMover->Show();
 		seatMover->Event_MoveToPos(seatPos_open);
+
+		//BC 2-19-2025: script call for when it goes closed -> opened
+		gameLocal.RunMapScriptArgs(spawnArgs.GetString("call_opened"), frobber, this);
 	}
 	else
 	{
@@ -109,8 +126,29 @@ bool idFoldingchair::DoFrob(int index, idEntity * frobber)
 		state = FCH_CLOSED;
 		Event_PlayAnim("close", 1);
 
+		// SW 17th Feb 2025: Wake up any moveables sitting on the chair mover
+		idEntity* entityList[32];
+		idEntity* touchingEntity = NULL;
+		int numEntities = gameLocal.EntitiesWithinAbsBoundingbox(seatMover->GetPhysics()->GetAbsBounds().Expand(1), entityList, 32);
+		for (int i = 0; i < numEntities; i++)
+		{
+			touchingEntity = entityList[i];
+			// For each entity, if it has valid physics and it's asleep, wake it up
+			if (touchingEntity != NULL &&
+				touchingEntity != this &&
+				touchingEntity->IsType(idMoveableItem::Type) &&
+				touchingEntity->GetPhysics() != NULL &&
+				touchingEntity->GetPhysics()->IsAtRest())
+			{
+				touchingEntity->ActivatePhysics(this);
+			}
+		}
+
 		seatMover->SetOrigin(GetPhysics()->GetOrigin());
 		seatMover->Hide();
+
+		//BC 2-19-2025: script call for when it goes open -> closed
+		gameLocal.RunMapScriptArgs(spawnArgs.GetString("call_closed"), frobber, this);
 	}
 
 	// SW: scripting things being hidden in the seat, etc	
@@ -137,6 +175,7 @@ bool idFoldingchair::DoFrob(int index, idEntity * frobber)
 	//		thread->DelayedStart(0);
 	//	}
 	//}
+
 
 	frobCube->isFrobbable = false;
 	stateTimer = gameLocal.time + FROB_OFFTIME;

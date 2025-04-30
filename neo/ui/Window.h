@@ -62,6 +62,8 @@ const int WIN_ACTIVE		= 0x00200000;
 const int WIN_SHOWCOORDS	= 0x00400000;
 const int WIN_SHOWTIME		= 0x00800000;
 const int WIN_WANTENTER		= 0x01000000;
+const int WIN_RATIOCORRECT  = 0x02000000;
+const int WIN_NORATIOCORRECT= 0x04000000;
 
 const int WIN_DESKTOP		= 0x10000000;
 
@@ -168,7 +170,7 @@ struct idTransitionData {
 
 
 class idUserInterfaceLocal;
-class idWindow {
+class idWindow : public idSaveGamePtr {
 public:
 	idWindow(idUserInterfaceLocal *gui);
 	idWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
@@ -188,6 +190,8 @@ public:
 		ON_ENTER,
 		ON_ENTERRELEASE,
 		ON_STARTBUTTON, // SM: special for controller start button only
+		ON_LEFTBUMPER,
+		ON_RIGHTBUMPER,
 		SCRIPT_COUNT
 	};
 
@@ -282,11 +286,11 @@ public:
 
 	// SaveGame support
 	void			WriteSaveGameString( const char *string, idFile *savefile );
-	void			WriteSaveGameTransition( idTransitionData &trans, idFile *savefile );
-	virtual void	WriteToSaveGame( idFile *savefile );
+	void			WriteSaveGameTransition( const idTransitionData &trans, idSaveGame *savefile ) const;
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const;
 	void			ReadSaveGameString( idStr &string, idFile *savefile );
-	void			ReadSaveGameTransition( idTransitionData & trans, idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile );
+	void			ReadSaveGameTransition( idTransitionData & trans, idRestoreGame *savefile );
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile );
 	void			FixupTransitions();
 	virtual void HasAction(){};
 	virtual void HasScripts(){};
@@ -330,7 +334,7 @@ public:
 	void		AddDefinedVar		( idWinVar* var );
 
 	idWindow*	FindChildByPoint	( float x, float y, idWindow* below = NULL );
-	int			GetChildIndex		( idWindow* window );
+	int			GetChildIndex		( idWindow* window ) const;
 	int			GetChildCount		( void );
 	idWindow*	GetChild			( int index );
 	void		RemoveChild			( idWindow *win );
@@ -378,6 +382,8 @@ protected:
 	void ConvertRegEntry(const char *name, idParser *src, idStr &out, int tabs);
 	bool OverClientRect(); // blendo eric alt hover state
 
+	idStr	name;
+	idStr	comment;
 
 	float actualX;					// physical coords
 	float actualY;					// ''
@@ -398,8 +404,6 @@ protected:
 	float borderSize;
 	float textAlignx;
 	float textAligny;
-	idStr	name;
-	idStr	comment;
 	idWinVec2 shear; // blendo eric: use winvar
 
 
@@ -407,11 +411,9 @@ protected:
 	bool forceDeleteKeys; //Allow key unbinding.
 
 
-	idWinInt textShadow;				// blendo eric: use winvar
 	class idFont * font;                // SM: From BFG
-	unsigned char cursor;					//
-	
 
+	idWinInt	textShadow;				// blendo eric: use winvar
 	idWinInt	textAlign;
 	idWinBool	noTime;					//
 	idWinBool	visible;				//
@@ -425,19 +427,22 @@ protected:
 	idWinFloat	textScale;
 	idWinFloat	rotate;
 	idWinStr	text;
-	idWinBackground	backGroundName;			//
 
 	idWinFloat	letterSpacing;			// blendo eric: faux kern spacing
-	const idMaterial *fontMaterial;		// blendo eric: custom font mats for BLENDLIT fonts etc..
 	idWinStr	fontMaterialName;		// blendo eric: custom font mats for BLENDLIT fonts etc..
+	const idMaterial *fontMaterial;		// blendo eric: custom font mats for BLENDLIT fonts etc..
 	idWinBool	controllerBinding;		// SM
 	idWinStr	bindName;				// SM
 	idWinBool	cursorBound;			// blendo eric: bind def window rect follows cursor position
+
+	idWinBool	hideCursor;
+	unsigned char cursor;
 
 	idList<idWinVar*> definedVars;
 	idList<idWinVar*> updateVars;
 
 	idRectangle textRect;			// text extented rect
+	idWinBackground	backGroundName;			//
 	const idMaterial *background;         // background asset
 
 	idWindow *parent;				// parent window
@@ -472,9 +477,13 @@ protected:
 
 	idRegisterList regList;
 
-	idWinBool	hideCursor;
-
 	idWinInt	cloneChildTemplate;
+
+	// SM: Additional override properties for gamepad buttons
+	float		buttonOffsetx;
+	float		buttonOffsety;
+	int			buttonAlignOverride;
+	float		buttonScale;
 };
 
 ID_INLINE void idWindow::AddDefinedVar( idWinVar* var ) {

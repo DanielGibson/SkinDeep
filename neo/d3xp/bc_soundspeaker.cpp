@@ -24,6 +24,7 @@ idSoundspeaker::~idSoundspeaker(void)
 {
 	physicsObj.PostEventMS(&EV_Remove, 0);
 	soundwaves->PostEventMS(&EV_Remove, 0);
+	soundwaves = nullptr;
 }
 
 void idSoundspeaker::Spawn(void)
@@ -53,10 +54,26 @@ void idSoundspeaker::Spawn(void)
 
 void idSoundspeaker::Save(idSaveGame *savefile) const
 {
+	savefile->WriteStaticObject( idSoundspeaker::physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteObject( soundwaves ); // idFuncEmitter * soundwaves
+	savefile->WriteInt( deathtimer ); // int deathtimer
 }
 
 void idSoundspeaker::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadObject( CastClassPtrRef(soundwaves) ); // idFuncEmitter * soundwaves
+	savefile->ReadInt( deathtimer ); // int deathtimer
 }
 
 void idSoundspeaker::Think(void)

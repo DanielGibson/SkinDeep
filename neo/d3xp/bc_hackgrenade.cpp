@@ -39,10 +39,16 @@ idHackGrenade::~idHackGrenade(void)
 
 void idHackGrenade::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteBool( hackSuccessful ); // bool hackSuccessful
 }
 
 void idHackGrenade::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadBool( hackSuccessful ); // bool hackSuccessful
 }
 
 void idHackGrenade::Spawn(void)

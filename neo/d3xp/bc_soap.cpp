@@ -37,10 +37,12 @@ void idSoap::Spawn(void)
 
 void idSoap::Save(idSaveGame *savefile) const
 {
+	// savegame no data
 }
 
 void idSoap::Restore(idRestoreGame *savefile)
 {
+	// savegame no data
 }
 
 bool idSoap::Collide(const trace_t &collision, const idVec3 &velocity)

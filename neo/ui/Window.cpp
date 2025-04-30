@@ -58,6 +58,7 @@ idCVar idWindow::gui_edit( "gui_edit", "0", CVAR_GUI | CVAR_BOOL, "" );
 
 extern idCVar r_skipGuiShaders;		// 1 = don't render any gui elements on surfaces
 extern idCVar in_forceButtonPrompts;
+extern idCVar r_scaleMenusTo169;
 
 //  made RegisterVars a member of idWindow
 const idRegEntry idWindow::RegisterVars[] = {
@@ -117,7 +118,9 @@ const char *idWindow::ScriptNames[] = {
 	"onContextRelease",	//When contextbutton is released.
 	"onEnter",
 	"onEnterRelease",
-	"onStartButton"
+	"onStartButton",
+	"onLeftBumper", //BC 2-23-2025: for the options menu
+	"onRightBumper" //BC 2-23-2025: for the options menu
 };
 
 /*
@@ -176,11 +179,18 @@ void idWindow::CommonInit() {
 	cursorBound = false;
 	cloneChildTemplate = 0;
 
+	// SM: Additional override properties for gamepad glyphs
+	buttonOffsetx = 0.0f;
+	buttonOffsety = 0.0f;
+	buttonAlignOverride = -1;
+	buttonScale = 1.0f;
+
 	for (int i = 0; i < SCRIPT_COUNT; i++) {
 		scripts[i] = NULL;
 	}
 
 	hideCursor = false;
+	saveTemps = nullptr;
 }
 
 /*
@@ -985,7 +995,9 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 					}
 				}
 				RunScript( ON_ESC );
-			} else if (event->evValue == K_JOY9 && event->evValue2) {
+			}
+			else if (event->evValue == K_JOY9 && event->evValue2)
+			{
 				if (GetFocusedChild()) {
 					const char* childRet = GetFocusedChild()->HandleEvent(event, updateVisuals);
 					if (childRet && *childRet) {
@@ -993,7 +1005,31 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 					}
 				}
 				RunScript(ON_STARTBUTTON);
-			} else if (event->evValue == K_ENTER ) {
+			}
+			else if (event->evValue == K_JOY5 && event->evValue2)
+			{
+				//BC 2-23-2025
+				if (GetFocusedChild()) {
+					const char* childRet = GetFocusedChild()->HandleEvent(event, updateVisuals);
+					if (childRet && *childRet) {
+						return childRet;
+					}
+				}
+				RunScript(ON_LEFTBUMPER);
+			}
+			else if (event->evValue == K_JOY6 && event->evValue2)
+			{
+				//BC 2-23-2025
+				if (GetFocusedChild()) {
+					const char* childRet = GetFocusedChild()->HandleEvent(event, updateVisuals);
+					if (childRet && *childRet) {
+						return childRet;
+					}
+				}
+				RunScript(ON_RIGHTBUMPER);
+			}
+			else if (event->evValue == K_ENTER )
+			{
 				if (GetFocusedChild()) {
 					const char *childRet = GetFocusedChild()->HandleEvent(event, updateVisuals);
 					if (childRet && *childRet) {
@@ -1303,6 +1339,15 @@ void idWindow::Redraw(float x, float y) {
 		return;
 	}
 
+	// DG: allow scaling menus to 4:3
+	bool allowFixup = (((flags & (WIN_MENUGUI | WIN_DESKTOP)) == (WIN_MENUGUI | WIN_DESKTOP)) || flags & WIN_RATIOCORRECT)
+		&& !(flags & WIN_NORATIOCORRECT);
+	bool fixupFor43 = false;
+	if (allowFixup && r_scaleMenusTo169.GetBool()) {
+		fixupFor43 = true;
+		dc->SetMenuScaleFix(true);
+	}
+
 	if ( flags & WIN_SHOWTIME ) {
 		dc->DrawText(va(" %0.1f seconds\n%s", (float)(time - timeLine) / 1000, gui->State().GetString("name")), 0.35f, 0, dc->colorWhite, idRectangle(100, 0, 80, 80), false);
 	}
@@ -1315,6 +1360,9 @@ void idWindow::Redraw(float x, float y) {
 	}
 
 	if (!visible) {
+		if (fixupFor43) { // DG: gotta reset that before returning this function
+			dc->SetMenuScaleFix(false);
+		}
 		return;
 	}
 
@@ -1381,6 +1429,10 @@ void idWindow::Redraw(float x, float y) {
 		dc->DrawText(str, 0.7, 0, dc->colorWhite, idRectangle(0, 0, 100, 20), false);
 		dc->DrawText(gui->GetSourceFile(), 0.7, 0, dc->colorWhite, idRectangle(0, 20, 300, 20), false);
 		dc->EnableClipping(true);
+	}
+
+	if (fixupFor43) { // DG: gotta reset that before returning this function
+		dc->SetMenuScaleFix(false);
 	}
 
 	drawRect.Offset(-x, -y);
@@ -2168,6 +2220,14 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 		}
 		return true;
 	}
+	if (idStr::Icmp(_name, "ratiocorrect") == 0) {
+		if (src->ParseBool()) {
+			flags |= WIN_RATIOCORRECT;
+		} else {
+			flags |= WIN_NORATIOCORRECT;
+		}
+		return true;
+	}
 	if (idStr::Icmp(_name, "name") == 0) {
 		ParseString(src, name);
 		return true;
@@ -2211,6 +2271,24 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 	}
 	if (idStr::Icmp(_name, "cloneChildTemplate") == 0) {
 		cloneChildTemplate = src->ParseInt();
+		return true;
+	}
+
+	// SM: Additional override properties for gamepad buttons
+	if (idStr::Icmp(_name, "buttonoffsetx") == 0) {
+		buttonOffsetx = src->ParseFloat();
+		return true;
+	}
+	if (idStr::Icmp(_name, "buttonoffsety") == 0) {
+		buttonOffsety = src->ParseFloat();
+		return true;
+	}
+	if (idStr::Icmp(_name, "buttonalignoverride") == 0) {
+		buttonAlignOverride = src->ParseInt();
+		return true;
+	}
+	if (idStr::Icmp(_name, "buttonscale") == 0) {
+		buttonScale = src->ParseFloat();
 		return true;
 	}
 	return false;
@@ -3281,7 +3359,7 @@ void idWindow::EvaluateRegisters(float *registers) {
 
 	// copy the local and global parameters
 	registers[WEXP_REG_TIME] = gui->GetTime();
-	registers[WEXP_REG_IS_GAMEPAD] = in_forceButtonPrompts.GetInteger() > 0 || usercmdGen->IsUsingJoystick();
+	registers[WEXP_REG_IS_GAMEPAD] = in_forceButtonPrompts.GetInteger() > 0 || (usercmdGen->IsUsingJoystick() && in_forceButtonPrompts.GetInteger() != 0); //BC 3-1-2025: if force kb/m, then make gamepad prompts always off.
 
 	for ( i = 0 ; i < oc ; i++ ) {
 		op = &ops[i];
@@ -3657,7 +3735,7 @@ void idWindow::WriteSaveGameString( const char *string, idFile *savefile ) {
 idWindow::WriteSaveGameTransition
 ===============
 */
-void idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefile ) {
+void idWindow::WriteSaveGameTransition( const idTransitionData &trans, idSaveGame *savefile ) const {
 	drawWin_t dw, *fdw;
 	idStr winName("");
 	dw.simp = NULL;
@@ -3669,7 +3747,7 @@ void idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefil
 	fdw = gui->GetDesktop()->FindChildByName( winName );
 	if ( offset != -1 && fdw && ( fdw->win || fdw->simp ) ) {
 		savefile->Write( &offset, sizeof( offset ) );
-		WriteSaveGameString( winName, savefile );
+		savefile->WriteString( winName );
 		savefile->Write( &trans.interp, sizeof( trans.interp ) );
 	} else {
 		offset = -1;
@@ -3682,13 +3760,13 @@ void idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefil
 idWindow::ReadSaveGameTransition
 ===============
 */
-void idWindow::ReadSaveGameTransition( idTransitionData &trans, idFile *savefile ) {
+void idWindow::ReadSaveGameTransition( idTransitionData &trans, idRestoreGame *savefile ) {
 	int offset;
 
 	savefile->Read( &offset, sizeof( offset ) );
 	if ( offset != -1 ) {
 		idStr winName;
-		ReadSaveGameString( winName, savefile );
+		savefile->ReadString( winName  );
 		savefile->Read( &trans.interp, sizeof( trans.interp ) );
 		trans.data = NULL;
 		trans.offset = offset;
@@ -3705,91 +3783,135 @@ void idWindow::ReadSaveGameTransition( idTransitionData &trans, idFile *savefile
 idWindow::WriteToSaveGame
 ===============
 */
-void idWindow::WriteToSaveGame( idFile *savefile ) {
-	int i;
+void idWindow::WriteToSaveGame( idSaveGame *savefile ) const {
+	idSaveGamePtr::WriteToSaveGame( savefile );
 
-	WriteSaveGameString( cmd, savefile );
+	savefile->WriteString( cmd ); // idStr cmd
 
-	savefile->Write( &actualX, sizeof( actualX ) );
-	savefile->Write( &actualY, sizeof( actualY ) );
-	savefile->Write( &childID, sizeof( childID ) );
-	savefile->Write( &flags, sizeof( flags ) );
-	savefile->Write( &lastTimeRun, sizeof( lastTimeRun ) );
-	savefile->Write( &drawRect, sizeof( drawRect ) );
-	savefile->Write( &clientRect, sizeof( clientRect ) );
-	savefile->Write( &origin, sizeof( origin ) );
-	savefile->Write( &timeLine, sizeof( timeLine ) );
-	savefile->Write( &xOffset, sizeof( xOffset ) );
-	savefile->Write( &yOffset, sizeof( yOffset ) );
-	savefile->Write( &cursor, sizeof( cursor ) );
-	savefile->Write( &forceAspectWidth, sizeof( forceAspectWidth ) );
-	savefile->Write( &forceAspectHeight, sizeof( forceAspectHeight ) );
-	savefile->Write( &matScalex, sizeof( matScalex ) );
-	savefile->Write( &matScaley, sizeof( matScaley ) );
-	savefile->Write( &borderSize, sizeof( borderSize ) );
-	savefile->Write( &textAlign, sizeof( textAlign ) );
-	savefile->Write( &textAlignx, sizeof( textAlignx ) );
-	savefile->Write( &textAligny, sizeof( textAligny ) );
+	savefile->WriteString( name ); // idString name
+	savefile->WriteString( comment ); // idString comment
+
+	savefile->WriteFloat( actualX ); // float actualX
+	savefile->WriteFloat( actualY ); // float actualY
+	savefile->WriteInt( childID ); // int childID
+	savefile->WriteUInt( flags ); // unsigned int flags
+	savefile->WriteInt( lastTimeRun ); // int lastTimeRun
+	savefile->WriteRect( drawRect ); // idRectangle drawRect
+	savefile->WriteRect( clientRect ); // idRectangle clientRect
+	savefile->WriteVec2( origin ); // idVec2 origin
+
+	savefile->WriteInt( timeLine ); // int timeLine
+	savefile->WriteFloat( xOffset ); // float xOffset
+	savefile->WriteFloat( yOffset ); // float yOffset
+	savefile->WriteFloat( forceAspectWidth ); // float forceAspectWidth
+	savefile->WriteFloat( forceAspectHeight ); // float forceAspectHeight
+	savefile->WriteFloat( matScalex ); // float matScalex
+	savefile->WriteFloat( matScaley ); // float matScaley
+	savefile->WriteFloat( borderSize ); // float borderSize
+	savefile->WriteFloat( textAlignx ); // float textAlignx
+	savefile->WriteFloat( textAligny ); // float textAligny
+	shear.WriteToSaveGame( savefile ); // idWinVec2 shear
+
+	savefile->WriteBool( forceDeleteKeys ); // bool forceDeleteKeys
+
+	savefile->WriteCheckSizeMarker();
+
 	// SM: From BFG
-	savefile->WriteString( font->GetName() );
-
-	WriteSaveGameString( name, savefile );
-	WriteSaveGameString( comment, savefile );
+	idStr fontName = font->GetName(); // idFont * font
+	savefile->WriteString( fontName );
 
 	// WinVars
-	noTime.WriteToSaveGame( savefile );
-	visible.WriteToSaveGame( savefile );
-	rect.WriteToSaveGame( savefile );
-	backColor.WriteToSaveGame( savefile );
-	matColor.WriteToSaveGame( savefile );
-	foreColor.WriteToSaveGame( savefile );
-	hoverColor.WriteToSaveGame( savefile );
-	borderColor.WriteToSaveGame( savefile );
-	textScale.WriteToSaveGame( savefile );
-	noEvents.WriteToSaveGame( savefile );
-	rotate.WriteToSaveGame( savefile );
-	text.WriteToSaveGame( savefile );
-	backGroundName.WriteToSaveGame( savefile );
-	hideCursor.WriteToSaveGame(savefile);
+	textShadow.WriteToSaveGame( savefile ); // idWinInt textShadow
+	textAlign.WriteToSaveGame( savefile ); // idWinInt textAlign
+	noTime.WriteToSaveGame( savefile ); // idWinBool noTime
+	visible.WriteToSaveGame( savefile ); // idWinBool visible
+	noEvents.WriteToSaveGame( savefile ); // idWinBool noEvents
+	rect.WriteToSaveGame( savefile ); // idWinRectangle rect
+	backColor.WriteToSaveGame( savefile ); // idWinVec4 backColor
+	matColor.WriteToSaveGame( savefile ); // idWinVec4 matColor
+	foreColor.WriteToSaveGame( savefile ); // idWinVec4 foreColor
+	hoverColor.WriteToSaveGame( savefile ); // idWinVec4 hoverColor
+	borderColor.WriteToSaveGame( savefile ); // idWinVec4 borderColor
+	textScale.WriteToSaveGame( savefile ); // idWinFloat textScale
+	rotate.WriteToSaveGame( savefile ); // idWinFloat rotate
+	text.WriteToSaveGame( savefile ); // idWinStr text
+
+	savefile->WriteCheckSizeMarker();
 
 	// blendo eric
-	textShadow.WriteToSaveGame(savefile);
-	shear.WriteToSaveGame(savefile);
-	letterSpacing.WriteToSaveGame(savefile); // blendo eric
-	fontMaterialName.WriteToSaveGame(savefile); // blendo eric
-	controllerBinding.WriteToSaveGame(savefile);
-	cursorBound.WriteToSaveGame(savefile);
-	cloneChildTemplate.WriteToSaveGame(savefile);
+	letterSpacing.WriteToSaveGame( savefile ); // idWinFloat letterSpacing
+	fontMaterialName.WriteToSaveGame( savefile ); // idWinStr fontMaterialName
+	//savefile->WriteMaterial( fontMaterial ); // const idMaterial * fontMaterial
+	controllerBinding.WriteToSaveGame( savefile ); // idWinBool controllerBinding
+	bindName.WriteToSaveGame( savefile ); // idWinStr bindName
+	cursorBound.WriteToSaveGame( savefile ); // idWinBool cursorBound
 
-	// Defined Vars
-	for ( i = 0; i < definedVars.Num(); i++ ) {
+	hideCursor.WriteToSaveGame( savefile ); // idWinBool hideCursor
+	savefile->WriteByte( cursor ); // unsigned char cursor
+
+	savefile->WriteInt( definedVars.Num() ); // idList<idWinVar*> definedVars
+	for ( int i = 0; i < definedVars.Num(); i++ ) {
 		definedVars[i]->WriteToSaveGame( savefile );
 	}
 
-	savefile->Write( &textRect, sizeof( textRect ) );
+	savefile->WriteInt( updateVars.Num() ); // idList<idWinVar*> updateVars
+	for ( int i = 0; i < updateVars.Num(); i++ ) {
+		updateVars[i]->WriteToSaveGame( savefile );
+	}
+
+	savefile->WriteRect( textRect ); // idRectangle textRect
+
+	backGroundName.WriteToSaveGame( savefile ); // idWinBackground backGroundName
+	// savefile->WriteMaterial( background ); // const idMaterial * background
+
+	// idWindow *parent; // idWindow * parent
+	// idList<idWindow*> children; // idList<idWindow*> children
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( drawWindows.Num() ); // idList<drawWin_t> drawWindows
+	for ( int i = 0; i < drawWindows.Num(); i++) {
+		drawWin_t window = drawWindows[i];
+		savefile->WriteCheckType(SG_CHECK_UI);
+		savefile->WriteCheckSizeMarker();
+		if (window.simp) {
+			window.simp->WriteToSaveGame(savefile);
+		}
+		else if (window.win) {
+			window.win->WriteToSaveGame(savefile);
+		}
+		savefile->WriteCheckSizeMarker();
+	}
 
 	// Window pointers saved as the child ID of the window
 	int winID;
-
-	winID = focusedChild ? focusedChild->childID : -1 ;
+	winID = focusedChild ? focusedChild->childID : -1 ; // idWindow * focusedChild
 	savefile->Write( &winID, sizeof( winID ) );
 
-	winID = captureChild ? captureChild->childID : -1 ;
+	winID = captureChild ? captureChild->childID : -1 ; // idWindow * captureChild
 	savefile->Write( &winID, sizeof( winID ) );
 
-	winID = overChild ? overChild->childID : -1 ;
+	winID = overChild ? overChild->childID : -1 ; // idWindow * overChild
 	savefile->Write( &winID, sizeof( winID ) );
 
+	savefile->WriteBool( hover ); // bool hover
 
-	// Scripts
-	for ( i = 0; i < SCRIPT_COUNT; i++ ) {
+	// blendo eric: given by maker
+	// idDeviceContext *dc; // idDeviceContext * dc
+	// idUserInterfaceLocal *gui; // idUserInterfaceLocal * gui
+
+	savefile->WriteInt( SCRIPT_COUNT); // idGuiScriptList *scripts[SCRIPT_COUNT]
+	for ( int i = 0; i < SCRIPT_COUNT; i++ ) {
+		savefile->WriteBool( scripts[i] != nullptr );
 		if ( scripts[i] ) {
 			scripts[i]->WriteToSaveGame( savefile );
 		}
 	}
 
-	// TimeLine Events
-	for ( i = 0; i < timeLineEvents.Num(); i++ ) {
+	// bool * saveTemps
+
+	savefile->WriteInt( timeLineEvents.Num() ); // idList<idTimeLineEvent*> timeLineEvents
+	for ( int i = 0; i < timeLineEvents.Num(); i++ ) {
 		if ( timeLineEvents[i] ) {
 			savefile->Write( &timeLineEvents[i]->pending, sizeof( timeLineEvents[i]->pending ) );
 			savefile->Write( &timeLineEvents[i]->time, sizeof( timeLineEvents[i]->time ) );
@@ -3799,39 +3921,28 @@ void idWindow::WriteToSaveGame( idFile *savefile ) {
 		}
 	}
 
-	// Transitions
-	int num = transitions.Num();
-
-	savefile->Write( &num, sizeof( num ) );
-	for ( i = 0; i < transitions.Num(); i++ ) {
+	savefile->WriteInt( transitions.Num() ); // idList<idTransitionData> transitions
+	for ( int i = 0; i < transitions.Num(); i++ ) {
 		WriteSaveGameTransition( transitions[ i ], savefile );
 	}
 
+	// blendo eric: likely only used during parsing?
+	// static bool registerIsTemporary[MAX_EXPRESSION_REGISTERS];
+	//idList<wexpOp_t> ops; // idList<wexpOp_t> ops
+	//idList<float> expressionRegisters; // idList<float> expressionRegisters
+	//idList<wexpOp_t> *saveOps; // idList<wexpOp_t> * saveOps
+	//idList<rvNamedEvent*> namedEvents; // idList<rvNamedEvent*> namedEvents
+	//idList<float> *saveRegs; // idList<float> * saveRegs
 
-	// Named Events
-	for ( i = 0; i < namedEvents.Num(); i++ ) {
-		if ( namedEvents[i] ) {
-			WriteSaveGameString( namedEvents[i]->mName, savefile );
-			if ( namedEvents[i]->mEvent ) {
-				namedEvents[i]->mEvent->WriteToSaveGame( savefile );
-			}
-		}
-	}
+	regList.WriteToSaveGame( savefile ); // idRegisterList regList
 
-	// regList
-	regList.WriteToSaveGame( savefile );
+	cloneChildTemplate.WriteToSaveGame( savefile ); // idWinInt cloneChildTemplate
+	savefile->WriteFloat( buttonOffsetx ); // float buttonOffsetx
+	savefile->WriteFloat( buttonOffsety ); // float buttonOffsety
+	savefile->WriteInt( buttonAlignOverride ); // int buttonAlignOverride
+	savefile->WriteFloat( buttonScale ); // float buttonScale
 
-
-	// Save children
-	for ( i = 0; i < drawWindows.Num(); i++ ) {
-		drawWin_t	window = drawWindows[i];
-
-		if ( window.simp ) {
-			window.simp->WriteToSaveGame( savefile );
-		} else if ( window.win ) {
-			window.win->WriteToSaveGame( savefile );
-		}
-	}
+	savefile->WriteCheckSizeMarker();
 }
 
 /*
@@ -3856,111 +3967,161 @@ void idWindow::ReadSaveGameString( idStr &string, idFile *savefile ) {
 idWindow::ReadFromSaveGame
 ===============
 */
-void idWindow::ReadFromSaveGame( idFile *savefile ) {
-	int i;
+void idWindow::ReadFromSaveGame( idRestoreGame *savefile ) {
+	idSaveGamePtr::ReadFromSaveGame( savefile );
+	//transitions.Clear();
 
-	transitions.Clear();
+	savefile->ReadString( cmd ); 
 
-	ReadSaveGameString( cmd, savefile );
+	savefile->ReadString( name ); // idString name
+	savefile->ReadString( comment ); // idString comment
 
-	savefile->Read( &actualX, sizeof( actualX ) );
-	savefile->Read( &actualY, sizeof( actualY ) );
-	savefile->Read( &childID, sizeof( childID ) );
-	savefile->Read( &flags, sizeof( flags ) );
-	savefile->Read( &lastTimeRun, sizeof( lastTimeRun ) );
-	savefile->Read( &drawRect, sizeof( drawRect ) );
-	savefile->Read( &clientRect, sizeof( clientRect ) );
-	savefile->Read( &origin, sizeof( origin ) );
-	savefile->Read( &timeLine, sizeof( timeLine ) );
-	savefile->Read( &xOffset, sizeof( xOffset ) );
-	savefile->Read( &yOffset, sizeof( yOffset ) );
-	savefile->Read( &cursor, sizeof( cursor ) );
-	savefile->Read( &forceAspectWidth, sizeof( forceAspectWidth ) );
-	savefile->Read( &forceAspectHeight, sizeof( forceAspectHeight ) );
-	savefile->Read( &matScalex, sizeof( matScalex ) );
-	savefile->Read( &matScaley, sizeof( matScaley ) );
-	savefile->Read( &borderSize, sizeof( borderSize ) );
-	savefile->Read( &textAlign, sizeof( textAlign ) );
-	savefile->Read( &textAlignx, sizeof( textAlignx ) );
-	savefile->Read( &textAligny, sizeof( textAligny ) );
+	savefile->ReadFloat( actualX ); // float actualX
+	savefile->ReadFloat( actualY ); // float actualY
+	savefile->ReadInt( childID ); // int childID
+	savefile->ReadUInt( flags ); // unsigned int flags
+	savefile->ReadInt( lastTimeRun ); // int lastTimeRun
+	savefile->ReadRect( drawRect ); // idRectangle drawRect
+	savefile->ReadRect( clientRect ); // idRectangle clientRect
+	savefile->ReadVec2( origin ); // idVec2 origin
+
+	savefile->ReadInt( timeLine ); // int timeLine
+	savefile->ReadFloat( xOffset ); // float xOffset
+	savefile->ReadFloat( yOffset ); // float yOffset
+	savefile->ReadFloat( forceAspectWidth ); // float forceAspectWidth
+	savefile->ReadFloat( forceAspectHeight ); // float forceAspectHeight
+	savefile->ReadFloat( matScalex ); // float matScalex
+	savefile->ReadFloat( matScaley ); // float matScaley
+	savefile->ReadFloat( borderSize ); // float borderSize
+	savefile->ReadFloat( textAlignx ); // float textAlignx
+	savefile->ReadFloat( textAligny ); // float textAligny
+	shear.ReadFromSaveGame( savefile ); // idWinVec2 shear
+
+	savefile->ReadBool( forceDeleteKeys ); // bool forceDeleteKeys
+
+	savefile->ReadCheckSizeMarker();
+
 	// SM: From BFG
 	idStr fontName;
-	savefile->ReadString( fontName );
+	savefile->ReadString( fontName ); // idFont * font
 	font = renderSystem->RegisterFont( fontName );
 
-	ReadSaveGameString( name, savefile );
-	ReadSaveGameString( comment, savefile );
-
 	// WinVars
-	noTime.ReadFromSaveGame( savefile );
-	visible.ReadFromSaveGame( savefile );
-	rect.ReadFromSaveGame( savefile );
-	backColor.ReadFromSaveGame( savefile );
-	matColor.ReadFromSaveGame( savefile );
-	foreColor.ReadFromSaveGame( savefile );
-	hoverColor.ReadFromSaveGame( savefile );
-	borderColor.ReadFromSaveGame( savefile );
-	textScale.ReadFromSaveGame( savefile );
-	noEvents.ReadFromSaveGame( savefile );
-	rotate.ReadFromSaveGame( savefile );
-	text.ReadFromSaveGame( savefile );
-	backGroundName.ReadFromSaveGame( savefile );
+	textShadow.ReadFromSaveGame( savefile ); // idWinInt textShadow
+	textAlign.ReadFromSaveGame( savefile ); // idWinInt textAlign
+	noTime.ReadFromSaveGame( savefile ); // idWinBool noTime
+	visible.ReadFromSaveGame( savefile ); // idWinBool visible
+	noEvents.ReadFromSaveGame( savefile ); // idWinBool noEvents
+	rect.ReadFromSaveGame( savefile ); // idWinRectangle rect
+	backColor.ReadFromSaveGame( savefile ); // idWinVec4 backColor
+	matColor.ReadFromSaveGame( savefile ); // idWinVec4 matColor
+	foreColor.ReadFromSaveGame( savefile ); // idWinVec4 foreColor
+	hoverColor.ReadFromSaveGame( savefile ); // idWinVec4 hoverColor
+	borderColor.ReadFromSaveGame( savefile ); // idWinVec4 borderColor
+	textScale.ReadFromSaveGame( savefile ); // idWinFloat textScale
+	rotate.ReadFromSaveGame( savefile ); // idWinFloat rotate
+	text.ReadFromSaveGame( savefile ); // idWinStr text
 
-	if ( session->GetSaveGameVersion() >= 17 ) {
-		hideCursor.ReadFromSaveGame(savefile);
-	} else {
-		hideCursor = false;
-	}
-
+	savefile->ReadCheckSizeMarker();
 
 	// blendo eric
-	textShadow.ReadFromSaveGame(savefile);
-	shear.ReadFromSaveGame(savefile);
-	letterSpacing.ReadFromSaveGame(savefile);
-	fontMaterialName.ReadFromSaveGame(savefile);
-	fontMaterial = fontMaterialName.Length() ? declManager->FindMaterial(fontMaterialName, false) : NULL;
-	controllerBinding.ReadFromSaveGame(savefile);
-	cursorBound.ReadFromSaveGame(savefile);
-	cloneChildTemplate.ReadFromSaveGame(savefile);
+	letterSpacing.ReadFromSaveGame( savefile ); // idWinFloat letterSpacing
 
-	// Defined Vars
-	for ( i = 0; i < definedVars.Num(); i++ ) {
+	fontMaterialName.ReadFromSaveGame( savefile ); // idWinStr fontMaterialName
+	fontMaterial = nullptr;
+	if (fontMaterialName.Length() > 0) // const idMaterial * fontMaterial
+	{
+		fontMaterial = declManager->FindMaterial(fontMaterialName, false);
+	}
+
+	controllerBinding.ReadFromSaveGame( savefile ); // idWinBool controllerBinding
+	bindName.ReadFromSaveGame( savefile ); // idWinStr bindName
+	cursorBound.ReadFromSaveGame( savefile ); // idWinBool cursorBound
+
+	hideCursor.ReadFromSaveGame( savefile ); // idWinBool hideCursor
+	savefile->ReadByte( cursor ); // unsigned char cursor
+
+	int num;
+	savefile->ReadInt( num ); // idList<idWinVar*> definedVars
+	// definedVars.SetNum(num);
+	for ( int i = 0; i < definedVars.Num(); i++ ) {
 		definedVars[i]->ReadFromSaveGame( savefile );
 	}
 
-	savefile->Read( &textRect, sizeof( textRect ) );
+	savefile->ReadInt( num ); // idList<idWinVar*> updateVars
+	// updateVars.SetNum(num);
+	for ( int i = 0; i < updateVars.Num(); i++ ) {
+		updateVars[i]->ReadFromSaveGame( savefile );
+	}
+
+	savefile->ReadRect( textRect ); // idRectangle textRect
+
+	backGroundName.ReadFromSaveGame( savefile ); // idWinBackground backGroundName
+	backGroundName.SetMaterialPtr( &background ); // const idMaterial * background
+
+	// idWindow *parent; // idWindow * parent
+	// idList<idWindow*> children; // idList<idWindow*> children
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( num ); // idList<drawWin_t> drawWindows
+	// drawWindows.SetNum(num);
+	for ( int i = 0; i < num; i++) {
+		drawWin_t window = drawWindows[i];
+		savefile->ReadCheckType(SG_CHECK_UI);
+		savefile->ReadCheckSizeMarker();
+		if (window.simp) {
+			window.simp->ReadFromSaveGame(savefile);
+		}
+		else if (window.win) {
+			window.win->ReadFromSaveGame(savefile);
+		}
+		savefile->ReadCheckSizeMarker();
+	}
 
 	// Window pointers saved as the child ID of the window
 	int winID = -1;
 
-	savefile->Read( &winID, sizeof( winID ) );
-	for ( i = 0; i < children.Num(); i++ ) {
+	savefile->Read( &winID, sizeof( winID ) ); // idWindow * focusedChild
+	for (int i = 0; i < children.Num(); i++ ) {
 		if ( children[i]->childID == winID ) {
 			focusedChild = children[i];
 		}
 	}
-	savefile->Read( &winID, sizeof( winID ) );
-	for ( i = 0; i < children.Num(); i++ ) {
+	savefile->Read( &winID, sizeof( winID ) ); // idWindow * captureChild
+	for (int i = 0; i < children.Num(); i++ ) {
 		if ( children[i]->childID == winID ) {
 			captureChild = children[i];
 		}
 	}
-	savefile->Read( &winID, sizeof( winID ) );
-	for ( i = 0; i < children.Num(); i++ ) {
+	savefile->Read( &winID, sizeof( winID ) ); // idWindow * overChild
+	for (int i = 0; i < children.Num(); i++ ) {
 		if ( children[i]->childID == winID ) {
 			overChild = children[i];
 		}
 	}
 
-	// Scripts
-	for ( i = 0; i < SCRIPT_COUNT; i++ ) {
-		if ( scripts[i] ) {
+	savefile->ReadBool( hover ); // bool hover
+
+	// blendo eric: given by maker
+	// idDeviceContext *dc; // idDeviceContext * dc
+	// idUserInterfaceLocal *gui; // idUserInterfaceLocal * gui
+
+	savefile->ReadInt( num ); // idGuiScriptList *scripts[SCRIPT_COUNT]
+	for ( int i = 0; i < num; i++ ) {
+		bool bExists;
+		savefile->ReadBool( bExists );
+		if ( bExists ) {
+			//scripts[i] = new idGuiScriptList;
 			scripts[i]->ReadFromSaveGame( savefile );
 		}
 	}
 
-	// TimeLine Events
-	for ( i = 0; i < timeLineEvents.Num(); i++ ) {
+	// bool * saveTemps
+
+	savefile->ReadInt( num ); // idList<idTimeLineEvent*> timeLineEvents
+	// timeLineEvents.SetNum( num );
+	for ( int i = 0; i < timeLineEvents.Num(); i++ ) {
 		if ( timeLineEvents[i] ) {
 			savefile->Read( &timeLineEvents[i]->pending, sizeof( timeLineEvents[i]->pending ) );
 			savefile->Read( &timeLineEvents[i]->time, sizeof( timeLineEvents[i]->time ) );
@@ -3970,43 +4131,31 @@ void idWindow::ReadFromSaveGame( idFile *savefile ) {
 		}
 	}
 
-
-	// Transitions
-	int num;
-	savefile->Read( &num, sizeof( num ) );
-	for ( i = 0; i < num; i++ ) {
-		idTransitionData trans;
-		trans.data = NULL;
-		ReadSaveGameTransition( trans, savefile );
-		if ( trans.data ) {
-			transitions.Append( trans );
-		}
+	savefile->ReadInt( num ); // idList<idTransitionData> transitions
+	transitions.SetNum( num );
+	for ( int i = 0; i < transitions.Num(); i++ ) {
+		ReadSaveGameTransition( transitions[ i ], savefile );
 	}
 
+	// blendo eric: likely only used during parsing?
+	// static bool registerIsTemporary[MAX_EXPRESSION_REGISTERS];
+	//idList<wexpOp_t> ops; // idList<wexpOp_t> ops
+	//idList<float> expressionRegisters; // idList<float> expressionRegisters
+	//idList<wexpOp_t> *saveOps; // idList<wexpOp_t> * saveOps
+	//idList<rvNamedEvent*> namedEvents; // idList<rvNamedEvent*> namedEvents
+	//idList<float> *saveRegs; // idList<float> * saveRegs
 
-	// Named Events
-	for ( i = 0; i < namedEvents.Num(); i++ ) {
-		if ( namedEvents[i] ) {
-			ReadSaveGameString( namedEvents[i]->mName, savefile );
-			if ( namedEvents[i]->mEvent ) {
-				namedEvents[i]->mEvent->ReadFromSaveGame( savefile );
-			}
-		}
-	}
+	regList.ReadFromSaveGame( savefile ); // idRegisterList regList
 
-	// regList
-	regList.ReadFromSaveGame( savefile );
+	cloneChildTemplate.ReadFromSaveGame( savefile ); // idWinInt cloneChildTemplate
+	savefile->ReadFloat( buttonOffsetx ); // float buttonOffsetx
+	savefile->ReadFloat( buttonOffsety ); // float buttonOffsety
+	savefile->ReadInt( buttonAlignOverride ); // int buttonAlignOverride
+	savefile->ReadFloat( buttonScale ); // float buttonScale
 
-	// Read children
-	for ( i = 0; i < drawWindows.Num(); i++ ) {
-		drawWin_t	window = drawWindows[i];
+	savefile->ReadCheckSizeMarker();
 
-		if ( window.simp ) {
-			window.simp->ReadFromSaveGame( savefile );
-		} else if ( window.win ) {
-			window.win->ReadFromSaveGame( savefile );
-		}
-	}
+	SetupBackground();
 
 	if ( flags & WIN_DESKTOP ) {
 		FixupTransitions();
@@ -4318,7 +4467,7 @@ idWindow::GetChildIndex
 Returns the index of the given child window
 ================
 */
-int idWindow::GetChildIndex ( idWindow* window ) {
+int idWindow::GetChildIndex ( idWindow* window ) const{
 	int find;
 	for ( find = 0; find < drawWindows.Num(); find ++ ) {
 		if ( drawWindows[find].win == window ) {
@@ -4461,6 +4610,12 @@ void idWindow::SetDefaults ( void ) {
 
 	background = NULL;
 	backGroundName = "";
+
+	// SM: Additional override properties for gamepad glyphs
+	buttonOffsetx = 0.0f;
+	buttonOffsety = 0.0f;
+	buttonAlignOverride = -1;
+	buttonScale = 1.0f;
 }
 
 /*

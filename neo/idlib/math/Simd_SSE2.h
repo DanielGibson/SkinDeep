@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MATH_SIMD_SSE2_H__
 #define __MATH_SIMD_SSE2_H__
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "idlib/math/Simd_SSE.h"
 
 /*
@@ -41,7 +43,13 @@ If you have questions concerning this license or the applicable additional terms
 
 class idSIMD_SSE2 : public idSIMD_SSE {
 public:
-#if defined(__GNUC__) && defined(__SSE2__)
+#if defined(__BLENDO_SIMD__) // blendo eric: SIMD using newer header/api
+	using idSIMD_SSE::CmpLT;
+
+	virtual const char * VPCALL GetName(void) const;
+	virtual void VPCALL CmpLT(byte *dst, const byte bitNum, const float *src0, const float constant, const int count);
+
+#elif defined(__GNUC__) && defined(__SSE2__)
 	using idSIMD_SSE::CmpLT;
 
 	virtual const char * VPCALL GetName( void ) const;
@@ -57,5 +65,7 @@ public:
 
 #endif
 };
+
+#endif
 
 #endif /* !__MATH_SIMD_SSE2_H__ */

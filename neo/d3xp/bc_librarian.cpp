@@ -30,8 +30,10 @@ idLibrarian::~idLibrarian(void)
 {
 	StopSound(SND_CHANNEL_ANY);
 
-	if (waterParticle != NULL)
+	if (waterParticle != NULL) {
 		waterParticle->PostEventMS(&EV_Remove, 0);
+		waterParticle = nullptr;
+	}
 }
 
 
@@ -83,10 +85,28 @@ void idLibrarian::Event_PostSpawn(void)
 
 void idLibrarian::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( myLocEntNum ); // int myLocEntNum
+
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( detectionTimer ); // int detectionTimer
+	savefile->WriteObject( waterParticle ); // idFuncEmitter * waterParticle
+
+	savefile->WriteInt( suspicionDelayTime ); // int suspicionDelayTime
+	savefile->WriteInt( suspicionTime ); // int suspicionTime
 }
 
 void idLibrarian::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( myLocEntNum ); // int myLocEntNum
+
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( detectionTimer ); // int detectionTimer
+	savefile->ReadObject( CastClassPtrRef(waterParticle) ); // idFuncEmitter * waterParticle
+
+	savefile->ReadInt( suspicionDelayTime ); // int suspicionDelayTime
+	savefile->ReadInt( suspicionTime ); // int suspicionTime
 }
 
 void idLibrarian::Think(void)

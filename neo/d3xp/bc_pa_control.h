@@ -13,7 +13,7 @@ public:
 							idPA_Control(void);
 	virtual					~idPA_Control(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -40,7 +40,7 @@ private:
 
 	idVec3					GetMicPosition();
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	idAnimatedEntity*		flagModel;
 	int						flagCheckTimer;

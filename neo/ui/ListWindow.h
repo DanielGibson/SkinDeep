@@ -47,12 +47,20 @@ struct idTabRect {
 	int	type;
 	idVec2 iconSize;
 	float iconVOffset;
+
+	void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void ReadFromSaveGame( idRestoreGame *savefile );
+
 };
 
 class idListWindow : public idWindow {
 public:
 	idListWindow(idUserInterfaceLocal *gui);
 	idListWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
+	virtual ~idListWindow();
+
+	virtual void WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void ReadFromSaveGame( idRestoreGame *savefile );
 
 	virtual const char*	HandleEvent(const sysEvent_t *event, bool *updateVisuals);
 	virtual void		PostParse();

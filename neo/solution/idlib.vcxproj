@@ -119,11 +119,11 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>__BLENDO_SIMD__;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <AdditionalOptions>/wd4458  /wd4312 %(AdditionalOptions)</AdditionalOptions>
-      <UndefinePreprocessorDefinitions>__BLENDO_SIMD_INLINE__;</UndefinePreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -157,11 +157,11 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>__BLENDO_SIMD__;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <AdditionalOptions>/wd4458  /wd4312 %(AdditionalOptions)</AdditionalOptions>
-      <UndefinePreprocessorDefinitions>__BLENDO_SIMD_INLINE__;</UndefinePreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -199,7 +199,6 @@
       <DebugInformationFormat>
       </DebugInformationFormat>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -238,7 +237,6 @@
       <DebugInformationFormat>
       </DebugInformationFormat>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -277,7 +275,6 @@
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -316,7 +313,6 @@
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -370,6 +366,7 @@
     <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\math\Simd_SSE.cpp" />
     <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\math\Simd_SSE2.cpp" />
     <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\math\Simd_SSE3.cpp" />
+    <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\math\Simd_Blendo.cpp" />
     <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\math\Vector.cpp" />
     <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\BitMsg.cpp" />
     <ClCompile Include="$(ProjectDir)\..\..\neo\idlib\LangDict.cpp" />

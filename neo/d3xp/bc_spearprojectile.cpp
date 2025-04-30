@@ -13,6 +13,7 @@
 
 
 #include "ai/AI.h"
+#include "bc_mech.h"
 #include "bc_spearprojectile.h"
 
 #define SPEARCHARGETIME 500
@@ -99,10 +100,50 @@ void idSpearprojectile::Spawn(void)
 
 void idSpearprojectile::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( spearState ); // int spearState
+	savefile->WriteVec3( ramPoint ); // idVec3 ramPoint
+	savefile->WriteInt( ramSpeed ); // int ramSpeed
+	savefile->WriteVec3( ramDir ); // idVec3 ramDir
+
+	savefile->WriteParticle( flyParticles ); // const idDeclParticle * flyParticles
+	savefile->WriteInt( flyParticlesFlyTime ); // int flyParticlesFlyTime
+
+	savefile->WriteBool( hasdoneSpawnBoundCheck ); // bool hasdoneSpawnBoundCheck
+
+
+	savefile->WriteVec3( collisionNormal ); // idVec3 collisionNormal
+
+	savefile->WriteInt( chargeTimer ); // int chargeTimer
+
+	savefile->WriteObject( enemyPtr ); // idEntityPtr<idEntity> enemyPtr
+
+	savefile->WriteBool( pluckedFromBelly ); // bool pluckedFromBelly
+
+	savefile->WriteBool( impaledInMonster ); // bool impaledInMonster
 }
 
 void idSpearprojectile::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( spearState ); // int spearState
+	savefile->ReadVec3( ramPoint ); // idVec3 ramPoint
+	savefile->ReadInt( ramSpeed ); // int ramSpeed
+	savefile->ReadVec3( ramDir ); // idVec3 ramDir
+
+	savefile->ReadParticle( flyParticles ); // const idDeclParticle * flyParticles
+	savefile->ReadInt( flyParticlesFlyTime ); // int flyParticlesFlyTime
+
+	savefile->ReadBool( hasdoneSpawnBoundCheck ); // bool hasdoneSpawnBoundCheck
+
+
+	savefile->ReadVec3( collisionNormal ); // idVec3 collisionNormal
+
+	savefile->ReadInt( chargeTimer ); // int chargeTimer
+
+	savefile->ReadObject( enemyPtr ); // idEntityPtr<idEntity> enemyPtr
+
+	savefile->ReadBool( pluckedFromBelly ); // bool pluckedFromBelly
+
+	savefile->ReadBool( impaledInMonster ); // bool impaledInMonster
 }
 
 void idSpearprojectile::Think(void)
@@ -269,16 +310,19 @@ bool idSpearprojectile::Collide(const trace_t &collision, const idVec3 &velocity
 				}
 			}
 
-			bloodPos = GetPhysics()->GetOrigin() + forwardDir * 10;
+			if (g_bloodEffects.GetBool())
+			{
+				bloodPos = GetPhysics()->GetOrigin() + forwardDir * 10;
 
-			splashArgs.Set("model", "spearbot_blood.prt");
-			splashArgs.Set("start_off", "1");
-			splashEnt = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &splashArgs));
-			splashEnt->GetPhysics()->SetOrigin(bloodPos);
-			splashEnt->GetPhysics()->SetAxis(particleDir.ToMat3());
-			splashEnt->PostEventMS(&EV_Activate, 0, this);
-			splashEnt->PostEventMS(&EV_Remove, 3000);
-			splashEnt->Bind(body, true);
+				splashArgs.Set("model", "spearbot_blood.prt");
+				splashArgs.Set("start_off", "1");
+				splashEnt = static_cast<idFuncEmitter*>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &splashArgs));
+				splashEnt->GetPhysics()->SetOrigin(bloodPos);
+				splashEnt->GetPhysics()->SetAxis(particleDir.ToMat3());
+				splashEnt->PostEventMS(&EV_Activate, 0, this);
+				splashEnt->PostEventMS(&EV_Remove, 3000);
+				splashEnt->Bind(body, true);
+			}
 
 			StartSound("snd_impact_flesh", SND_CHANNEL_ANY, 0, false, NULL);
 
@@ -318,13 +362,20 @@ bool idSpearprojectile::Collide(const trace_t &collision, const idVec3 &velocity
 			this->isFrobbable = true;
 		}
 
-		if (gameLocal.entities[collision.c.entityNum]->fl.takedamage)
+		//BC 2-18-2025: if spear hit mech, then do no damage and just blow up
+		bool hitPlayerInMech = ((body->IsType(idPlayer::Type) || body->IsType(idMech::Type)) && gameLocal.GetLocalPlayer()->IsInMech());
+		if (gameLocal.entities[collision.c.entityNum]->fl.takedamage && !hitPlayerInMech)
 		{
 			const idDeclEntityDef *damageDef = gameLocal.FindEntityDef(spawnArgs.GetString("def_damage"), false);
 			if (damageDef)
 			{
 				gameLocal.entities[collision.c.entityNum]->Damage(this, this, vec3_zero, spawnArgs.GetString("def_damage"), 1.0f, CLIPMODEL_ID_TO_JOINT_HANDLE(collision.c.id));
 			}
+		}
+
+		if (hitPlayerInMech)
+		{
+			PostEventMS(&EV_Remove, 1000);
 		}
 	}
 

@@ -6,6 +6,7 @@
 #include "Player.h"
 #include "Fx.h"
 #include "framework/DeclEntityDef.h"
+#include "idlib/LangDict.h"
 
 #include "bc_meta.h"
 #include "bc_ventdoor.h"
@@ -34,6 +35,13 @@ const int FORCEDUCK_BASE_DURATION = 400;
 
 idVentdoor::idVentdoor()
 {
+	ventdoorNode.SetOwner(this);
+	ventdoorNode.AddToEnd(gameLocal.ventdoorEntities);	
+
+	locbox = NULL;
+
+	ventTimer = 0;
+	ventState = 0;
 }
 
 idVentdoor::~idVentdoor(void)
@@ -47,9 +55,6 @@ void idVentdoor::Spawn(void)
 {
 	ventState = VENT_NONE;
 	ventTimer = 0;
-	
-	ventdoorNode.SetOwner(this);
-	ventdoorNode.AddToEnd(gameLocal.ventdoorEntities);	
 
 	displayNamePeek = spawnArgs.GetString( "displaynamepeek" );
 
@@ -103,14 +108,38 @@ void idVentdoor::Spawn(void)
 		warningsign[i] = (idAnimatedEntity*)gameLocal.SpawnEntityType(idAnimatedEntity::Type, &args);
 		warningsign[i]->Event_PlayAnim("stowed", 0);
 	}
+
+	//BC 3-25-2025: locbox
+	#define LOCBOXRADIUS 4
+	idVec3 locboxPos = GetPhysics()->GetOrigin() + (upDir * (-doorBounds[0].z + .5f) + (upDir * -LOCBOXRADIUS));
+	idDict args;
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_def_gameplay_ventpurgesign"));
+	args.SetVector("origin", locboxPos);
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	locbox = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+	locbox->Hide();
+
 }
 
 void idVentdoor::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( ventTimer ); //  int ventTimer
+	savefile->WriteInt( ventState ); //  int ventState
+	SaveFileWriteArray( warningsign, 2, WriteObject ); // idAnimatedEntity *warningsign[2]
+	savefile->WriteString( displayNamePeek ); //  idString displayNamePeek
+	savefile->WriteObject( locbox ); //  idEntity* locbox
 }
 
 void idVentdoor::Restore(idRestoreGame *savefile)
 {	
+	savefile->ReadInt( ventTimer ); //  int ventTimer
+	savefile->ReadInt( ventState ); //  int ventState
+	SaveFileReadArrayCast( warningsign, ReadObject, idClass*& ); // idAnimatedEntity *warningsign[2]
+	savefile->ReadString( displayNamePeek ); //  idString displayNamePeek
+	savefile->ReadObject( locbox ); //  idEntity* locbox
 }
 
 void idVentdoor::VentClose()
@@ -160,7 +189,7 @@ idVec3 idVentdoor::GetPlayerDestinationPos()
 
 		if ( developer.GetInteger() >= 2 )
 		{
-			gameRenderWorld->DebugArrow( colorRed, GetPhysics()->GetOrigin(), ventTr.endpos, 4, 5000 );
+			gameRenderWorld->DebugArrow( colorRed, GetPhysics()->GetOrigin(), ventTr.endpos, 4, 60000 );
 		}
 
 		if ( ventTr.fraction >= 1.0f )
@@ -184,7 +213,34 @@ idVec3 idVentdoor::GetPlayerDestinationPos()
 
 			//Now trace down to find the ground.
 			gameLocal.clip.TracePoint( downTr, candidatePos, candidatePos + idVec3( 0, 0, -80 ), MASK_SOLID, this );
-			playerDestinationPosition = downTr.endpos;
+
+			if ( developer.GetInteger() >= 2 )
+			{
+				gameRenderWorld->DebugArrow( colorMagenta, candidatePos, downTr.endpos, 4, 60000 );
+			}
+
+			// fix the case where there's a drop, but the player clips into wall
+			if (downTr.fraction >= 1.0f)
+			{
+				// trace backwards from the drop to find wall
+				trace_t wallTrace;
+				idVec3 dropPos = candidatePos + idVec3(0, 0, pm_crouchheight.GetFloat()*0.5f - pm_normalheight.GetFloat());
+				float playerRadius = gameLocal.GetLocalPlayer()->GetPhysics()->GetBounds()[1][1];
+				gameLocal.clip.TracePoint( wallTrace, dropPos, dropPos + (downDir*-playerRadius), MASK_SOLID, this );
+
+				if (wallTrace.fraction < 1.0f) // wall found
+				{ // pushout from wall
+					playerDestinationPosition = wallTrace.endpos + (downDir * playerRadius);
+				}
+				else
+				{
+					playerDestinationPosition = downTr.endpos;
+				}
+			}
+			else
+			{
+				playerDestinationPosition = downTr.endpos;
+			}
 		}
 		else
 		{
@@ -342,7 +398,7 @@ bool idVentdoor::DoFrob(int index, idEntity * frobber)
 				{
 					gameLocal.AddEventLog("#str_def_gameplay_vent_seenenter", gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin());
 					gameLocal.GetLocalPlayer()->confinedStealthActive = false;
-					static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge();
+					static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge(nullptr); //We don't really track who saw the player, so just use generic voiceprint A...
 				}
 			}
 		}
@@ -437,15 +493,19 @@ void idVentdoor::SetPurgeSign( bool value)
 		for (int i = 0; i < 2; i++)
 		{
 			warningsign[i]->Event_PlayAnim("deploy", 0);
-			warningsign[i]->Show();
+			warningsign[i]->Show();			
 		}
+
+		locbox->Show();
 	}
 	else
 	{
 		for (int i = 0; i < 2; i++)
 		{
-			warningsign[i]->Event_PlayAnim("undeploy", 0);
+			warningsign[i]->Event_PlayAnim("undeploy", 0);			
 		}
+
+		locbox->Hide();
 	}
 }
 

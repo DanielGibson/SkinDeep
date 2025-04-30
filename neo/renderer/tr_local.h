@@ -263,6 +263,9 @@ public:
 	virtual void			RemoveDecals();
 
 	renderEntity_t			parms;
+#if defined(_DEBUG) || defined(_RELWITHDEBINFO)
+	const renderEntity_t*	parmsDebug;
+#endif
 
 	float					modelMatrix[16];		// this is just a rearrangement of parms.axis and parms.origin
 
@@ -800,6 +803,8 @@ public:
 	virtual bool			UseBlendoAmbience() const;
 	virtual void			SetUseBlendoAmbience(bool setting) { useBlendoAmbience = setting; }
 	virtual float			GetBlendoAmbienceScale() const;
+
+	virtual void			UpdateScreenWidth();
 
 public:
 	// internal functions

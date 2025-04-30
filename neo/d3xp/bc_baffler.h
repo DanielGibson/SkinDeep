@@ -26,7 +26,7 @@ public:
 							idBaffler(void);
 	virtual					~idBaffler(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -42,15 +42,15 @@ private:
 	int						state;
 	int						timer;
 
-	idEntity*				bubble;
+	idEntity*				bubble = nullptr;
 
-	const idDeclParticle *	soundParticles;
+	const idDeclParticle *	soundParticles = nullptr;
 	int						soundParticlesFlyTime;
 
 	int						healthState;
 	int						maxHealth;
 
-	const idDeclParticle *	damageSmoke;
+	const idDeclParticle *	damageSmoke = nullptr;
 	int						damageSmokeFlyTime;
 	
 

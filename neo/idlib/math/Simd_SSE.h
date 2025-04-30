@@ -29,7 +29,11 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MATH_SIMD_SSE_H__
 #define __MATH_SIMD_SSE_H__
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "idlib/math/Simd_MMX.h"
+
+//#define __BLENDO_SIMD_AVX__ 1
 
 /*
 ===============================================================================
@@ -41,7 +45,26 @@ If you have questions concerning this license or the applicable additional terms
 
 class idSIMD_SSE : public idSIMD_MMX {
 public:
-#if defined(__GNUC__) && defined(__SSE__)
+
+#if defined(__BLENDO_SIMD__) // blendo eric: SIMD using newer header/api
+	using idSIMD_MMX::Dot;
+	using idSIMD_MMX::MinMax;
+
+	virtual const char * VPCALL GetName(void) const;
+	virtual void VPCALL Dot(float *dst, const idPlane &constant, const idDrawVert *src, const int count);
+	virtual	void VPCALL MinMax(idVec3 &min, idVec3 &max, const idDrawVert *src, const int *indexes, const int count);
+	virtual void VPCALL Dot(float *dst, const idVec3 &constant, const idPlane *src, const int count);
+
+#if defined(__BLENDO_SIMD_AVX__) // blendo eric: added rbdoom simd
+	virtual void VPCALL BlendJoints(idJointQuat* joints, const idJointQuat* blendJoints, const float lerp, const int* index, const int numJoints);
+	virtual void VPCALL BlendJointsFast(idJointQuat* joints, const idJointQuat* blendJoints, const float lerp, const int* index, const int numJoints);
+	virtual void VPCALL ConvertJointQuatsToJointMats(idJointMat* jointMats, const idJointQuat* jointQuats, const int numJoints);
+	virtual void VPCALL ConvertJointMatsToJointQuats(idJointQuat* jointQuats, const idJointMat* jointMats, const int numJoints);
+	virtual void VPCALL TransformJoints(idJointMat* jointMats, const int* parents, const int firstJoint, const int lastJoint);
+	virtual void VPCALL UntransformJoints(idJointMat* jointMats, const int* parents, const int firstJoint, const int lastJoint);
+#endif
+
+#elif defined(__GNUC__) && defined(__SSE__)
 	using idSIMD_MMX::Dot;
 	using idSIMD_MMX::MinMax;
 
@@ -49,7 +72,6 @@ public:
 	virtual void VPCALL Dot( float *dst,			const idPlane &constant,const idDrawVert *src,	const int count );
 	virtual	void VPCALL MinMax( idVec3 &min,		idVec3 &max,			const idDrawVert *src,	const int *indexes,		const int count );
 	virtual void VPCALL Dot( float *dst,			const idVec3 &constant,	const idPlane *src,		const int count );
-
 #elif defined(_MSC_VER) && defined(_M_IX86)
 	virtual const char * VPCALL GetName( void ) const;
 
@@ -144,5 +166,7 @@ public:
 
 #endif
 };
+
+#endif
 
 #endif /* !__MATH_SIMD_SSE_H__ */

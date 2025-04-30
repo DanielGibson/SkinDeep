@@ -70,11 +70,16 @@ idIK::Save
 ================
 */
 void idIK::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( initialized );
-	savefile->WriteBool( ik_activate );
-	savefile->WriteObject( self );
+	savefile->WriteBool( initialized ); // bool initialized
+	savefile->WriteBool( ik_activate ); // bool ik_activate
+	savefile->WriteObject( self ); // idEntity * self
+
+	savefile->WriteAnimatorPtr( animator ); // idAnimator * animator
+
+	// int modifiedAnim // regened using animator name
 	savefile->WriteString( animator != NULL && animator->GetAnim( modifiedAnim ) ? animator->GetAnim( modifiedAnim )->Name() : "" );
-	savefile->WriteVec3( modelOffset );
+
+	savefile->WriteVec3( modelOffset ); // idVec3 modelOff
 }
 
 /*
@@ -85,27 +90,29 @@ idIK::Restore
 void idIK::Restore( idRestoreGame *savefile ) {
 	idStr anim;
 
-	savefile->ReadBool( initialized );
-	savefile->ReadBool( ik_activate );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
-	savefile->ReadString( anim );
-	savefile->ReadVec3( modelOffset );
+	savefile->ReadBool( initialized ); // bool initialized
+	savefile->ReadBool( ik_activate ); // bool ik_activate
+	savefile->ReadObject( self ); // idEntity * self
 
-	if ( self ) {
-		animator = self->GetAnimator();
+	savefile->ReadAnimatorPtr( animator ); // idAnimator * animator
+
+	idStr animName; // int modifiedAnim
+	savefile->ReadString( animName );
+	if ( animator && animName.Length() > 0 ) {
 		if ( animator == NULL || animator->ModelDef() == NULL ) {
 			gameLocal.Warning( "idIK::Restore: IK for entity '%s' at (%s) has no model set.",
-								self->name.c_str(), self->GetPhysics()->GetOrigin().ToString(0) );
+				self->name.c_str(), self->GetPhysics()->GetOrigin().ToString(0) );
 		}
-		modifiedAnim = animator->GetAnim( anim );
+		modifiedAnim = animator->GetAnim( animName ); // int modifiedAnim
 		if ( modifiedAnim == 0 ) {
 			gameLocal.Warning( "idIK::Restore: IK for entity '%s' at (%s) has no modified animation.",
-									self->name.c_str(), self->GetPhysics()->GetOrigin().ToString(0) );
+				self->name.c_str(), self->GetPhysics()->GetOrigin().ToString(0) );
 		}
 	} else {
-		animator = NULL;
 		modifiedAnim = 0;
 	}
+
+	savefile->ReadVec3( modelOffset ); // idVec3 modelOff
 }
 
 /*
@@ -298,61 +305,47 @@ idIK_Walk::Save
 ================
 */
 void idIK_Walk::Save( idSaveGame *savefile ) const {
-	int i;
-
 	idIK::Save( savefile );
 
-	savefile->WriteClipModel( footModel );
+	savefile->WriteClipModel( footModel ); // idClipModel * footModel
 
-	savefile->WriteInt( numLegs );
-	savefile->WriteInt( enabledLegs );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteInt( footJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteInt( ankleJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteInt( kneeJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteInt( hipJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteInt( dirJoints[i] );
-	savefile->WriteInt( waistJoint );
+	savefile->WriteInt( numLegs ); // int numLegs
+	savefile->WriteInt( enabledLegs ); // int enabledLegs
+	SaveFileWriteArray( footJoints, MAX_LEGS, WriteInt ); // jointHandle_t footJoints[MAX_LEGS]
+	SaveFileWriteArray( ankleJoints, MAX_LEGS, WriteInt ); // jointHandle_t ankleJoints[MAX_LEGS]
+	SaveFileWriteArray( kneeJoints, MAX_LEGS, WriteInt ); // jointHandle_t kneeJoints[MAX_LEGS]
+	SaveFileWriteArray( hipJoints, MAX_LEGS, WriteInt ); // jointHandle_t hipJoints[MAX_LEGS]
+	SaveFileWriteArray( dirJoints, MAX_LEGS, WriteInt ); // jointHandle_t dirJoints[MAX_LEGS]
+	savefile->WriteJoint( waistJoint ); // jointHandle_t waistJoint
 
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteVec3( hipForward[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteVec3( kneeForward[i] );
+	SaveFileWriteArray( hipForward, MAX_LEGS, WriteVec3 );  // idVec3 hipForward[MAX_LEGS]
+	SaveFileWriteArray( kneeForward, MAX_LEGS, WriteVec3 );  // idVec3 kneeForward[MAX_LEGS]
 
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteFloat( upperLegLength[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteFloat( lowerLegLength[i] );
+	SaveFileWriteArray( upperLegLength, MAX_LEGS, WriteFloat );  // float upperLegLength[MAX_LEGS]
+	SaveFileWriteArray( lowerLegLength, MAX_LEGS, WriteFloat );  // float lowerLegLength[MAX_LEGS]
 
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteMat3( upperLegToHipJoint[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->WriteMat3( lowerLegToKneeJoint[i] );
+	SaveFileWriteArray( upperLegToHipJoint, MAX_LEGS, WriteMat3 );  // idMat3 upperLegToHipJoint[MAX_LEGS]
+	SaveFileWriteArray( lowerLegToKneeJoint, MAX_LEGS, WriteMat3 );  // idMat3 lowerLegToKneeJoint[MAX_LEGS]
 
-	savefile->WriteFloat( smoothing );
-	savefile->WriteFloat( waistSmoothing );
-	savefile->WriteFloat( footShift );
-	savefile->WriteFloat( waistShift );
-	savefile->WriteFloat( minWaistFloorDist );
-	savefile->WriteFloat( minWaistAnkleDist );
-	savefile->WriteFloat( footUpTrace );
-	savefile->WriteFloat( footDownTrace );
-	savefile->WriteBool( tiltWaist );
-	savefile->WriteBool( usePivot );
+	savefile->WriteFloat( smoothing ); // float smoothing
+	savefile->WriteFloat( waistSmoothing ); // float waistSmoothing
+	savefile->WriteFloat( footShift ); // float footShift
+	savefile->WriteFloat( waistShift ); // float waistShift
+	savefile->WriteFloat( minWaistFloorDist ); // float minWaistFloorDist
+	savefile->WriteFloat( minWaistAnkleDist ); // float minWaistAnkleDist
+	savefile->WriteFloat( footUpTrace ); // float footUpTrace
+	savefile->WriteFloat( footDownTrace ); // float footDownTrace
+	savefile->WriteBool( tiltWaist ); // bool tiltWaist
+	savefile->WriteBool( usePivot ); // bool usePivot
+	savefile->WriteInt( pivotFoot ); // int pivotFoot
+	savefile->WriteFloat( pivotYaw ); // float pivotYaw
+	savefile->WriteVec3( pivotPos ); // idVec3 pivotPos
+	savefile->WriteBool( oldHeightsValid ); // bool oldHeightsValid
+	savefile->WriteFloat( oldWaistHeight ); // float oldWaistHeight
 
-	savefile->WriteInt( pivotFoot );
-	savefile->WriteFloat( pivotYaw );
-	savefile->WriteVec3( pivotPos );
-	savefile->WriteBool( oldHeightsValid );
-	savefile->WriteFloat( oldWaistHeight );
-	for ( i = 0; i < MAX_LEGS; i++ ) {
-		savefile->WriteFloat( oldAnkleHeights[i] );
-	}
-	savefile->WriteVec3( waistOffset );
+	SaveFileWriteArray( oldAnkleHeights, MAX_LEGS, WriteFloat );  // float oldAnkleHeights[MAX_LEGS]
+
+	savefile->WriteVec3( waistOffset ); // idVec3 waistOffset
 }
 
 /*
@@ -361,61 +354,47 @@ idIK_Walk::Restore
 ================
 */
 void idIK_Walk::Restore( idRestoreGame *savefile ) {
-	int i;
-
 	idIK::Restore( savefile );
 
-	savefile->ReadClipModel( footModel );
+	savefile->ReadClipModel( footModel ); // idClipModel * footModel
 
-	savefile->ReadInt( numLegs );
-	savefile->ReadInt( enabledLegs );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadInt( (int&)footJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadInt( (int&)ankleJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadInt( (int&)kneeJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadInt( (int&)hipJoints[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadInt( (int&)dirJoints[i] );
-	savefile->ReadInt( (int&)waistJoint );
+	savefile->ReadInt( numLegs ); // int numLegs
+	savefile->ReadInt( enabledLegs ); // int enabledLegs
+	SaveFileReadArrayCast( footJoints, ReadInt, int& ); // jointHandle_t footJoints[MAX_LEGS]
+	SaveFileReadArrayCast( ankleJoints, ReadInt, int& ) // jointHandle_t ankleJoints[MAX_LEGS]
+	SaveFileReadArrayCast( kneeJoints, ReadInt, int& ) // jointHandle_t kneeJoints[MAX_LEGS]
+	SaveFileReadArrayCast( hipJoints, ReadInt, int& ) // jointHandle_t hipJoints[MAX_LEGS]
+	SaveFileReadArrayCast( dirJoints, ReadInt, int& ) // jointHandle_t dirJoints[MAX_LEGS]
+	savefile->ReadJoint( waistJoint ); // jointHandle_t waistJoint
 
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadVec3( hipForward[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadVec3( kneeForward[i] );
+	SaveFileReadArray( hipForward, ReadVec3 );  // idVec3 hipForward[MAX_LEGS]
+	SaveFileReadArray( kneeForward, ReadVec3 );  // idVec3 kneeForward[MAX_LEGS]
 
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadFloat( upperLegLength[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadFloat( lowerLegLength[i] );
+	SaveFileReadArray( upperLegLength, ReadFloat );  // float upperLegLength[MAX_LEGS]
+	SaveFileReadArray( lowerLegLength, ReadFloat );  // float lowerLegLength[MAX_LEGS]
 
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadMat3( upperLegToHipJoint[i] );
-	for ( i = 0; i < MAX_LEGS; i++ )
-		savefile->ReadMat3( lowerLegToKneeJoint[i] );
+	SaveFileReadArray( upperLegToHipJoint, ReadMat3 );  // idMat3 upperLegToHipJoint[MAX_LEGS]
+	SaveFileReadArray( lowerLegToKneeJoint, ReadMat3 );  // idMat3 lowerLegToKneeJoint[MAX_LEGS]
 
-	savefile->ReadFloat( smoothing );
-	savefile->ReadFloat( waistSmoothing );
-	savefile->ReadFloat( footShift );
-	savefile->ReadFloat( waistShift );
-	savefile->ReadFloat( minWaistFloorDist );
-	savefile->ReadFloat( minWaistAnkleDist );
-	savefile->ReadFloat( footUpTrace );
-	savefile->ReadFloat( footDownTrace );
-	savefile->ReadBool( tiltWaist );
-	savefile->ReadBool( usePivot );
+	savefile->ReadFloat( smoothing ); // float smoothing
+	savefile->ReadFloat( waistSmoothing ); // float waistSmoothing
+	savefile->ReadFloat( footShift ); // float footShift
+	savefile->ReadFloat( waistShift ); // float waistShift
+	savefile->ReadFloat( minWaistFloorDist ); // float minWaistFloorDist
+	savefile->ReadFloat( minWaistAnkleDist ); // float minWaistAnkleDist
+	savefile->ReadFloat( footUpTrace ); // float footUpTrace
+	savefile->ReadFloat( footDownTrace ); // float footDownTrace
+	savefile->ReadBool( tiltWaist ); // bool tiltWaist
+	savefile->ReadBool( usePivot ); // bool usePivot
+	savefile->ReadInt( pivotFoot ); // int pivotFoot
+	savefile->ReadFloat( pivotYaw ); // float pivotYaw
+	savefile->ReadVec3( pivotPos ); // idVec3 pivotPos
+	savefile->ReadBool( oldHeightsValid ); // bool oldHeightsValid
+	savefile->ReadFloat( oldWaistHeight ); // float oldWaistHeight
 
-	savefile->ReadInt( pivotFoot );
-	savefile->ReadFloat( pivotYaw );
-	savefile->ReadVec3( pivotPos );
-	savefile->ReadBool( oldHeightsValid );
-	savefile->ReadFloat( oldWaistHeight );
-	for ( i = 0; i < MAX_LEGS; i++ ) {
-		savefile->ReadFloat( oldAnkleHeights[i] );
-	}
-	savefile->ReadVec3( waistOffset );
+	SaveFileReadArray( oldAnkleHeights, ReadFloat );  // float oldAnkleHeights[MAX_LEGS]
+
+	savefile->ReadVec3( waistOffset ); // idVec3 waistOffset
 }
 
 /*
@@ -747,10 +726,10 @@ void idIK_Walk::Evaluate( void ) {
 		SolveTwoBones( hipOrigin, jointOrigins[i], kneeDir, upperLegLength[i], lowerLegLength[i], kneeOrigin );
 
 		if ( ik_debug.GetBool() ) {
-			gameRenderWorld->DebugLine( colorCyan, hipOrigin, kneeOrigin );
-			gameRenderWorld->DebugLine( colorRed, kneeOrigin, jointOrigins[i] );
-			gameRenderWorld->DebugLine( colorYellow, kneeOrigin, kneeOrigin + hipDir );
-			gameRenderWorld->DebugLine( colorGreen, kneeOrigin, kneeOrigin + kneeDir );
+			gameRenderWorld->DebugArrow( colorCyan, hipOrigin, kneeOrigin, 1.0f );
+			gameRenderWorld->DebugArrow( colorRed, kneeOrigin, jointOrigins[i], 1.0f );
+			gameRenderWorld->DebugArrow( colorYellow, hipOrigin, hipOrigin + hipDir*upperLegLength[i], 1.0f );
+			gameRenderWorld->DebugArrow( colorGreen, kneeOrigin, kneeOrigin + kneeDir*lowerLegLength[i], 1.0f );
 		}
 
 		// get the axis for the hip joint
@@ -761,7 +740,7 @@ void idIK_Walk::Evaluate( void ) {
 		GetBoneAxis( kneeOrigin, jointOrigins[i], kneeDir, axis );
 		kneeAxis[i] = lowerLegToKneeJoint[i] * ( axis * modelAxis.Transpose() );
 	}
-
+#
 	// set the joint mods
 	animator->SetJointAxis( waistJoint, JOINTMOD_WORLD_OVERRIDE, waistAxis );
 	animator->SetJointPos( waistJoint, JOINTMOD_WORLD_OVERRIDE, ( waistOrigin + waistOffset - modelOrigin ) * modelAxis.Transpose() );
@@ -883,34 +862,24 @@ idIK_Reach::Save
 ================
 */
 void idIK_Reach::Save( idSaveGame *savefile ) const {
-	int i;
 	idIK::Save( savefile );
 
-	savefile->WriteInt( numArms );
-	savefile->WriteInt( enabledArms );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteInt( handJoints[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteInt( elbowJoints[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteInt( shoulderJoints[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteInt( dirJoints[i] );
+	savefile->WriteInt( numArms ); // int numArms
+	savefile->WriteInt( enabledArms ); // int enabledArms
 
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteVec3( shoulderForward[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteVec3( elbowForward[i] );
+	SaveFileWriteArray( handJoints, MAX_ARMS, WriteInt ); // jointHandle_t handJoints[MAX_ARMS]
+	SaveFileWriteArray( elbowJoints, MAX_ARMS, WriteInt ); // jointHandle_t elbowJoints[MAX_ARMS]
+	SaveFileWriteArray( shoulderJoints, MAX_ARMS, WriteInt ); // jointHandle_t shoulderJoints[MAX_ARMS]
+	SaveFileWriteArray( dirJoints, MAX_ARMS, WriteInt ); // jointHandle_t dirJoints[MAX_ARMS]
 
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteFloat( upperArmLength[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteFloat( lowerArmLength[i] );
+	SaveFileWriteArray( shoulderForward, MAX_ARMS, WriteVec3 ); //  idVec3 shoulderForward[MAX_ARMS]
+	SaveFileWriteArray( elbowForward, MAX_ARMS, WriteVec3 ); //  idVec3 elbowForward[MAX_ARMS]
 
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteMat3( upperArmToShoulderJoint[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->WriteMat3( lowerArmToElbowJoint[i] );
+	SaveFileWriteArray( upperArmLength, MAX_ARMS, WriteFloat ); //  float upperArmLength[MAX_ARMS]
+	SaveFileWriteArray( lowerArmLength, MAX_ARMS, WriteFloat ); //  float lowerArmLength[MAX_ARMS]
+
+	SaveFileWriteArray( upperArmToShoulderJoint, MAX_ARMS, WriteMat3 ); //  idMat3 upperArmToShoulderJoint[MAX_ARMS]
+	SaveFileWriteArray( lowerArmToElbowJoint, MAX_ARMS, WriteMat3 ); //  idMat3 lowerArmToElbowJoint[MAX_ARMS]
 }
 
 /*
@@ -919,34 +888,24 @@ idIK_Reach::Restore
 ================
 */
 void idIK_Reach::Restore( idRestoreGame *savefile ) {
-	int i;
 	idIK::Restore( savefile );
 
-	savefile->ReadInt( numArms );
-	savefile->ReadInt( enabledArms );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadInt( (int&)handJoints[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadInt( (int&)elbowJoints[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadInt( (int&)shoulderJoints[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadInt( (int&)dirJoints[i] );
+	savefile->ReadInt( numArms ); // int numArms
+	savefile->ReadInt( enabledArms ); // int enabledArms
 
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadVec3( shoulderForward[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadVec3( elbowForward[i] );
+	SaveFileReadArrayCast( handJoints, ReadInt, int& ); // jointHandle_t handJoints[MAX_ARMS]
+	SaveFileReadArrayCast( elbowJoints, ReadInt, int& ); // jointHandle_t elbowJoints[MAX_ARMS]
+	SaveFileReadArrayCast( shoulderJoints, ReadInt, int& ); // jointHandle_t shoulderJoints[MAX_ARMS]
+	SaveFileReadArrayCast( dirJoints, ReadInt, int& ); // jointHandle_t dirJoints[MAX_ARMS]
 
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadFloat( upperArmLength[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadFloat( lowerArmLength[i] );
+	SaveFileReadArray( shoulderForward, ReadVec3 ); //  idVec3 shoulderForward[MAX_ARMS]
+	SaveFileReadArray( elbowForward, ReadVec3 ); //  idVec3 elbowForward[MAX_ARMS]
 
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadMat3( upperArmToShoulderJoint[i] );
-	for ( i = 0; i <  MAX_ARMS; i++ )
-		savefile->ReadMat3( lowerArmToElbowJoint[i] );
+	SaveFileReadArray( upperArmLength, ReadFloat ); //  float upperArmLength[MAX_ARMS]
+	SaveFileReadArray( lowerArmLength, ReadFloat ); //  float lowerArmLength[MAX_ARMS]
+
+	SaveFileReadArray( upperArmToShoulderJoint, ReadMat3 ); //  idMat3 upperArmToShoulderJoint[MAX_ARMS]
+	SaveFileReadArray( lowerArmToElbowJoint, ReadMat3 ); //  idMat3 lowerArmToElbowJoint[MAX_ARMS]
 }
 
 /*

@@ -59,7 +59,7 @@ class idForce_Field : public idForce {
 public:
 	CLASS_PROTOTYPE( idForce_Field );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 						idForce_Field( void );

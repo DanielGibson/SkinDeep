@@ -14,14 +14,44 @@ CLASS_DECLARATION(idMoveableItem, idFlyingBarrel )
 	EVENT(EV_Explode, idFlyingBarrel::Event_PreDeath)
 END_CLASS
 
+
+idFlyingBarrel::idFlyingBarrel()
+{
+	jetNode = nullptr;
+	barrelLight = nullptr;
+}
+
+idFlyingBarrel::~idFlyingBarrel()
+{
+
+}
+
 void idFlyingBarrel::Save( idSaveGame *savefile ) const
 {
-	//savefile->WriteInt(state);
+	savefile->WriteInt( state ); //  explode_state_t state
+
+	savefile->WriteInt( fireSpewIntervalTimer ); //  int fireSpewIntervalTimer
+	savefile->WriteBool( isSpewingFire ); //  bool isSpewingFire
+	savefile->WriteInt( fireSpewTimer ); //  int fireSpewTimer
+	savefile->WriteVec3( fireSpewDirection ); //  idVec3 fireSpewDirection
+
+	savefile->WriteObject( jetNode ); //  idEntity * jetNode
+
+	savefile->WriteObject( barrelLight ); //  idLight * barrelLight
 }
 
 void idFlyingBarrel::Restore( idRestoreGame *savefile )
 {
-	//savefile->ReadInt(state);
+	savefile->ReadInt( (int&)state ); //  explode_state_t state
+
+	savefile->ReadInt( fireSpewIntervalTimer ); //  int fireSpewIntervalTimer
+	savefile->ReadBool( isSpewingFire ); //  bool isSpewingFire
+	savefile->ReadInt( fireSpewTimer ); //  int fireSpewTimer
+	savefile->ReadVec3( fireSpewDirection ); //  idVec3 fireSpewDirection
+
+	savefile->ReadObject( jetNode ); //  idEntity * jetNode
+
+	savefile->ReadObject( CastClassPtrRef(barrelLight) ); //  idLight * barrelLight
 }
 
 void idFlyingBarrel::Spawn( void )

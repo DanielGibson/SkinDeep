@@ -48,8 +48,8 @@ public:
 				SSDCrossHair();
 				~SSDCrossHair();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile );
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile );
 
 	void		InitCrosshairs();
 	void		Draw(idDeviceContext *dc, const idVec2& cursor);
@@ -101,8 +101,8 @@ public:
 						SSDEntity();
 	virtual				~SSDEntity();
 
-	virtual void		WriteToSaveGame( idFile *savefile );
-	virtual void		ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game );
 
 	void				EntityInit();
 
@@ -147,8 +147,8 @@ public:
 						SSDMover();
 	virtual				~SSDMover();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
 	void				MoverInit(const idVec3& _speed, float _rotationSpeed);
 
@@ -175,16 +175,17 @@ public:
 						SSDAsteroid();
 						~SSDAsteroid();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
 	void				Init(idGameSSDWindow* _game, const idVec3& startPosition, const idVec2& _size, float _speed, float rotate, int _health);
 
 	virtual void		EntityUpdate();
+
 	static SSDAsteroid*	GetNewAsteroid(idGameSSDWindow* _game, const idVec3& startPosition, const idVec2& _size, float _speed, float rotate, int _health);
 	static SSDAsteroid*	GetSpecificAsteroid(int id);
-	static void			WriteAsteroids(idFile* savefile);
-	static void			ReadAsteroids(idFile* savefile, idGameSSDWindow* _game);
+	static void			WriteAsteroids( idSaveGame *savefile);
+	static void			ReadAsteroids( idRestoreGame *savefile, idGameSSDWindow* _game);
 
 
 
@@ -204,21 +205,21 @@ class SSDAstronaut : public SSDMover {
 
 public:
 
-	int					health;
+	int						health;
 
 public:
 							SSDAstronaut();
 							~SSDAstronaut();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void			WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void			ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
 	void					Init(idGameSSDWindow* _game, const idVec3& startPosition, float _speed, float rotate, int _health);
 
 	static SSDAstronaut*	GetNewAstronaut(idGameSSDWindow* _game, const idVec3& startPosition, float _speed, float rotate, int _health);
 	static SSDAstronaut*	GetSpecificAstronaut(int id);
-	static void				WriteAstronauts(idFile* savefile);
-	static void				ReadAstronauts(idFile* savefile, idGameSSDWindow* _game);
+	static void				WriteAstronauts( idSaveGame *savefile );
+	static void				ReadAstronauts( idRestoreGame *savefile, idGameSSDWindow* _game);
 
 protected:
 	static SSDAstronaut	astronautPool[MAX_ASTRONAUT];
@@ -255,16 +256,16 @@ public:
 	SSDExplosion();
 	~SSDExplosion();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void			WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void			ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
-	void				Init(idGameSSDWindow* _game, const idVec3& _position, const idVec2& _size, int _length, int _type, SSDEntity* _buddy, bool _killBuddy = true, bool _followBuddy = true);
+	void					Init(idGameSSDWindow* _game, const idVec3& _position, const idVec2& _size, int _length, int _type, SSDEntity* _buddy, bool _killBuddy = true, bool _followBuddy = true);
 
-	virtual void		EntityUpdate();
+	virtual void			EntityUpdate();
 	static SSDExplosion*	GetNewExplosion(idGameSSDWindow* _game, const idVec3& _position, const idVec2& _size, int _length, int _type, SSDEntity* _buddy, bool _killBuddy = true, bool _followBuddy = true);
 	static SSDExplosion*	GetSpecificExplosion(int id);
-	static void				WriteExplosions(idFile* savefile);
-	static void				ReadExplosions(idFile* savefile, idGameSSDWindow* _game);
+	static void				WriteExplosions(idSaveGame* savefile);
+	static void				ReadExplosions(idRestoreGame* savefile, idGameSSDWindow* _game);
 
 protected:
 	static SSDExplosion	explosionPool[MAX_EXPLOSIONS];
@@ -290,16 +291,16 @@ public:
 	SSDPoints();
 	~SSDPoints();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
 	void				Init(idGameSSDWindow* _game, SSDEntity* _ent, int _points, int _length, int _distance, const idVec4& color);
 	virtual void		EntityUpdate();
 
 	static SSDPoints*	GetNewPoints(idGameSSDWindow* _game, SSDEntity* _ent, int _points, int _length, int _distance, const idVec4& color);
 	static SSDPoints*	GetSpecificPoints(int id);
-	static void			WritePoints(idFile* savefile);
-	static void			ReadPoints(idFile* savefile, idGameSSDWindow* _game);
+	static void			WritePoints( idSaveGame *savefile);
+	static void			ReadPoints( idRestoreGame *savefile, idGameSSDWindow* _game);
 
 protected:
 	static SSDPoints	pointsPool[MAX_POINTS];
@@ -320,16 +321,16 @@ public:
 	SSDProjectile();
 	~SSDProjectile();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
 	void				Init(idGameSSDWindow* _game, const idVec3& _beginPosition, const idVec3& _endPosition, float _speed, float _size);
 	virtual void		EntityUpdate();
 
 	static SSDProjectile* GetNewProjectile(idGameSSDWindow* _game, const idVec3& _beginPosition, const idVec3& _endPosition, float _speed, float _size);
 	static SSDProjectile* GetSpecificProjectile(int id);
-	static void				WriteProjectiles(idFile* savefile);
-	static void				ReadProjectiles(idFile* savefile, idGameSSDWindow* _game);
+	static void				WriteProjectiles( idSaveGame *savefile );
+	static void				ReadProjectiles( idRestoreGame *savefile, idGameSSDWindow* _game);
 
 protected:
 	static SSDProjectile	projectilePool[MAX_PROJECTILES];
@@ -378,8 +379,8 @@ public:
 	SSDPowerup();
 	virtual ~SSDPowerup();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  );
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const;
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile,  idGameSSDWindow* _game  );
 
 	virtual void		OnHit(int key);
 	virtual void		OnStrikePlayer();
@@ -393,8 +394,8 @@ public:
 
 	static SSDPowerup* GetNewPowerup(idGameSSDWindow* _game, float _speed, float _rotation);
 	static SSDPowerup* GetSpecificPowerup(int id);
-	static void			WritePowerups(idFile* savefile);
-	static void			ReadPowerups(idFile* savefile, idGameSSDWindow* _game);
+	static void			WritePowerups( idSaveGame *savefile );
+	static void			ReadPowerups( idRestoreGame *savefile, idGameSSDWindow* _game);
 
 protected:
 	static SSDPowerup	powerupPool[MAX_POWERUPS];
@@ -488,8 +489,8 @@ public:
 	idGameSSDWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	~idGameSSDWindow();
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile );
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: unused
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile );
 
 	virtual const char*	HandleEvent(const sysEvent_t *event, bool *updateVisuals);
 	virtual idWinVar*	GetWinVarByName	(const char *_name, bool winLookup = false, drawWin_t** owner = NULL);

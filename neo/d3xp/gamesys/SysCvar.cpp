@@ -69,7 +69,80 @@ struct gameVersion_s {
 	char	string[256];
 } gameVersion;
 
+#define YEARINDEX 2
+#define MONTHINDEX 0
+#define DAYINDEX 1
+
+#define HOURINDEX 0
+#define MINUTEINDEX 1
+
+// SW 10th March 2025:
+// __DATE__ is formatted as Mmm dd yyyy but the dd has a leading space if the date number is less than 10
+// As you can probably tell by the date on this comment, I have run afoul of this. Fixing now.
+struct gameVersionShort_s {
+	gameVersionShort_s()
+	{
+		idStr date = __DATE__;
+		idStr time = __TIME__;
+		bool leadingSpace = false;
+
+		idList<idStr> dateSplits = date.Split(' ');
+		if (dateSplits.Num() > 3) // SW 10th March 2025
+		{
+			leadingSpace = true;
+		}
+
+		idList<idStr> months;
+		months.Append("");
+		months.Append("Jan");
+		months.Append("Feb");
+		months.Append("Mar");
+		months.Append("Apr");
+		months.Append("May");
+		months.Append("Jun");
+		months.Append("Jul");
+		months.Append("Aug");
+		months.Append("Sep");
+		months.Append("Oct");
+		months.Append("Nov");
+		months.Append("Dec");
+
+		string = dateSplits[YEARINDEX + (leadingSpace ? 1 : 0)]; //Year.
+		string += '.';
+		for (int i = 0; i < months.Num(); i++)
+		{
+			if (months[i] == dateSplits[MONTHINDEX]) //month
+			{				
+				string += idStr::Format("%02d", i);
+			}
+		}
+		string += '.';
+
+		if (dateSplits[DAYINDEX + (leadingSpace ? 1 : 0)].Length() <= 1)
+			string += idStr::Format("0%s", dateSplits[DAYINDEX + (leadingSpace ? 1 : 0)].c_str()); //day
+		else
+			string += dateSplits[DAYINDEX + (leadingSpace ? 1 : 0)]; //day
+
+		string += '.';
+
+		idList<idStr> timeSplits = time.Split(':');
+
+		if (timeSplits[HOURINDEX].Length() <= 1)
+			string += idStr::Format("0%s", timeSplits[HOURINDEX].c_str()); //hour
+		else
+			string += timeSplits[HOURINDEX]; //hour
+
+		if (timeSplits[MINUTEINDEX].Length() <= 1)
+			string += idStr::Format("0%s", timeSplits[MINUTEINDEX].c_str()); //minute
+		else
+			string += timeSplits[MINUTEINDEX]; //minute
+
+	}
+	idStr	string;
+} gameVersionShort;
+
 idCVar g_version(					"g_version",				gameVersion.string,	CVAR_GAME | CVAR_ROM, "game version" );
+idCVar g_versionShort(				"g_versionShort",			gameVersionShort.string, CVAR_GAME | CVAR_ROM, "game version (short)");
 
 // noset vars
 idCVar gamename(					"gamename",					GAME_VERSION,	CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "" );
@@ -110,7 +183,7 @@ idCVar ui_skin(						"ui_skin",				ui_skinArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO |
 idCVar ui_team(						"ui_team",				ui_teamArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "player team", ui_teamArgs, idCmdSystem::ArgCompletion_String<ui_teamArgs> );
 idCVar ui_autoSwitch(				"ui_autoSwitch",			"0",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto switch weapon" );
 idCVar ui_autoReload(				"ui_autoReload",			"0",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto reload weapon" );
-idCVar ui_showGun(					"ui_showGun",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "show gun" );
+idCVar ui_showGun(					"ui_showGun",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "(DEPRECATED NOT IN USE) show gun" );
 idCVar ui_ready(					"ui_ready",				si_readyArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "player is ready to start playing", idCmdSystem::ArgCompletion_String<si_readyArgs> );
 idCVar ui_spectate(					"ui_spectate",		si_spectateArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "play or spectate", idCmdSystem::ArgCompletion_String<si_spectateArgs> );
 idCVar ui_chat(						"ui_chat",					"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BOOL | CVAR_ROM | CVAR_CHEAT, "player is chatting" );
@@ -155,6 +228,7 @@ idCVar g_healthTakeTime(			"g_healthTakeTime",			"5",			CVAR_GAME | CVAR_INTEGER
 idCVar g_healthTakeAmt(				"g_healthTakeAmt",			"5",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "how much health to take in nightmare mode" );
 idCVar g_healthTakeLimit(			"g_healthTakeLimit",		"25",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "how low can health get taken in nightmare mode" );
 idCVar g_locbox(					"g_locbox",					"1",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "Localization box. 0 = always off, 1 = automatic, 2 = always on");
+idCVar g_locbox_minscreensize(		"g_locbox_minscreensize",	"1500",			CVAR_GAME | CVAR_FLOAT | CVAR_ARCHIVE, "Minimum area (in screen space coordinates) that a locbox must occupy before it is displayed."); // SW 12th March 2025
 idCVar g_onehitkill(				"g_onehitkill",				"0",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "Toggle one-hit kill accessibility option.");
 
 
@@ -344,7 +418,7 @@ idCVar pm_airlessCrouch(			"pm_airlessCrouch",			"1",			CVAR_GAME | CVAR_NETWORK
 
 
 
-idCVar g_showPlayerShadow(			"g_showPlayerShadow",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enables shadow of player model" );
+idCVar g_showPlayerShadow(			"g_showPlayerShadow",		"1",			CVAR_GAME | CVAR_BOOL, "enables shadow of player model" );
 idCVar g_showHud(					"g_showHud",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "" );
 idCVar g_showProjectilePct(			"g_showProjectilePct",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enables display of player hit percentage" );
 idCVar g_showBrass(					"g_showBrass",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enables ejected shells from weapon" );
@@ -441,7 +515,7 @@ idCVar g_showmodel(					"g_showmodel",				"0",			CVAR_GAME | CVAR_BOOL, "Show mo
 idCVar g_showEntityHealth(			"g_showEntityHealth",		"0",			CVAR_GAME | CVAR_BOOL, "Show health of entities.");
 idCVar g_screenshake(				"g_screenshake",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enable screenshake.");
 idCVar g_headbob(					"g_headbob",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enable headbob.");
-idCVar g_showPlayerBody(			"g_showPlayerBody",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enables first person player model");
+idCVar g_showPlayerBody(			"g_showPlayerBody",			"1",			CVAR_GAME | CVAR_BOOL, "enables first person player model");
 idCVar g_hiteffects(				"g_hiteffects",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "enable player fullscreen hit effects.");
 idCVar g_clambermaxheight(			"g_clambermaxheight",		"144",			CVAR_GAME | CVAR_INTEGER, "Clamp maximum height the player can clamber.");
 idCVar g_savingthrows(				"g_savingthrows",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "toggle saving throw system");
@@ -539,6 +613,11 @@ idCVar g_showModelNames("g_showmodelnames", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_
 
 idCVar g_eventhighlighter("g_eventhighlighter", "1", CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enables event highlighter.");
 
+idCVar g_showIntro("g_showIntro", "1", CVAR_SYSTEM | CVAR_BOOL | CVAR_ARCHIVE, "show intro.");
+
+//BC 2-20-2025: impact slowmo toggle.
+idCVar g_impactslowmo("g_impactslowmo", "1", CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enables impact slowmo.");
+
 idCVar g_froboutline("g_froboutline", "1", CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "enables frob outline.");
 
 idCVar gamepad_rumble_intensity("gamepad_rumble_intensity", "0.5", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ARCHIVE, "intensity of controller/gamepad rumble/vibrate/haptic, 0 to disable, 1 high, >1 overdrive", 0.0f, 1000.0f);
@@ -551,3 +630,8 @@ idCVar gamepad_rumble_enable("gamepad_rumble_enable", "1", CVAR_SYSTEM | CVAR_BO
 
 idCVar s_aiMuffleDoor( "s_aiMuffleDoor", "1.0", CVAR_CHEAT | CVAR_SOUND | CVAR_FLOAT, "reduce distance AI hears past a door with this percent [0.0f,1.0f] (0.0 = no reduction, 0.5f = half distance, 1.0 = silent)", 0.0f, 1.0f);
 idCVar s_aiMuffleCorner( "s_aiMuffleCorner", "0.1", CVAR_CHEAT | CVAR_SOUND | CVAR_FLOAT, "reduce distance AI hears around a corner with this percent [0.0f,1.0f] (0.0 = no reduction, 0.5f = half distance, 1.0 = silent)", 0.0f, 1.0f);
+
+idCVar g_pauseOnFocusLost("g_pauseOnFocusLost", "1", CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "If true, game pauses when focus is lost.");
+
+//BC 3-14-2025 g_showtimer
+idCVar g_showtimer("g_showtimer", "0", CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "Show mission timer.");

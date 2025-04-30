@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #define __PHYSICS_PLAYER_H__
 
 #include "physics/Physics_Actor.h"
+#include "Mover.h"
 
 /*
 ===================================================================================
@@ -121,7 +122,7 @@ public:
 
 							idPhysics_Player( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 							// initialisation
@@ -207,6 +208,10 @@ public:	// common physics interface
 	void					StartGrabRing(idVec3 grabPosition, idEntity *grabring);
 	bool					GetGrabringState();
 
+	// SW 17th Feb 2025
+	void					SetVacuumSplineMover(idMover* mover);
+	idMover*				GetVacuumSplineMover(void);
+
 	//END BC PUBLIC
 
 private:
@@ -279,15 +284,15 @@ public:
 	bool					TryClamber(bool checkFromCrouch = false, int numIterations = 4);
 	bool					TryClamberOutOfCubby(bool checkInCubby); // blendo eric: clambers out of cubby if there's clearance nearby to stand
 private:
-	idVec3					GetPossibleClamberPos_Ledge(int numIterations);
-	idVec3					GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, int numIterations);
+	idVec3					GetPossibleClamberPos_Ledge(int numIterations, idVec3 & startingPosOut);
+	idVec3					GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, int numIterations, idVec3 & startingPosOut);
 	idVec3					GetPossibleClamberPos_Cubby(idVec3 eyePos, int numIterations);
 	float					GetClamberLerp(void);
 	idVec3					CheckClamberBounds(idVec3 basePos, idVec3 sweepStart, bool doExtraChecks = true);
 	idVec3					CheckClamberBounds(idVec3 basePos, bool doExtraChecks = true){ return CheckClamberBounds(basePos,basePos,doExtraChecks); }
-	void					StartClamber(idVec3 targetPos, float raiseTimeScale, float settleTimeScale, float verticalMix, float horiztonalMix, bool forceDuck);
-	void					StartClamber(idVec3 targetPos);
-	void					StartClamberQuick(idVec3 targetPos);
+	void					StartClamber(idVec3 targetPos, idVec3 shiftBack, float raiseTimeScale, float settleTimeScale, float verticalMix, float horiztonalMix, bool forceDuck, bool ignoreLipCheck = false);
+	void					StartClamber(idVec3 targetPos, idVec3 shiftBack = vec3_zero);
+	void					StartClamberQuick(idVec3 targetPos, idVec3  shiftBack = vec3_zero);
 	int						GetClamberMaxHeightLocal();
 	int						GetClamberMaxHeightWorld();
 	int						CheckClamberHeight(float z);
@@ -395,6 +400,10 @@ private:
 	int						spacenudgeState;
 	enum                    { SN_NONE, SN_RAMPINGUP, SN_NUDGING };
 	int						spacenudgeRampTimer;
+
+	// SW 17th Feb 2025
+	void					UpdateVacuumSplineMoving(void);
+	idEntityPtr<idMover>	vacuumSplineMover;
 
 	//BC PRIVATE END
 

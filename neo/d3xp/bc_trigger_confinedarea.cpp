@@ -10,6 +10,8 @@ END_CLASS
 
 idTrigger_confinedarea::idTrigger_confinedarea()
 {
+	confinedNode.SetOwner(this);
+	confinedNode.AddToEnd(gameLocal.confinedEntities);
 }
 
 idTrigger_confinedarea::~idTrigger_confinedarea(void)
@@ -29,12 +31,25 @@ void idTrigger_confinedarea::Spawn()
 	playerEnterAngle = 0;
 	adjustedBaseAngle = 0;
 
-	confinedNode.SetOwner(this);
-	confinedNode.AddToEnd(gameLocal.confinedEntities);
-
 	gameLocal.DoOriginContainmentCheck(this);
 }
 
+void idTrigger_confinedarea::Save(idSaveGame* savefile) const
+{
+	savefile->WriteFloat( adjustedBaseAngle ); // float adjustedBaseAngle
+	savefile->WriteFloat( baseAngle ); // float baseAngle
+	savefile->WriteFloat( playerEnterAngle ); // float playerEnterAngle
+
+	savefile->WriteInt( lastUpdatetime ); // int lastUpdatetime
+}
+void idTrigger_confinedarea::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadFloat( adjustedBaseAngle ); // float adjustedBaseAngle
+	savefile->ReadFloat( baseAngle ); // float baseAngle
+	savefile->ReadFloat( playerEnterAngle ); // float playerEnterAngle
+
+	savefile->ReadInt( lastUpdatetime ); // int lastUpdatetime
+}
 
 void idTrigger_confinedarea::Event_Touch(idEntity* other, trace_t* trace)
 {

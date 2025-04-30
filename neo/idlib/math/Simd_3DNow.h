@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MATH_SIMD_3DNOW_H__
 #define __MATH_SIMD_3DNOW_H__
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "idlib/math/Simd_MMX.h"
 
 /*
@@ -49,4 +51,5 @@ public:
 #endif
 };
 
-#endif /* !__MATH_SIMD_3DNOW_H__ */
+#endif
+#endif

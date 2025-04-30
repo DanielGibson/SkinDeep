@@ -72,7 +72,7 @@ public:
 							idPhysics_Parametric( void );
 							~idPhysics_Parametric( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					SetPusher( int flags );

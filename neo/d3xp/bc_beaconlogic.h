@@ -10,12 +10,15 @@ public:
 							~idBeaconLogic();
 	void					Spawn();
 
+	void					Save(idSaveGame* savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame* savefile);
+
 	virtual void			Think(void);
 
 	void					FlashConfirm();
 
 	bool					validLandingPosition;
-	idEntity				*placerEnt;
+	idEntity				*placerEnt = nullptr;
 
 	bool					HasLockedOn();
 
@@ -23,8 +26,8 @@ public:
 
 private:
 	
-	idBeam*					lasersightbeam;
-	idBeam*					lasersightbeamTarget;
+	idBeam*					lasersightbeam = nullptr;
+	idBeam*					lasersightbeamTarget = nullptr;
 
 	
 
@@ -36,7 +39,7 @@ private:
 
 	void					DeployConfirmation(bool force);
 
-	idEntity				*tubeEnt;
+	idEntity				*tubeEnt = nullptr;
 
 	idVec3					FindAlternateLaunchPosition(idVec3 destinationPoint);
 	idVec3					podLaunchPosition;

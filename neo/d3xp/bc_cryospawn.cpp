@@ -5,6 +5,7 @@
 #include "Player.h"
 #include "Fx.h"
 #include "framework/DeclEntityDef.h"
+#include "idlib/LangDict.h"
 
 
 #include "bc_cryospawn.h"
@@ -27,6 +28,7 @@ END_CLASS
 
 idCryospawn::idCryospawn(void)
 {
+	locbox = NULL;
 }
 
 idCryospawn::~idCryospawn(void)
@@ -38,6 +40,17 @@ void idCryospawn::Spawn(void)
 	stateTimer = 0;
 	state = OPEN;
 
+	//3-24-2025: locbox
+	#define LOCBOXRADIUS 8
+	idDict args;
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_def_gameplay_commando"));
+	args.SetVector("origin", GetPhysics()->GetOrigin() + idVec3(0,0,-8));
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	locbox = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+
 	BecomeInactive(TH_THINK);
 }
 
@@ -45,10 +58,18 @@ void idCryospawn::Spawn(void)
 
 void idCryospawn::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteObject( locbox ); // idEntity* locbox
 }
 
 void idCryospawn::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadObject( locbox ); // idEntity* locbox
 }
 
 
@@ -104,6 +125,9 @@ void idCryospawn::Think(void)
 				//StartSound("snd_despawn", SND_CHANNEL_ANY, 0, false, NULL); //TODO: Make this only play if player is looking at it, has LOS to it.
 				this->PostEventMS(&EV_Remove, 500);
 				this->Hide();
+
+				//BC 3-24-2025: locbox.
+				locbox->Hide();
 			}
 		}
 	}

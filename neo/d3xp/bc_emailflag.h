@@ -13,7 +13,7 @@ public:
 							idEmailflag(void);
 	virtual					~idEmailflag(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -31,7 +31,8 @@ private:
 
 	int						idleTimer;
 
-
+	//BC 3-22-2025: locbox for emailflag.
+	idEntity*				locbox = nullptr;
 
 };
 //#pragma once

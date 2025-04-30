@@ -1387,7 +1387,11 @@ void idPhysics_Player::CheckGround( void ) {
 	// let the entity know about the collision
 	self->Collide( groundTrace, current.velocity );
 
-	if ( groundEntityPtr.GetEntity() ) {
+	// SW 26th Feb 2025:
+	// Don't push our ground contact if it's a monster the player is jockeying!
+	// This causes the player (and the monster) to build up ridiculous speeds while ascending ramps
+	// (I'd like to make it speedrun-exploitable, but it happens so consistently it just reads as a bug)
+	if ( groundEntityPtr.GetEntity() && !gameLocal.GetLocalPlayer()->IsJockeying()) {
 		impactInfo_t info;
 		groundEntityPtr.GetEntity()->GetImpactInfo( self, groundTrace.c.id, groundTrace.c.point, &info );
 		if ( info.invMass != 0.0f ) {
@@ -1600,8 +1604,18 @@ idPhysics_Player::CheckJump
 */
 bool idPhysics_Player::CheckJump( void )
 {
+	// SW 9th April 2025: Moving this to the top so it isn't affected by player's fallen state 
+	// (it's possible to jockey from a fallen state and still technically be fallen)
+	if (gameLocal.GetLocalPlayer()->IsJockeying() && command.upmove >= 10)
+	{
+		//Player is jockeying. Don't do a normal jump. Exit jockey state.
+		gameLocal.GetLocalPlayer()->SetJockeyMode(false);
+		current.movementFlags |= PMF_JUMP_HELD;
+		return false;
+	}
+
 	// SM: If already in a jump don't jump again
-	if ( inJump )
+ 	if ( inJump )
 		return false;
 
 	//if (gameLocal.GetLocalPlayer()->inDownedState || gameLocal.GetLocalPlayer()->IsInMech() || gameLocal.GetLocalPlayer()->IsInHealState())
@@ -1634,14 +1648,6 @@ bool idPhysics_Player::CheckJump( void )
 		return false;
 	}
 	if (current.movementFlags & PMF_DUCKED && !gameLocal.GetLocalPlayer()->inDownedState) {
-		return false;
-	}
-
-	if (gameLocal.GetLocalPlayer()->IsJockeying() && command.upmove >= 10 )
-	{
-		//Player is jockeying. Don't do a normal jump. Exit jockey state.
-		gameLocal.GetLocalPlayer()->SetJockeyMode(false);		
-		current.movementFlags |= PMF_JUMP_HELD;
 		return false;
 	}
 
@@ -2050,6 +2056,12 @@ void idPhysics_Player::MovePlayer(int msec)
 
 	// if no movement at all
 	if (current.movementType == PM_FREEZE) {
+		// SW 10th March 2025:
+		// Check jump if the player is jockeying (we need to let them jump off)
+		if (gameLocal.GetLocalPlayer()->IsJockeying())
+		{
+			idPhysics_Player::CheckJump();
+		}
 		return;
 	}
 
@@ -2147,6 +2159,11 @@ void idPhysics_Player::MovePlayer(int msec)
 	else if (swoopState != SWOOPSTATE_NONE)
 	{
 		idPhysics_Player::UpdateSwooping();
+	}
+	else if (vacuumSplineMover.IsValid())
+	{
+		idPhysics_Player::UpdateVacuumSplineMoving();
+		idPhysics_Player::SlideMove(false, true, true, true);
 	}
 	else if (ladder)
 	{
@@ -2380,6 +2397,11 @@ idPhysics_Player::idPhysics_Player( void ) {
 	spacenudgeRampTimer = 0;
 	spacenudgeState = SN_NONE;
 
+	vacuumSplineMover = NULL;
+
+	swoopStartEnt = 0;
+	swoopEndEnt = 0;
+
 	//BC INIT
 	//BC RESET
 }
@@ -2390,14 +2412,14 @@ idPhysics_Player_SavePState
 ================
 */
 void idPhysics_Player_SavePState( idSaveGame *savefile, const playerPState_t &state ) {
-	savefile->WriteVec3( state.origin );
-	savefile->WriteVec3( state.velocity );
-	savefile->WriteVec3( state.localOrigin );
-	savefile->WriteVec3( state.pushVelocity );
-	savefile->WriteFloat( state.stepUp );
-	savefile->WriteInt( state.movementType );
-	savefile->WriteInt( state.movementFlags );
-	savefile->WriteInt( state.movementTime );
+	savefile->WriteVec3( state.origin ); //  idVec3 origin
+	savefile->WriteVec3( state.velocity ); //  idVec3 velocity
+	savefile->WriteVec3( state.localOrigin ); //  idVec3 localOrigin
+	savefile->WriteVec3( state.pushVelocity ); //  idVec3 pushVelocity
+	savefile->WriteFloat( state.stepUp ); //  float stepUp
+	savefile->WriteInt( state.movementType ); //  int movementType
+	savefile->WriteInt( state.movementFlags ); //  int movementFlags
+	savefile->WriteInt( state.movementTime ); //  int movementTime
 }
 
 /*
@@ -2406,14 +2428,14 @@ idPhysics_Player_RestorePState
 ================
 */
 void idPhysics_Player_RestorePState( idRestoreGame *savefile, playerPState_t &state ) {
-	savefile->ReadVec3( state.origin );
-	savefile->ReadVec3( state.velocity );
-	savefile->ReadVec3( state.localOrigin );
-	savefile->ReadVec3( state.pushVelocity );
-	savefile->ReadFloat( state.stepUp );
-	savefile->ReadInt( state.movementType );
-	savefile->ReadInt( state.movementFlags );
-	savefile->ReadInt( state.movementTime );
+	savefile->ReadVec3( state.origin ); //  idVec3 origin
+	savefile->ReadVec3( state.velocity ); //  idVec3 velocity
+	savefile->ReadVec3( state.localOrigin ); //  idVec3 localOrigin
+	savefile->ReadVec3( state.pushVelocity ); //  idVec3 pushVelocity
+	savefile->ReadFloat( state.stepUp ); //  float stepUp
+	savefile->ReadInt( state.movementType ); //  int movementType
+	savefile->ReadInt( state.movementFlags ); //  int movementFlags
+	savefile->ReadInt( state.movementTime ); //  int movementTime
 }
 
 /*
@@ -2422,35 +2444,106 @@ idPhysics_Player::Save
 ================
 */
 void idPhysics_Player::Save( idSaveGame *savefile ) const {
-
-	idPhysics_Player_SavePState( savefile, current );
-	idPhysics_Player_SavePState( savefile, saved );
-
-	savefile->WriteFloat( walkSpeed );
-	savefile->WriteFloat( crouchSpeed );
-	savefile->WriteFloat( maxStepHeight );
-	savefile->WriteFloat( maxJumpHeight );
-	savefile->WriteInt( debugLevel );
-
-	savefile->WriteUsercmd( command );
-	savefile->WriteAngles( viewAngles );
-
-	savefile->WriteInt( framemsec );
-	savefile->WriteFloat( frametime );
-	savefile->WriteFloat( playerSpeed );
-	savefile->WriteVec3( viewForward );
-	savefile->WriteVec3( viewRight );
-
-	savefile->WriteBool( walking );
-	savefile->WriteBool( groundPlane );
-	savefile->WriteTrace( groundTrace );
-	savefile->WriteMaterial( groundMaterial );
-
-	savefile->WriteBool( ladder );
-	savefile->WriteVec3( ladderNormal );
-
-	savefile->WriteInt( (int)waterLevel );
-	savefile->WriteInt( waterType );
+	savefile->WriteInt( hideType ); //  int hideType
+	
+	idPhysics_Player_SavePState( savefile, current ); //  playerPState_t current
+	idPhysics_Player_SavePState( savefile, saved ); //  playerPState_t saved
+	
+	savefile->WriteFloat( walkSpeed ); //  float walkSpeed
+	savefile->WriteFloat( crouchSpeed ); //  float crouchSpeed
+	savefile->WriteFloat( maxStepHeight ); //  float maxStepHeight
+	savefile->WriteFloat( maxJumpHeight ); //  float maxJumpHeight
+	savefile->WriteInt( debugLevel ); //  int debugLevel
+	savefile->WriteUsercmd( command ); //  usercmd_t command
+	savefile->WriteAngles( viewAngles ); //  idAngles viewAngles
+	savefile->WriteInt( framemsec ); //  int framemsec
+	savefile->WriteFloat( frametime ); //  float frametime
+	savefile->WriteFloat( playerSpeed ); //  float playerSpeed
+	savefile->WriteVec3( viewForward ); //  idVec3 viewForward
+	savefile->WriteVec3( viewRight ); //  idVec3 viewRight
+	savefile->WriteBool( walking ); //  bool walking
+	savefile->WriteBool( groundPlane ); //  bool groundPlane
+	savefile->WriteTrace( groundTrace ); //  trace_t groundTrace
+	savefile->WriteMaterial( groundMaterial ); // const  idMaterial * groundMaterial
+	savefile->WriteBool( ladder ); //  bool ladder
+	savefile->WriteVec3( ladderNormal ); //  idVec3 ladderNormal
+	savefile->WriteInt( waterLevel ); //  waterLevel_t waterLevel
+	savefile->WriteInt( waterType ); //  int waterType
+	
+	savefile->WriteInt( clamberState ); //  int clamberState
+	savefile->WriteVec3( clamberOrigin ); //  idVec3 clamberOrigin
+	savefile->WriteVec3( clamberTransition ); //  idVec3 clamberTransition
+	savefile->WriteVec3( clamberDestination ); //  idVec3 clamberDestination
+	savefile->WriteInt( clamberStartTime ); //  int clamberStartTime
+	savefile->WriteInt( clamberStateTime ); //  int clamberStateTime
+	savefile->WriteFloat( clamberTotalMoveTime ); //  float clamberTotalMoveTime
+	savefile->WriteBool( clamberForceDuck ); //  bool clamberForceDuck
+	savefile->WriteVec3( clamberGroundPosInitial ); //  idVec3 clamberGroundPosInitial
+	savefile->WriteVec3( clamberGroundPosCurrent ); //  idVec3 clamberGroundPosCurrent
+	
+	savefile->WriteInt( acroUpdateTimer ); //  int acroUpdateTimer
+	
+	savefile->WriteInt( acroType ); //  int acroType
+	savefile->WriteFloat( acroAngle ); //  float acroAngle
+	savefile->WriteVec3( lastgoodAcroPosition ); //  idVec3 lastgoodAcroPosition
+	savefile->WriteFloat( acroViewAngleArc ); //  float acroViewAngleArc
+	savefile->WriteInt( dashStartTime ); //  int dashStartTime
+	savefile->WriteInt( dashWarningTimer ); //  int dashWarningTimer
+	savefile->WriteFloat( dashSlopeScale ); //  float dashSlopeScale
+	
+	savefile->WriteBool( inJump ); //  bool inJump
+	savefile->WriteInt( coyotetimeTimer ); //  int coyotetimeTimer
+	
+	savefile->WriteInt( ladderLerpTimer ); //  int ladderLerpTimer
+	savefile->WriteBool( ladderLerpActive ); //  bool ladderLerpActive
+	savefile->WriteVec3( ladderLerpTarget ); //  idVec3 ladderLerpTarget
+	savefile->WriteVec3( ladderLerpStart ); //  idVec3 ladderLerpStart
+	savefile->WriteInt( ladderTimer ); //  int ladderTimer
+	
+	savefile->WriteInt( fallenState ); //  int fallenState
+	savefile->WriteInt( fallenTimer ); //  int fallenTimer
+	
+	savefile->WriteInt( forceduckTimer ); //  int forceduckTimer
+	
+	savefile->WriteInt( zippingState ); //  int zippingState
+	savefile->WriteInt( zippingTimer ); //  int zippingTimer
+	savefile->WriteVec3( zippingOrigin ); //  idVec3 zippingOrigin
+	savefile->WriteVec3( zippingCameraStart ); //  idVec3 zippingCameraStart
+	savefile->WriteVec3( zippingCameraEnd ); //  idVec3 zippingCameraEnd
+	savefile->WriteVec3( zippingCameraMidpoint ); //  idVec3 zippingCameraMidpoint
+	savefile->WriteFloat( zipForceDuckDuration ); //  float zipForceDuckDuration
+	
+	savefile->WriteInt( swoopState ); //  int swoopState
+	savefile->WriteInt( swoopTimer ); //  int swoopTimer
+	savefile->WriteVec3( swoopStartPoint ); //  idVec3 swoopStartPoint
+	savefile->WriteVec3( swoopDestinationPoint ); //  idVec3 swoopDestinationPoint
+	savefile->WriteObject( swoopStartEnt ); //  idEntity * swoopStartEnt
+	savefile->WriteObject( swoopEndEnt ); //  idEntity * swoopEndEnt
+	savefile->WriteInt( swoopParticletype ); //  int swoopParticletype
+	
+	savefile->WriteObject( cargohideEnt ); //  idEntityPtr<idEntity> cargohideEnt
+	
+	savefile->WriteVec3( movelerpStartPoint ); //  idVec3 movelerpStartPoint
+	savefile->WriteVec3( movelerpDestinationPoint ); //  idVec3 movelerpDestinationPoint
+	savefile->WriteInt( movelerpTimer ); //  int movelerpTimer
+	savefile->WriteBool( movelerping ); //  bool movelerping
+	savefile->WriteInt( movelerp_Duration ); //  int movelerp_Duration
+	
+	savefile->WriteInt( nextAutocrouchChecktime ); //  int nextAutocrouchChecktime
+	savefile->WriteVec3( grabringStartPos ); //  idVec3 grabringStartPos
+	savefile->WriteVec3( grabringDestinationPos ); //  idVec3 grabringDestinationPos
+	savefile->WriteInt( grabringTimer ); //  int grabringTimer
+	savefile->WriteInt( grabringState ); //  int grabringState
+	
+	savefile->WriteObject( grabringEnt ); //  idEntityPtr<idEntity> grabringEnt
+	
+	savefile->WriteBool( canFlymoveUp ); //  bool canFlymoveUp
+	
+	savefile->WriteInt( lastAirlessMoveTime ); //  int lastAirlessMoveTime
+	savefile->WriteInt( spacenudgeState ); //  int spacenudgeState
+	
+	savefile->WriteInt( spacenudgeRampTimer ); //  int spacenudgeRampTimer
+	vacuumSplineMover.Save( savefile ); //  idEntityPtr<idMover> vacuumSplineMover
 }
 
 /*
@@ -2460,34 +2553,106 @@ idPhysics_Player::Restore
 */
 void idPhysics_Player::Restore( idRestoreGame *savefile ) {
 
-	idPhysics_Player_RestorePState( savefile, current );
-	idPhysics_Player_RestorePState( savefile, saved );
-
-	savefile->ReadFloat( walkSpeed );
-	savefile->ReadFloat( crouchSpeed );
-	savefile->ReadFloat( maxStepHeight );
-	savefile->ReadFloat( maxJumpHeight );
-	savefile->ReadInt( debugLevel );
-
-	savefile->ReadUsercmd( command );
-	savefile->ReadAngles( viewAngles );
-
-	savefile->ReadInt( framemsec );
-	savefile->ReadFloat( frametime );
-	savefile->ReadFloat( playerSpeed );
-	savefile->ReadVec3( viewForward );
-	savefile->ReadVec3( viewRight );
-
-	savefile->ReadBool( walking );
-	savefile->ReadBool( groundPlane );
-	savefile->ReadTrace( groundTrace );
-	savefile->ReadMaterial( groundMaterial );
-
-	savefile->ReadBool( ladder );
-	savefile->ReadVec3( ladderNormal );
-
-	savefile->ReadInt( (int &)waterLevel );
-	savefile->ReadInt( waterType );
+	savefile->ReadInt( hideType ); //  int hideType
+	
+	idPhysics_Player_RestorePState( savefile, current ); //  playerPState_t current
+	idPhysics_Player_RestorePState( savefile, saved ); //  playerPState_t saved
+	
+	savefile->ReadFloat( walkSpeed ); //  float walkSpeed
+	savefile->ReadFloat( crouchSpeed ); //  float crouchSpeed
+	savefile->ReadFloat( maxStepHeight ); //  float maxStepHeight
+	savefile->ReadFloat( maxJumpHeight ); //  float maxJumpHeight
+	savefile->ReadInt( debugLevel ); //  int debugLevel
+	savefile->ReadUsercmd( command ); //  usercmd_t command
+	savefile->ReadAngles( viewAngles ); //  idAngles viewAngles
+	savefile->ReadInt( framemsec ); //  int framemsec
+	savefile->ReadFloat( frametime ); //  float frametime
+	savefile->ReadFloat( playerSpeed ); //  float playerSpeed
+	savefile->ReadVec3( viewForward ); //  idVec3 viewForward
+	savefile->ReadVec3( viewRight ); //  idVec3 viewRight
+	savefile->ReadBool( walking ); //  bool walking
+	savefile->ReadBool( groundPlane ); //  bool groundPlane
+	savefile->ReadTrace( groundTrace ); //  trace_t groundTrace
+	savefile->ReadMaterial( groundMaterial ); // const  idMaterial * groundMaterial
+	savefile->ReadBool( ladder ); //  bool ladder
+	savefile->ReadVec3( ladderNormal ); //  idVec3 ladderNormal
+	savefile->ReadInt( (int&)waterLevel ); //  waterLevel_t waterLevel
+	savefile->ReadInt( waterType ); //  int waterType
+	
+	savefile->ReadInt( clamberState ); //  int clamberState
+	savefile->ReadVec3( clamberOrigin ); //  idVec3 clamberOrigin
+	savefile->ReadVec3( clamberTransition ); //  idVec3 clamberTransition
+	savefile->ReadVec3( clamberDestination ); //  idVec3 clamberDestination
+	savefile->ReadInt( clamberStartTime ); //  int clamberStartTime
+	savefile->ReadInt( clamberStateTime ); //  int clamberStateTime
+	savefile->ReadFloat( clamberTotalMoveTime ); //  float clamberTotalMoveTime
+	savefile->ReadBool( clamberForceDuck ); //  bool clamberForceDuck
+	savefile->ReadVec3( clamberGroundPosInitial ); //  idVec3 clamberGroundPosInitial
+	savefile->ReadVec3( clamberGroundPosCurrent ); //  idVec3 clamberGroundPosCurrent
+	
+	savefile->ReadInt( acroUpdateTimer ); //  int acroUpdateTimer
+	
+	savefile->ReadInt( acroType ); //  int acroType
+	savefile->ReadFloat( acroAngle ); //  float acroAngle
+	savefile->ReadVec3( lastgoodAcroPosition ); //  idVec3 lastgoodAcroPosition
+	savefile->ReadFloat( acroViewAngleArc ); //  float acroViewAngleArc
+	savefile->ReadInt( dashStartTime ); //  int dashStartTime
+	savefile->ReadInt( dashWarningTimer ); //  int dashWarningTimer
+	savefile->ReadFloat( dashSlopeScale ); //  float dashSlopeScale
+	
+	savefile->ReadBool( inJump ); //  bool inJump
+	savefile->ReadInt( coyotetimeTimer ); //  int coyotetimeTimer
+	
+	savefile->ReadInt( ladderLerpTimer ); //  int ladderLerpTimer
+	savefile->ReadBool( ladderLerpActive ); //  bool ladderLerpActive
+	savefile->ReadVec3( ladderLerpTarget ); //  idVec3 ladderLerpTarget
+	savefile->ReadVec3( ladderLerpStart ); //  idVec3 ladderLerpStart
+	savefile->ReadInt( ladderTimer ); //  int ladderTimer
+	
+	savefile->ReadInt( fallenState ); //  int fallenState
+	savefile->ReadInt( fallenTimer ); //  int fallenTimer
+	
+	savefile->ReadInt( forceduckTimer ); //  int forceduckTimer
+	
+	savefile->ReadInt( zippingState ); //  int zippingState
+	savefile->ReadInt( zippingTimer ); //  int zippingTimer
+	savefile->ReadVec3( zippingOrigin ); //  idVec3 zippingOrigin
+	savefile->ReadVec3( zippingCameraStart ); //  idVec3 zippingCameraStart
+	savefile->ReadVec3( zippingCameraEnd ); //  idVec3 zippingCameraEnd
+	savefile->ReadVec3( zippingCameraMidpoint ); //  idVec3 zippingCameraMidpoint
+	savefile->ReadFloat( zipForceDuckDuration ); //  float zipForceDuckDuration
+	
+	savefile->ReadInt( swoopState ); //  int swoopState
+	savefile->ReadInt( swoopTimer ); //  int swoopTimer
+	savefile->ReadVec3( swoopStartPoint ); //  idVec3 swoopStartPoint
+	savefile->ReadVec3( swoopDestinationPoint ); //  idVec3 swoopDestinationPoint
+	savefile->ReadObject( swoopStartEnt ); //  idEntity * swoopStartEnt
+	savefile->ReadObject( swoopEndEnt ); //  idEntity * swoopEndEnt
+	savefile->ReadInt( swoopParticletype ); //  int swoopParticletype
+	
+	savefile->ReadObject( cargohideEnt ); //  idEntityPtr<idEntity> cargohideEnt
+	
+	savefile->ReadVec3( movelerpStartPoint ); //  idVec3 movelerpStartPoint
+	savefile->ReadVec3( movelerpDestinationPoint ); //  idVec3 movelerpDestinationPoint
+	savefile->ReadInt( movelerpTimer ); //  int movelerpTimer
+	savefile->ReadBool( movelerping ); //  bool movelerping
+	savefile->ReadInt( movelerp_Duration ); //  int movelerp_Duration
+	
+	savefile->ReadInt( nextAutocrouchChecktime ); //  int nextAutocrouchChecktime
+	savefile->ReadVec3( grabringStartPos ); //  idVec3 grabringStartPos
+	savefile->ReadVec3( grabringDestinationPos ); //  idVec3 grabringDestinationPos
+	savefile->ReadInt( grabringTimer ); //  int grabringTimer
+	savefile->ReadInt( grabringState ); //  int grabringState
+	
+	savefile->ReadObject( grabringEnt ); //  idEntityPtr<idEntity> grabringEnt
+	
+	savefile->ReadBool( canFlymoveUp ); //  bool canFlymoveUp
+	
+	savefile->ReadInt( lastAirlessMoveTime ); //  int lastAirlessMoveTime
+	savefile->ReadInt( spacenudgeState ); //  int spacenudgeState
+	
+	savefile->ReadInt( spacenudgeRampTimer ); //  int spacenudgeRampTimer
+	vacuumSplineMover.Restore( savefile ); //  idEntityPtr<idMover> vacuumSplineMover
 }
 
 /*
@@ -3126,23 +3291,24 @@ bool idPhysics_Player::TryClamber(bool checkFromCrouch, int numIterations)
 		clamberGroundPosCurrent.z = Min(clamberGroundPosCurrent.z,current.origin.z);
 	}
 
-	if ( pm_debugclamber.GetInteger() >= 511 )
+	if ( pm_debugclamber.GetInteger() >= 511 ) // 511 = 0001 1111 1111
 	{
 		gameRenderWorld->DebugClearLines(0);
 		gameRenderWorld->DebugClearLines(gameLocal.time);
 	}
 
-
 	if ( pm_debugclamber.GetInteger() != 0 )
 	{
-		gameRenderWorld->DebugCircle( colorCyan, clamberGroundPosInitial, idVec3::Up(), DEBUG_CLAMBER_SIZE, pm_debugclambertime.GetInteger());
+		gameRenderWorld->DebugCircle( colorCyan, clamberGroundPosInitial, idVec3::Up(), DEBUG_CLAMBER_SIZE, 5, pm_debugclambertime.GetInteger());
 	}
+
+	idVec3 shiftBack = vec3_zero;
 
 	//prioritize the 2 clamber checks based on view pitch.
 	if (viewAngles.pitch < ACRO_CLAMBER_PITCHTHRESHOLD)
 	{
 		//player is looking upward. prioritize the high ledge check.
-		clamberCandidatePos = GetPossibleClamberPos_Ledge(numIterations);
+		clamberCandidatePos = GetPossibleClamberPos_Ledge(numIterations, shiftBack);
 
 		if (clamberCandidatePos == vec3_zero)
 		{
@@ -3160,7 +3326,7 @@ bool idPhysics_Player::TryClamber(bool checkFromCrouch, int numIterations)
 		{
 			//failed the cubby check.
 			//attempt the ledge check.
-			clamberCandidatePos = GetPossibleClamberPos_Ledge(numIterations);
+			clamberCandidatePos = GetPossibleClamberPos_Ledge(numIterations, shiftBack);
 			
 			if (clamberCandidatePos == vec3_zero)
 			{
@@ -3222,7 +3388,7 @@ bool idPhysics_Player::TryClamber(bool checkFromCrouch, int numIterations)
 	}
 	else
 	{
-		StartClamber(clamberCandidatePos);
+		StartClamber(clamberCandidatePos, shiftBack);
 		((idPlayer *)self)->SetViewPitchLerp(ACRO_CLAMBER_TRACELENGTH);
 	}
 	return true;
@@ -3366,19 +3532,19 @@ bool idPhysics_Player::TryClamberOutOfCubby(bool checkInCubby)
 	return true;
 }
 
-void idPhysics_Player::StartClamber( idVec3 targetPos )
+void idPhysics_Player::StartClamber( idVec3 targetPos, idVec3 shiftBack )
 {
 	// defaults from previous rev
-	idPhysics_Player::StartClamber( targetPos, CLAMBER_MOVETIMESCALAR, CLAMBER_SETTLETIMESCALAR, 1.0f, 0.3f, true );
+	idPhysics_Player::StartClamber( targetPos, shiftBack, CLAMBER_MOVETIMESCALAR, CLAMBER_SETTLETIMESCALAR, 1.0f, 0.3f, true );
 }
 
-void idPhysics_Player::StartClamberQuick( idVec3 targetPos )
+void idPhysics_Player::StartClamberQuick( idVec3 targetPos, idVec3 shiftBack )
 { // easy clamber smooths horiztonal motion, without ducking
 	float newClamberTimeScale = CLAMBER_EASYTIMESCALAR * 1000.0f/ (pm_walkspeed.GetFloat()+0.00001f); // seconds per unit pace
-	idPhysics_Player::StartClamber(targetPos,newClamberTimeScale,newClamberTimeScale, 0.4f, 0.5f, false);
+	idPhysics_Player::StartClamber(targetPos, shiftBack, newClamberTimeScale,newClamberTimeScale, 0.4f, 0.5f, false);
 }
 
-void idPhysics_Player::StartClamber( idVec3 targetPos, float raiseTimeScale, float settleTimeScale, float verticalMix, float horizontalMix, bool forceDuck )
+void idPhysics_Player::StartClamber( idVec3 targetPos, idVec3 shiftBack, float raiseTimeScale, float settleTimeScale, float verticalMix, float horizontalMix, bool forceDuck, bool ignoreLipCheck )
 {
 	// raiseTimeScale/settleTimeScale = x milliseconds per 1 unit moved
 	// verticalMix/horizontalMix = contribution of vertical/horiztonal component to first clamber state
@@ -3394,12 +3560,45 @@ void idPhysics_Player::StartClamber( idVec3 targetPos, float raiseTimeScale, flo
 
 	idVec3 clamberVec = (targetPos - current.origin);
 
+	// check for a high lip on ledge and prevent player phasing through it when clambering up
+	idVec3 clamberVecBack = -clamberVec;
+	clamberVecBack.z = pm_crouchviewheight.GetFloat();
+	// check for lip behind
+	trace_t findLip;
+	gameLocal.clip.TracePoint(findLip, targetPos, targetPos + clamberVecBack, clipMask, self);
+
+	if (shiftBack != vec3_zero)
+	{
+		horizontalMix = 0.0f;
+		verticalMix = 1.0f;
+	}
+
+	// SW 23rd April 2025: Letting certain clambers ignore lip check (mostly those entering cargohides or acropoints)
+	bool edgeLipExists = ignoreLipCheck ? false : findLip.fraction < 1.0f;
+	float extraClamberTimeMS = 0.0f;
+	if (edgeLipExists)
+	{
+		horizontalMix *= 0.5f;
+		verticalMix = 1.0f;
+		extraClamberTimeMS = 100.0f; // extra pause
+	}
+
+	// calc the middle position the player transitions to
 	idVec3 transitionVec = idVec3( clamberVec.x*horizontalMix, clamberVec.y*horizontalMix, clamberVec.z*verticalMix );
+
+	if (edgeLipExists)
+	{ // add height of a potential lip
+		transitionVec.z = clamberVec.z + pm_normalviewheight.GetFloat();
+	}
+	if (shiftBack != vec3_zero)
+	{
+		transitionVec += shiftBack;
+	}
 
 	this->clamberTransition = transitionVec + current.origin;
 
 	// timeScale is ms per 1 unit moved
-	float clamberRaiseTime = transitionVec.LengthFast() * raiseTimeScale;
+	float clamberRaiseTime = transitionVec.LengthFast() * raiseTimeScale + extraClamberTimeMS;
 	float clamberSettleTime = (clamberVec - transitionVec).LengthFast() * settleTimeScale;
 
 	this->clamberTotalMoveTime = gameLocal.time + clamberRaiseTime + clamberSettleTime;
@@ -3419,6 +3618,9 @@ void idPhysics_Player::StartClamber( idVec3 targetPos, float raiseTimeScale, flo
 
 		// SW 11th Feb 2025: changed to use body channel (we've had problems with it interrupting VO)
 		gameLocal.GetLocalPlayer()->StartSound("snd_clamber", SND_CHANNEL_BODY, 0, false, NULL);
+
+		//BC 2-13-2025: clamber grunt now on a cooldown timer.
+		gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay((gameLocal.GetLocalPlayer()->GetWoundCount() > 0) ? "snd_vo_exertion" : "snd_vo_clamber", VO_CATEGORY_GRUNT);
 	}
 	else
 	{
@@ -3521,20 +3723,25 @@ void idPhysics_Player::UpdateClamber(void)
 }
 
 //The ledge check checks for ledges above the player.
-idVec3 idPhysics_Player::GetPossibleClamberPos_Ledge(int numIterations)
+idVec3 idPhysics_Player::GetPossibleClamberPos_Ledge(int numIterations, idVec3 & shiftBack)
 {
-	idVec3 returnValue = GetPossibleClamberPos_Ledgecheck(false, numIterations);
+	idVec3 returnValue = GetPossibleClamberPos_Ledgecheck(false, numIterations, shiftBack);
 
 	if( returnValue == vec3_zero )
 	{
-		returnValue = GetPossibleClamberPos_Ledgecheck(true, numIterations);
+		returnValue = GetPossibleClamberPos_Ledgecheck(true, numIterations, shiftBack);
 
-		if( (pm_debugclamber.GetInteger() != 0) && returnValue != vec3_zero ) gameLocal.Printf( "\nclamber spot ledge edge" );
+		if( (pm_debugclamber.GetInteger() != 0) && returnValue != vec3_zero ) gameLocal.Printf( "\nclamber spot ledge shiftback" );
 	}
 
 	if ( (pm_debugclamber.GetInteger() & 1) && returnValue != vec3_zero)
 	{
-		gameRenderWorld->DebugCircle( colorGreen, returnValue, idVec3::Up(), DEBUG_CLAMBER_SIZE, pm_debugclambertime.GetInteger());
+		gameRenderWorld->DebugCircle( colorGreen, returnValue, idVec3::Up(), DEBUG_CLAMBER_SIZE, 5, pm_debugclambertime.GetInteger());
+	}
+
+	if (returnValue == vec3_zero)
+	{
+		shiftBack = vec3_zero;
 	}
 
 	return returnValue;
@@ -3542,7 +3749,7 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledge(int numIterations)
 
 
 //backwardscheck = if player is under an overhang ledge, do a check that peeks over the ledge. This is for situations where there's a slight lip on the ledge.
-idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, int numIterations)
+idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, int numIterations, idVec3 & shiftBack)
 {	
 	int DEBUG_CLAMBER_LEDGE_FLAG = 1;
 
@@ -3568,10 +3775,11 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 
 	startPos = current.origin;
 
-	//trace upward.
+	// check for ledges slightly behind
 	if (backwardsCheck)
 	{
-		startPos += (forward * -playerRadius);
+		shiftBack = (forward * -playerRadius);
+		startPos += shiftBack;
 		DEBUG_CLAMBER_LEDGE_FLAG = 8;
 	}
 
@@ -3614,6 +3822,13 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 	//Trace that goes vertically; start at player position and go upward.
 	gameLocal.clip.TracePoint(verticalCheck1, startPos, startPos + idVec3(0, 0, clamberHeightReach), MASK_SOLID | CONTENTS_CLIMBCLIP, self, CONTENTS_NOCLIMBCLIP);
 	DEBUG_CLAMBER_ARROW(backwardsCheck ? colorBlue: colorCyan, startPos, verticalCheck1.endpos,DEBUG_CLAMBER_LEDGE_FLAG);
+	
+	// leave room for player
+	if (verticalCheck1.fraction < 1.0f)
+	{
+		verticalCheck1.endpos.z -= pm_crouchheight.GetFloat() * 0.5f;
+		assert((verticalCheck1.endpos.z - current.origin.z) > 0.0f);
+	}
 
 	//downward vertical distance we travel.
 	idVec3 landingTraceDownVec = idVec3(0.0f,0.0f, idMath::Fabs(verticalCheck1.endpos.z - current.origin.z) * -1.f );
@@ -3630,13 +3845,21 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 	{
 		//Trace that goes FORWARD.
 		gameLocal.clip.TracePoint(forwardCheck1, forwardTraceStart, forwardTraceNext, MASK_SOLID | CONTENTS_CLIMBCLIP, self, CONTENTS_NOCLIMBCLIP);
-		DEBUG_CLAMBER_ARROW(backwardsCheck ? colorBlue: colorCyan, forwardTraceStart, forwardCheck1.endpos,DEBUG_CLAMBER_LEDGE_FLAG);
+		DEBUG_CLAMBER_ARROW(backwardsCheck ? colorBlue: colorCyan, forwardTraceStart, forwardCheck1.endpos,DEBUG_CLAMBER_LEDGE_FLAG | 512);
 
 		bool forwardHit = forwardCheck1.fraction < 1.0f;
 
 		//Trace that checks for the LANDING POSITION.
 		gameLocal.clip.TracePoint(landingCheck1, forwardCheck1.endpos, forwardCheck1.endpos + landingTraceDownVec, MASK_SOLID | CONTENTS_CLIMBCLIP, self, CONTENTS_NOCLIMBCLIP);
-		DEBUG_CLAMBER_ARROW(colorWhite, forwardCheck1.endpos, landingCheck1.endpos,DEBUG_CLAMBER_LEDGE_FLAG);
+		DEBUG_CLAMBER_ARROW(colorWhite, forwardCheck1.endpos, landingCheck1.endpos,DEBUG_CLAMBER_LEDGE_FLAG | 512);
+
+		if (landingCheck1.endpos.z > GetClamberMaxHeightWorld())
+		{
+			// if there's geo blocking higher than clamber height, don't bother continuing
+			DEBUG_CLAMBER_TEXT( "too high", colorRed, landingCheck1.endpos );
+			break;
+		}
+
 
 		bool landingOK = landingCheck1.fraction < 1.0f;
 
@@ -3644,8 +3867,49 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 
 		landingOK = ent && ent->CanClamber();
 
+		idMat3 playerViewaxis;
+		idVec3 playerOrigin;
+		gameLocal.GetLocalPlayer()->GetViewPos(playerOrigin, playerViewaxis);
+
+		// check there is a large enough path for the player
+		// as it is possible to trace through small holes or cracks
 		if (landingOK)
 		{
+			idVec3 midPoint = (forwardCheck1.endpos + landingCheck1.endpos)*0.5f;
+			idVec3 diagBound = (0.5f * playerRadius) * (forward + right) + (midPoint - landingCheck1.endpos);
+			idVec3 topBound = idVec3(idMath::Fabs(diagBound.x), idMath::Fabs(diagBound.y), idMath::Fabs(diagBound.z));
+			idVec3 bottomBound = -topBound;
+
+			// make sure there's room above the landing, to allow a path to drop down onto
+			float openingOverheadRoom = pm_crouchheight.GetFloat();
+			topBound.z += openingOverheadRoom*0.5f;
+			bottomBound.z += openingOverheadRoom*0.5f;
+
+			// enforce bounds min height
+			if ((topBound.z - bottomBound.z) < openingOverheadRoom)
+			{
+				bottomBound.z = topBound.z - openingOverheadRoom;
+			}
+
+			idBounds openingBound = idBounds( bottomBound, topBound );
+			trace_t openingCheck;
+			gameLocal.clip.TraceBounds(openingCheck, midPoint, midPoint, openingBound, MASK_SOLID | CONTENTS_CLIMBCLIP, self);
+
+			if (openingCheck.fraction < 1.0f)
+			{
+				landingOK = false;
+			}
+
+			if ( developer.GetInteger() >= 2 || (pm_debugclamber.GetInteger() & 512) )
+			{
+				openingBound.TranslateSelf(midPoint);
+				gameRenderWorld->DebugBounds(landingOK ? colorCyan : colorRed, openingBound, vec3_origin, pm_debugclambertime.GetInteger());
+			}
+		}
+
+		if (landingOK)
+		{
+			// prevent player from hovering over ledge, when pushed out by steppable geo
 			// if wall already hit, skip edge detection and "step" forward
 			if(!forwardHit && pm_clamberEdgeDetection.GetBool())
 			{ // if too close to edge, find edge wall position, then find a landing a step further in
@@ -3673,8 +3937,11 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 				if( !wallClipped )
 				{
   					trace_t wallTrace; // find the position of the ledge edge, by tracing into the front wall
-					gameLocal.clip.TracePoint( wallTrace, outsideWallPos, outsideWallPos+forward*desiredDistFromEdge, MASK_SOLID | CONTENTS_CLIMBCLIP, self, CONTENTS_NOCLIMBCLIP );
+					gameLocal.clip.TracePoint( wallTrace, outsideWallPos, outsideWallPos+forward*desiredDistFromEdge, MASK_SOLID | CONTENTS_CLIMBCLIP, self );
 					bool edgeOK = wallTrace.fraction > 0.0f && wallTrace.fraction < 1.0f;
+
+
+					DEBUG_CLAMBER_ARROW (colorOrange, outsideWallPos, wallTrace.endpos, 512);
 
 					if( edgeOK )
 					{ // we can use the discovered wall position to do a very accurate stair check on the corner edge
@@ -3690,19 +3957,23 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 
 						trace_t stepInTrace;
 						// trace forward a "step" from our high up forward trace
-						gameLocal.clip.TracePoint( stepInTrace, posFromWall, finalStepInPos, MASK_SOLID | CONTENTS_CLIMBCLIP, self, CONTENTS_NOCLIMBCLIP );
+						gameLocal.clip.TracePoint( stepInTrace, posFromWall, finalStepInPos, MASK_SOLID | CONTENTS_CLIMBCLIP, self );
+
+						DEBUG_CLAMBER_ARROW (colorOrange, posFromWall, stepInTrace.endpos, 512);
 
 						/// remove bounds margin from drop in
 						idVec3 dropStart = stepInTrace.endpos - forward*playerRadius;
 						trace_t dropTrace; // drop down again to find new landing
 						gameLocal.clip.TracePoint( dropTrace, dropStart, dropStart + landingTraceDownVec, MASK_SOLID | CONTENTS_CLIMBCLIP, self, CONTENTS_NOCLIMBCLIP );
 
+						DEBUG_CLAMBER_ARROW (colorOrange, dropStart, dropTrace.endpos, 512);
+
 						if( dropTrace.fraction < 1.0f )
 						{
 							idVec3 clamberCheckPos = CheckClamberBounds( dropTrace.endpos + idVec3(0, 0, .1f), (forwardTraceStart + forwardCheck1.endpos)*0.5f, false );
 							if (clamberCheckPos != vec3_zero)
 							{
-								if( (pm_debugclamber.GetInteger() != 0) ) gameLocal.Printf( "\nclamber spot ledge edge" );
+								if( (pm_debugclamber.GetInteger() != 0) ) gameLocal.Printf( "\nclamber spot ledge-lip" );
 								return clamberCheckPos; 
 							}
 						}
@@ -3794,7 +4065,7 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Ledgecheck(bool backwardsCheck, i
 						idVec3 clambercheckPos = CheckClamberBounds(candidateTr.endpos, false);
 						if (clambercheckPos != vec3_zero)
 						{
-							if( (pm_debugclamber.GetInteger() != 0) ) gameLocal.Printf( "\nclamber spot ledge perpendicular" );
+							if( (pm_debugclamber.GetInteger() != 0) ) gameLocal.Printf( "\nclamber spot ledge-perpendicular" );
 							return clambercheckPos;
 						}
 					}
@@ -3917,7 +4188,24 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Cubby(idVec3 eyePos, int numItera
 
 		DEBUG_CLAMBER_ARROW( colorBlue, downCheck.endpos + idVec3(0, 0, 8), downCheck.endpos );
 
-		idVec3 result = CheckClamberBounds(downCheck.endpos);
+		idVec3 candidatePos = downCheck.endpos;
+
+		idMat3 playerViewaxis;
+		idVec3 playerOrigin;
+		gameLocal.GetLocalPlayer()->GetViewPos(playerOrigin, playerViewaxis);
+
+		// check that there's a clear path to the spot first
+		// to avoid phasing through vents, etc
+		idVec3 matchedHeightPos = playerOrigin;
+		matchedHeightPos.z = candidatePos.z + pm_crouchheight.GetFloat();
+		trace_t intoCubbyTrace;
+		gameLocal.clip.TracePoint(intoCubbyTrace, matchedHeightPos, candidatePos, MASK_SOLID | CONTENTS_CLIMBCLIP, self);
+
+		idVec3 result = vec3_origin;
+		if (intoCubbyTrace.fraction >= 1.0f)
+		{
+			result = CheckClamberBounds(candidatePos);
+		}
 
 		if (result != vec3_zero)
 		{
@@ -3926,12 +4214,9 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Cubby(idVec3 eyePos, int numItera
 		else
 		{
 			//Jiggle the position left and right a bit. This is for situations like clambering up the side of a jagged staircase.
-			idMat3 playerViewaxis;
 			idVec3 playerDir;
 			idVec3 playerGravityDir;
-			idVec3 playerOrigin;
 
-			gameLocal.GetLocalPlayer()->GetViewPos(playerOrigin, playerViewaxis);
 			playerGravityDir = gameLocal.GetLocalPlayer()->GetPhysics()->GetGravityNormal();
 			playerDir = (playerViewaxis[0] - playerGravityDir * (playerGravityDir * playerViewaxis[0])).Cross(playerGravityDir); //Get angle perpendicular to 'playerViewaxis'.
 
@@ -3939,13 +4224,23 @@ idVec3 idPhysics_Player::GetPossibleClamberPos_Cubby(idVec3 eyePos, int numItera
 
 			for (int k = 0; k < 8; k++)
 			{
-				idVec3 candidatePos = downCheck.endpos + (playerDir * distanceArray[i]);
+				candidatePos = downCheck.endpos + (playerDir * distanceArray[i]);
 
-				result = CheckClamberBounds(candidatePos);
-				if (result != vec3_zero)
-				{
-					if( (pm_debugclamber.GetInteger() != 0) ) gameLocal.Printf( "\nclamber spot cubby jiggle" );
-					break;
+				// check that there's a clear path to the spot first
+				// to avoid phasing through vents/walls
+				matchedHeightPos.z = candidatePos.z + pm_crouchheight.GetFloat();
+				gameLocal.clip.TracePoint(intoCubbyTrace, matchedHeightPos, candidatePos, MASK_SOLID | CONTENTS_CLIMBCLIP, self);
+
+				DEBUG_CLAMBER_ARROW(intoCubbyTrace.fraction >= 1.0f ? colorWhite : colorYellow, matchedHeightPos, candidatePos, 512);
+
+				if (intoCubbyTrace.fraction >= 1.0f)
+				{ // path clear, check the clamber spot to see if player can fit
+					result = CheckClamberBounds(candidatePos);
+					if (result != vec3_zero)
+					{
+						if ((pm_debugclamber.GetInteger() != 0)) gameLocal.Printf("\nclamber spot cubby jiggle");
+						break;
+					}
 				}
 			}
 		}
@@ -3988,6 +4283,8 @@ idVec3 idPhysics_Player::CheckClamberBounds(idVec3 basePos, idVec3 sweepStart, b
 		return vec3_zero;
 	}
 
+	DEBUG_CLAMBER_ARROW (colorBrown,  sweepStart, basePos, 512);
+
 	const int MAX_VERTICAL_CHECKDISTANCE = 8; //max height player can be from ground surface.
 	const int CHECKDISTANCE_STEP = 4;
 
@@ -4004,7 +4301,6 @@ idVec3 idPhysics_Player::CheckClamberBounds(idVec3 basePos, idVec3 sweepStart, b
 
 
 	{ //Do a tracebounds check at the position.
-
 		gameLocal.clip.TraceBounds(trace, basePos, basePos, playerBounds, MASK_SOLID | CONTENTS_CLIMBCLIP, self);
 		bool boundsOK = trace.fraction >= 1;
 
@@ -4947,7 +5243,8 @@ void idPhysics_Player::SetAcroState(idEntity * hideEnt)
 		((idPlayer *)self)->SetViewPitchLerp(ACRO_SPLITS_VIEWPITCH);
 	}
 
-	StartClamber(hideEnt->GetPhysics()->GetOrigin() + clamberposOffset);
+	// SW 23rd April 2025: Skip lip check for acropoint clambers (messes with the lerps, causes player to clip into walls/ceilings)
+	StartClamber(hideEnt->GetPhysics()->GetOrigin() + clamberposOffset, vec3_zero, CLAMBER_MOVETIMESCALAR, CLAMBER_SETTLETIMESCALAR, 1.0f, 1.0f, true, true);
 
 	((idPlayer *)self)->SetViewYawLerp(acroAngle);
 
@@ -4994,8 +5291,9 @@ void idPhysics_Player::SetHideState(idEntity * hideEnt, int _hideType)
 	
 	acroType = ACROTYPE_CARGOHIDE;
 	finalPos = hideEnt->GetPhysics()->GetOrigin() + (forward * forwardOffset) + (up * verticalOffset);
-	StartClamber(finalPos);
 
+	// SW 23rd April 2025: Skip lip check for acropoint clambers (messes with the lerps, causes player to clip into walls/ceilings)
+	StartClamber(finalPos, vec3_zero, CLAMBER_MOVETIMESCALAR, CLAMBER_SETTLETIMESCALAR, 1.0f, 1.0f, true, true);
 	
 	idEntityFx::StartFx("fx/dustfall01", &dustPos, &mat3_identity, NULL, false);
 }
@@ -5226,5 +5524,44 @@ void idPhysics_Player::UpdateGrabRing()
 			return;
 		}
 
+	}
+}
+
+void idPhysics_Player::SetVacuumSplineMover(idMover* mover)
+{
+	vacuumSplineMover = mover;
+}
+
+idMover* idPhysics_Player::GetVacuumSplineMover(void)
+{
+	return vacuumSplineMover.IsValid() ? vacuumSplineMover.GetEntity() : NULL;
+}
+
+// SW 17th Feb 2025
+// The vacuum spline mover has the potential to move the player outside the world, 
+// because it is following a dynamically generated curve that cannot be guaranteed to stay inside the world at all times.
+// We must follow it as closely as we can, but ensure that we remain inside the world
+void idPhysics_Player::UpdateVacuumSplineMoving(void)
+{
+	idVec3 moverOrigin = vacuumSplineMover.GetEntity()->GetPhysics()->GetOrigin();
+	idVec3 difference;
+
+	trace_t results;
+	gameLocal.clip.TraceBounds(results, this->current.origin, moverOrigin, clipModel->GetBounds(), CONTENTS_SOLID, this->self);
+
+	if (results.fraction < 1)
+	{
+		// Player would exit the world if they followed the mover directly.
+		// Instead, try to follow along the wall
+		difference = (moverOrigin - current.origin);
+
+		// Project the difference onto the collision plane and slide along it
+		difference = difference - (DotProduct(difference, results.c.normal) / DotProduct(results.c.normal, results.c.normal)) * results.c.normal;
+		current.origin = current.origin + difference;
+	}
+	else
+	{
+		// It's safe to be directly where the mover is
+		current.origin = moverOrigin;
 	}
 }

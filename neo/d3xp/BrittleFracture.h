@@ -70,7 +70,7 @@ public:
 								idBrittleFracture( void );
 	virtual						~idBrittleFracture( void );
 
-	void						Save( idSaveGame *savefile ) const;
+	void						Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void						Restore( idRestoreGame *savefile );
 
 	void						Spawn( void );
@@ -100,6 +100,8 @@ public:
 	//idList<int>					vacuumDoorsToClose;
 
 	virtual void				Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType = SURFTYPE_NONE);
+
+	void						SpectateUpdate();
 
 private:
 	// setttings

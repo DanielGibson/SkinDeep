@@ -1,6 +1,7 @@
 //#include "script/Script_Thread.h"
 #include "framework/DeclEntityDef.h"
 #include "gamesys/SysCvar.h"
+#include "idlib/LangDict.h"
 
 #include "worldspawn.h"
 #include "player.h"
@@ -29,6 +30,11 @@ END_CLASS
 
 idHighlighter::idHighlighter()
 {
+	highlightCamera = nullptr;
+
+	cameraStartAngle = {};
+	cameraEndAngle = {};
+
 	state = HLR_NONE;
 	stateTimer = 0;
 	transitionTime = 0;
@@ -89,7 +95,84 @@ void idHighlighter::Spawn()
 	BecomeActive(TH_THINK);
 }
 
+void idHighlighter::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( state ); // int state
 
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( transitionTime ); // int transitionTime
+
+	SaveFileWriteArray(entNames, MAX_ARROWS, WriteString); // idString entNames[MAX_ARROWS]
+	SaveFileWriteArray(arrowPositions, MAX_ARROWS, WriteVec2); // idVec2 arrowPositions[MAX_ARROWS]
+	SaveFileWriteArray(arrowAngles, MAX_ARROWS, WriteFloat); // float arrowAngles[MAX_ARROWS]
+
+	SaveFileWriteArray(barYPositions, 2, WriteInt); // int barYPositions[2]
+
+	savefile->WriteInt( letterboxTimer ); // int letterboxTimer
+	savefile->WriteBool( letterboxLerpActive ); // bool letterboxLerpActive
+
+	savefile->WriteInt( cooldownTimer ); // int cooldownTimer
+	savefile->WriteObject( highlightCamera ); // idCameraView* highlightCamera
+
+	savefile->WriteInt(2); // highlightEntity_t highlightEntityInfos[2];
+	for (int idx = 0; idx < 2; idx++)
+	{
+		savefile->WriteVec3( highlightEntityInfos[idx].position ); // idVec3 position
+		savefile->WriteString( highlightEntityInfos[idx].name ); // idString name
+		savefile->WriteBounds( highlightEntityInfos[idx].bounds ); // idBounds bounds
+	}
+
+	savefile->WriteBool( cameraRotateActive ); // bool cameraRotateActive
+	savefile->WriteAngles( cameraStartAngle ); // idAngles cameraStartAngle
+	savefile->WriteAngles( cameraEndAngle ); // idAngles cameraEndAngle
+
+
+	savefile->WriteBool( cameraOffsetActive ); // bool cameraOffsetActive
+	savefile->WriteVec3( cameraOffsetPosition ); // idVec3 cameraOffsetPosition
+	savefile->WriteVec3( cameraStartOffsetPosition ); // idVec3 cameraStartOffsetPosition
+
+	savefile->WriteBool( worldIsPaused ); // bool worldIsPaused
+}
+
+void idHighlighter::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( transitionTime ); // int transitionTime
+
+	SaveFileReadArray(entNames, ReadString); // idString entNames[MAX_ARROWS]
+	SaveFileReadArray(arrowPositions, ReadVec2); // idVec2 arrowPositions[MAX_ARROWS]
+	SaveFileReadArray(arrowAngles, ReadFloat); // float arrowAngles[MAX_ARROWS]
+
+	SaveFileReadArray(barYPositions, ReadInt); // int barYPositions[2]
+
+	savefile->ReadInt( letterboxTimer ); // int letterboxTimer
+	savefile->ReadBool( letterboxLerpActive ); // bool letterboxLerpActive
+
+	savefile->ReadInt( cooldownTimer ); // int cooldownTimer
+	savefile->ReadObject( CastClassPtrRef(highlightCamera) ); // idCameraView* highlightCamera
+
+	int num;
+	savefile->ReadInt(num); // highlightEntity_t highlightEntityInfos[2];
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadVec3( highlightEntityInfos[idx].position ); // idVec3 position
+		savefile->ReadString( highlightEntityInfos[idx].name ); // idString name
+		savefile->ReadBounds( highlightEntityInfos[idx].bounds ); // idBounds bounds
+	}
+
+	savefile->ReadBool( cameraRotateActive ); // bool cameraRotateActive
+	savefile->ReadAngles( cameraStartAngle ); // idAngles cameraStartAngle
+	savefile->ReadAngles( cameraEndAngle ); // idAngles cameraEndAngle
+
+
+	savefile->ReadBool( cameraOffsetActive ); // bool cameraOffsetActive
+	savefile->ReadVec3( cameraOffsetPosition ); // idVec3 cameraOffsetPosition
+	savefile->ReadVec3( cameraStartOffsetPosition ); // idVec3 cameraStartOffsetPosition
+
+	savefile->ReadBool( worldIsPaused ); // bool worldIsPaused
+}
 
 void idHighlighter::Think(void)
 {
@@ -177,7 +260,8 @@ void idHighlighter::Think(void)
 
 			if (cameraRotateActive || gameLocal.GetLocalPlayer()->IsHidden())
 			{
-				gameLocal.GetLocalPlayer()->Hide();
+				// SW 26th March 2025: Pretty sure this is supposed to be a 'show', not 'hide'
+				gameLocal.GetLocalPlayer()->Show();
 				highlightCamera->SetActive(false);
 			}
 		}
@@ -202,6 +286,14 @@ bool idHighlighter::DoHighlight(idEntity* ent0, idEntity* ent1)
 	if (cooldownTimer > gameLocal.time)
 		return false;
 
+	//BC 3-14-2025: skip if player is dead.
+	if (gameLocal.GetLocalPlayer()->health <= 0)
+		return false;
+
+	// SW 26th March 2025: skip if player is defibrillating
+	if (gameLocal.GetLocalPlayer()->GetDefibState())
+		return false;
+
 	cooldownTimer = gameLocal.time + COOLDOWNTIME;
 
 	int eventVisibleToPlayer = IsEventVisibleToPlayer(ent0, ent1);
@@ -222,7 +314,7 @@ bool idHighlighter::DoHighlight(idEntity* ent0, idEntity* ent1)
 		//Found a viable camera position.
 		eventVisibleToPlayer = VIS_BEHIND;
 		cameraOffsetActive = true;
-		cameraStartOffsetPosition = gameLocal.GetLocalPlayer()->firstPersonViewOrigin;
+		cameraStartOffsetPosition = gameLocal.GetLocalPlayer()->renderView->vieworg; // SW 26th March 2025: Adjusting how we calculate the view origin. This should accommodate for different camera heights and also jockey mode
 	}
 	
 	if (eventVisibleToPlayer == VIS_BEHIND || eventVisibleToPlayer == VIS_ALMOSTDIRECTLOOK)
@@ -230,12 +322,17 @@ bool idHighlighter::DoHighlight(idEntity* ent0, idEntity* ent1)
 		//The event is off-screen.
 		//Enable the highlightcamera.
 		cameraRotateActive = true;
-		gameLocal.GetLocalPlayer()->Hide();
+		// SW 26th March 2025: don't hide the player if we're jockeying (i.e. third-person)
+		if (!gameLocal.GetLocalPlayer()->IsJockeying())
+		{
+			gameLocal.GetLocalPlayer()->Hide();
+		}
+		
 
-		highlightCamera->SetOrigin(gameLocal.GetLocalPlayer()->firstPersonViewOrigin);
-		highlightCamera->SetAxis(gameLocal.GetLocalPlayer()->viewAngles.ToMat3());
+		highlightCamera->SetOrigin(gameLocal.GetLocalPlayer()->renderView->vieworg);
+		highlightCamera->SetAxis(gameLocal.GetLocalPlayer()->renderView->viewaxis);
 
-		cameraStartAngle = gameLocal.GetLocalPlayer()->viewAngles;
+		cameraStartAngle = gameLocal.GetLocalPlayer()->renderView->viewaxis.ToAngles();
 		cameraStartAngle.yaw = idMath::AngleNormalize360(cameraStartAngle.yaw);
 
 		//cameraMover->SetOrigin(gameLocal.GetLocalPlayer()->firstPersonViewOrigin);
@@ -248,10 +345,10 @@ bool idHighlighter::DoHighlight(idEntity* ent0, idEntity* ent1)
 		//gameRenderWorld->DebugArrowSimple(targetPosition);
 		//gameRenderWorld->DebugLine(colorGreen, gameLocal.GetLocalPlayer()->firstPersonViewOrigin, targetPosition, 90000);
 
-		idVec3 cameraEndPosition = (cameraOffsetPosition != vec3_zero) ? cameraOffsetPosition : gameLocal.GetLocalPlayer()->firstPersonViewOrigin;
+		idVec3 cameraEndPosition = (cameraOffsetPosition != vec3_zero) ? cameraOffsetPosition : gameLocal.GetLocalPlayer()->renderView->vieworg;
 
 		cameraEndAngle = (targetPosition - cameraEndPosition).ToAngles();
-		cameraEndAngle.pitch = idMath::AngleNormalize360(cameraEndAngle.pitch);
+		cameraEndAngle.pitch = idMath::AngleNormalize180(cameraEndAngle.pitch); // SW 26th March 2025: Making it so pitch is -90 to 90 so the camera doesn't do a sicknasty flip if the highlight point is above us
 		cameraEndAngle.yaw = idMath::AngleNormalize360(cameraEndAngle.yaw);
 		cameraEndAngle.roll = 0;
 
@@ -319,10 +416,12 @@ idVec3 idHighlighter::FindViableCameraOffset(idEntity* ent)
 
 	for (int i = 0; i < OFFSETARRAYSIZE; i++)
 	{
-		idVec3 playerCameraPos = gameLocal.GetLocalPlayer()->firstPersonViewOrigin + (forward * offsetArray[i].x) + (right * offsetArray[i].y);
+		// SW 26th March 2025: Adjusting how we calculate the view origin. This should accommodate for different camera heights and also jockey mode
+		idVec3 playerCameraPos = gameLocal.GetLocalPlayer()->renderView->vieworg + (forward * offsetArray[i].x) + (right * offsetArray[i].y);
 		
 		trace_t wallcheckTr;
-		gameLocal.clip.TracePoint(wallcheckTr, gameLocal.GetLocalPlayer()->firstPersonViewOrigin, playerCameraPos, MASK_OPAQUE, gameLocal.GetLocalPlayer());
+		// SW 26th March 2025: Adjusting how we calculate the view origin. This should accommodate for different camera heights and also jockey mode
+		gameLocal.clip.TracePoint(wallcheckTr, gameLocal.GetLocalPlayer()->renderView->vieworg, playerCameraPos, MASK_OPAQUE, gameLocal.GetLocalPlayer());
 		if (wallcheckTr.fraction < 1)
 			continue; //There's a wall or something in the way.
 
@@ -498,13 +597,15 @@ int idHighlighter::IsEventVisibleToPlayer(idEntity* ent0, idEntity* ent1)
 	//traceline check.
 	idVec3 lookpoint = GetEntityLookpoint(ent0);
 	trace_t tr;
-	gameLocal.clip.TracePoint(tr, gameLocal.GetLocalPlayer()->firstPersonViewOrigin, lookpoint, MASK_SOLID, NULL);
+	// SW 26th March 2025: Adjusting how we calculate the view origin. This should accommodate for different camera heights and also jockey mode
+	gameLocal.clip.TracePoint(tr, gameLocal.GetLocalPlayer()->renderView->vieworg, lookpoint, MASK_SOLID, NULL);
 	if (!CanTraceSeeEntity(tr, ent0))
 	{		
 		return VIS_INVALID; //No direct LOS.
 	}
 
-	idVec3 dirToEvent = lookpoint - gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin();
+	// SW 26th March 2025: Adjusting how we calculate the view origin. This should accommodate for different camera heights and also jockey mode
+	idVec3 dirToEvent = lookpoint - gameLocal.GetLocalPlayer()->renderView->vieworg;
 	dirToEvent.Normalize();
 	float facingResult = DotProduct(dirToEvent, gameLocal.GetLocalPlayer()->viewAngles.ToForward());
 
@@ -512,7 +613,10 @@ int idHighlighter::IsEventVisibleToPlayer(idEntity* ent0, idEntity* ent1)
 	//0.99  = target is directly in front of player
 	//0.0   = target is directly to side of player
 	//-0.99 = target is directly behind player
-	#define DOT_THRESHOLD .7f
+	
+	// SW 26th March 2025: Adjusting dot product threshold to stamp out some nasty edge-cases where the highlighter bars would cover the whole dang screen.
+	// This is maybe a bit harsh yaw-wise, but pitch-wise it's necessary
+	#define DOT_THRESHOLD .85f
 	if (facingResult >= DOT_THRESHOLD)
 		return VIS_DIRECTLOOK; //Looking directly at the target.	
 	else if (facingResult > 0)
@@ -552,7 +656,7 @@ idStr idHighlighter::ParseName(idEntity* ent)
 	{
 		if (static_cast<idMoveableItem*>(ent)->GetSparking())
 		{
-			return "Spark";
+			return common->GetLanguageDict()->GetString("#str_def_gameplay_900097"); //"spark" BC 3-25-2025: loc fix
 		}
 	}
 
@@ -672,6 +776,7 @@ void idHighlighter::DrawBars()
 	}
 }
 
+//This gets called if player presses ESC
 void idHighlighter::DoSkip()
 {
 	state = HLR_LERPOFF;

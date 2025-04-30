@@ -49,6 +49,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "framework/FileSystem.h"
 
+#include "idlib/LangDict.h"
+
 /*
 =============================================================================
 
@@ -347,7 +349,7 @@ public:
 	virtual const char *	OSPathToRelativePath( const char *OSPath );
 	virtual const char *	RelativePathToOSPath( const char *relativePath, const char *basePath );
 	virtual const char *	BuildOSPath( const char *base, const char *game, const char *relativePath );
-	virtual void			CreateOSPath( const char *OSPath );
+	virtual bool			CreateOSPath( const char *OSPath ); // blendo eric: return success
 	virtual bool			FileIsInPAK( const char *relativePath );
 	virtual void			UpdatePureServerChecksums( void );
 	virtual fsPureReply_t	SetPureServerChecksums( const int pureChecksums[ MAX_PURE_PAKS ], int missingChecksums[ MAX_PURE_PAKS ] );
@@ -599,6 +601,10 @@ FILE *idFileSystemLocal::OpenOSFile( const char *fileName, const char *mode, idS
 	}
 #endif
 	fp = fopen( fileName, mode );
+	if( !fp ) {
+		int errOut = errno;
+		common->DPrintf( "idFileSystem::OpenFileWrite: could not open file due to err %d: %s\n", errOut, fileName );
+	}
 	if ( !fp && fs_caseSensitiveOS.GetBool() ) {
 		fpath = fileName;
 		fpath.StripFilename();
@@ -672,27 +678,58 @@ idFileSystemLocal::CreateOSPath
 Creates any directories needed to store the given filename
 ============
 */
-void idFileSystemLocal::CreateOSPath( const char *OSPath ) {
-	char	*ofs;
+// blendo eric 2025-03-30: returns true on success
+// added more error checking, but haven't tested all edge cases
+bool idFileSystemLocal::CreateOSPath( const char *OSPath ) {
+	if ( !OSPath || OSPath[0] == 0 ) {
+		common->Warning( "idFileSystemLocal::CreateOSPath: malformed path! \n" );
+		return false;
+	}
 
 	// make absolutely sure that it can't back up the path
 	// FIXME: what about c: ?
 	if ( strstr( OSPath, ".." ) || strstr( OSPath, "::" ) ) {
 #ifdef _DEBUG
-		common->DPrintf( "refusing to create relative path \"%s\"\n", OSPath );
+		common->DPrintf( "idFileSystemLocal::CreateOSPath: can't create relative paths \"%s\"\n", OSPath );
 #endif
-		return;
+		return false;
 	}
-
 	idStr path( OSPath );
-	for( ofs = &path[ 1 ]; *ofs ; ofs++ ) {
-		if ( *ofs == PATHSEPERATOR_CHAR ) {
-			// create the directory
-			*ofs = 0;
-			Sys_Mkdir( path );
-			*ofs = PATHSEPERATOR_CHAR;
+	// form ancestory directory one folder at a time (mkdir doesn't do multiple folders)
+	for( int idx = 0; idx < path.Length() ; idx++) {
+		if ( path[idx] == PATHSEPERATOR_CHAR ) {
+			idStr ancestorPath = path.Left(idx);
+
+			bool finalFolder = ancestorPath.Length() == (path.Length()-1);
+
+			// check if folder exists and is accessible
+			// make sure final folder has write access
+			SYS_ACCESS_MODE mode = finalFolder ? SYS_ACCESS_READWRITE : SYS_ACCESS_READ;
+			bool existsAndAccessible = Sys_Access(ancestorPath, mode) == 0;
+			if (existsAndAccessible) {
+				continue; // valid folder, skip
+			}
+
+			int errOut = errno;
+			if (errOut != ENOENT) { // probably exists, but there was problems
+				if( errOut == EACCES || errOut == EPERM ) {
+					common->DPrintf("idFileSystemLocal::CreateOSPath: folder denied access \"%s\"\n", ancestorPath.c_str());
+					return false;
+				}
+				common->DPrintf("idFileSystemLocal::CreateOSPath: folder access invalid (_access() errno %d) \"%s\"\n", errOut, ancestorPath.c_str());
+				return false;
+			}
+
+			// does not exist yet, so mkdir
+			if ( Sys_Mkdir(ancestorPath) ) {
+				// there was still an error
+				int errOut = errno;
+				common->DPrintf("idFileSystemLocal::CreateOSPath: error creating directory (_mkdir() errno %d) \"%s\"\n", errOut, ancestorPath.c_str());
+				return false;
+			}
 		}
 	}
+	return true;
 }
 
 /*
@@ -1758,7 +1795,7 @@ idModList *idFileSystemLocal::ListMods( void ) {
 					fclose( f );
 					break;
 				} else {
-					common->DWarning( "Error reading %s", descfile.c_str() );
+					common->DWarning( "Error reading '%s'", descfile.c_str() );
 					fclose( f );
 					continue;
 				}
@@ -1771,7 +1808,7 @@ idModList *idFileSystemLocal::ListMods( void ) {
 	}
 
 	list->mods.Insert( "" );
-	list->descriptions.Insert( "dhewm 3" );
+	list->descriptions.Insert( common->GetLanguageDict()->GetString( "#str_title_skindeep") );
 
 	assert( list->mods.Num() == list->descriptions.Num() );
 

@@ -9,6 +9,8 @@ public:
 							idVacuumSpline();
 							~idVacuumSpline();
 	void					Spawn();
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
 
 	virtual void			Think(void);
 
@@ -21,12 +23,12 @@ private:
 	
 	idEntityPtr<idEntity>	targetActor;
 
-	idCurve_Spline<idVec3> *spline;
+	idCurve_Spline<idVec3> *spline = nullptr;
 
-	idEntity				*mover;
+	idEntity				*mover = nullptr;
 
 	int						startTime;
-	idEntity				*splineEnt;
+	idEntity				*splineEnt = nullptr;
 
 	idVec3					flingDirection;
 

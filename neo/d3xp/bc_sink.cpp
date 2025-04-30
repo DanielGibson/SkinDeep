@@ -65,11 +65,12 @@ void idSink::Spawn(void)
 	args.Set("model", "models/objects/sink/kneebutton2_cm.ase");
 	args.SetVector("cursoroffset", idVec3(2, 0, -3.5f));
 	args.SetInt("health", 1);
-	args.Set("displayname", "Sink Button");
+	args.Set("displayname", common->GetLanguageDict()->GetString("#str_def_gameplay_sinkbutton"));
 	frobbutton1 = gameLocal.SpawnEntityType(idFrobcube::Type, &args);
 	frobbutton1.GetEntity()->SetOrigin(GetPhysics()->GetOrigin() + idVec3(0, 0, 7) + forwardDir * 16);
 	frobbutton1.GetEntity()->SetAngles(this->GetPhysics()->GetAxis().ToAngles());
 	frobbutton1.GetEntity()->GetPhysics()->GetClipModel()->SetOwner(this);
+	frobbutton1.GetEntity()->Bind(this, true);
 	static_cast<idFrobcube*>(frobbutton1.GetEntity())->SetIndex(1);
 
 	//Button1 animated.
@@ -78,6 +79,7 @@ void idSink::Spawn(void)
 	args.Set("model", "env_kneebutton");
 	button1Anim = (idAnimated *)gameLocal.SpawnEntityType(idAnimated::Type, &args);
 	button1Anim.GetEntity()->SetAngles(this->GetPhysics()->GetAxis().ToAngles());
+	button1Anim.GetEntity()->Bind(this, true);
 
 	button1Timer = 0;
 
@@ -86,11 +88,12 @@ void idSink::Spawn(void)
 	args.Set("model", "models/objects/sink/kneebutton2_cm.ase");
 	args.SetVector("cursoroffset", idVec3(2, 0, -1.5f));
 	args.SetInt("health", 1);
-	args.Set("displayname", "Sink Button");
+	args.Set("displayname", common->GetLanguageDict()->GetString("#str_def_gameplay_sinkbutton"));
 	frobbutton2 = gameLocal.SpawnEntityType(idFrobcube::Type, &args);
 	frobbutton2.GetEntity()->SetOrigin(GetPhysics()->GetOrigin() + idVec3(0, 0, 7) + forwardDir * 16 + rightDir * -26);
 	frobbutton2.GetEntity()->SetAngles(this->GetPhysics()->GetAxis().ToAngles());
 	frobbutton2.GetEntity()->GetPhysics()->GetClipModel()->SetOwner(this);
+	frobbutton2.GetEntity()->Bind(this, true);
 	static_cast<idFrobcube*>(frobbutton2.GetEntity())->SetIndex(2);
 
 	//Button2 animated.
@@ -99,6 +102,7 @@ void idSink::Spawn(void)
 	args.Set("model", "env_kneebutton2");
 	button2Anim = (idAnimated *)gameLocal.SpawnEntityType(idAnimated::Type, &args);
 	button2Anim.GetEntity()->SetAngles(this->GetPhysics()->GetAxis().ToAngles());
+	button2Anim.GetEntity()->Bind(this, true);
 
 	BecomeActive(TH_THINK);
 	fl.takedamage = true;
@@ -115,6 +119,7 @@ void idSink::Spawn(void)
 	args.SetMatrix("rotation", particleAngle.ToMat3());
 	args.SetBool("start_off", true);
 	faucetEmitter = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &args));
+	faucetEmitter.GetEntity()->Bind(this, true);
 }
 
 idVec3 idSink::GetFaucetPos()
@@ -126,10 +131,36 @@ idVec3 idSink::GetFaucetPos()
 
 void idSink::Save(idSaveGame *savefile) const
 {
+	button1Anim.Save( savefile ); // idEntityPtr<idAnimated> button1Anim
+	savefile->WriteObject( frobbutton1 ); // idEntityPtr<idEntity> frobbutton1
+	savefile->WriteInt( button1Timer ); // int button1Timer
+
+	button2Anim.Save( savefile ); // idEntityPtr<idAnimated> button2Anim
+	savefile->WriteObject( frobbutton2 ); // idEntityPtr<idEntity> frobbutton2
+
+	faucetEmitter.Save( savefile ); // idEntityPtr<idFuncEmitter> faucetEmitter
+	savefile->WriteBool( sinkIsOn ); // bool sinkIsOn
+
+	savefile->WriteInt( interestTimer ); // int interestTimer
+
+	savefile->WriteInt( soapCooldownTimer ); // int soapCooldownTimer
 }
 
 void idSink::Restore(idRestoreGame *savefile)
 {
+	button1Anim.Restore( savefile ); // idEntityPtr<idAnimated> button1Anim
+	savefile->ReadObject( frobbutton1 ); // idEntityPtr<idEntity> frobbutton1
+	savefile->ReadInt( button1Timer ); // int button1Timer
+
+	button2Anim.Restore( savefile ); // idEntityPtr<idAnimated> button2Anim
+	savefile->ReadObject( frobbutton2 ); // idEntityPtr<idEntity> frobbutton2
+
+	faucetEmitter.Restore( savefile ); // idEntityPtr<idFuncEmitter> faucetEmitter
+	savefile->ReadBool( sinkIsOn ); // bool sinkIsOn
+
+	savefile->ReadInt( interestTimer ); // int interestTimer
+
+	savefile->ReadInt( soapCooldownTimer ); // int soapCooldownTimer
 }
 
 void idSink::Think(void)

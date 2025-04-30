@@ -41,8 +41,10 @@ idKeypad::~idKeypad(void)
 		delete this->frobcubes[i];
 	}
 
-	if (zapParticle != NULL)
+	if (zapParticle != NULL) {
 		zapParticle->PostEventMS(&EV_Remove, 0);
+		zapParticle = nullptr;
+	}
 
 	//delete frobcubeMain;
 }
@@ -182,65 +184,40 @@ void idKeypad::Event_PostSpawn(void)
 
 void idKeypad::Save( idSaveGame *savefile ) const
 {
-	savefile->WriteInt(state);
-	savefile->WriteInt(counter);
-	savefile->WriteInt(nextStateTime);
-	//savefile->WriteObject(frobcubeMain);
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( counter ); // int counter
+	savefile->WriteInt( nextStateTime ); // int nextStateTime
+	SaveFileWriteArray( frobcubes, 9, WriteObject ); // idEntity* frobcubes[9]
+	SaveFileWriteArray( skin_glow, 9, WriteSkin ); // const idDeclSkin * skin_glow[9];
+	SaveFileWriteArray( transitions, 9, WriteInt ); // int transitions[9];
 
-	for (int i = 0; i < 9; i++)
-	{
-		savefile->WriteObject(frobcubes[i]);
-		savefile->WriteSkin(skin_glow[i]);
-		savefile->WriteInt(transitions[i]);
-	}
+	SaveFileWriteArray( keys, keys.Num(), WriteString ); // idStrList keys
 
-	savefile->WriteInt( keys.Num() );
-	for (int i = 0; i < keys.Num(); i++ )
-	{
-		savefile->WriteString( keys[ i ] );
-	}
+	SaveFileWriteArray( keycode, 4, WriteInt ); // int keycode[4]
+	SaveFileWriteArray( input, 4, WriteInt ); // int input[4]
 
-	for (int i = 0; i < 4; i++)
-	{
-		savefile->WriteInt(keycode[i]);
-		savefile->WriteInt(input[i]);
-	}
+	savefile->WriteInt( keyIndex ); // int keyIndex
 
-	savefile->WriteInt(keyIndex);
-	
+	savefile->WriteObject( zapParticle ); // idFuncEmitter * zapParticle
 }
 
 void idKeypad::Restore( idRestoreGame *savefile )
 {
-	savefile->ReadInt(state);
-	savefile->ReadInt(counter);
-	savefile->ReadInt(nextStateTime);
-	//savefile->ReadObject(reinterpret_cast<idClass *&>(frobcubeMain));
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( counter ); // int counter
+	savefile->ReadInt( nextStateTime ); // int nextStateTime
+	SaveFileReadArray( frobcubes, ReadObject ); // idEntity* frobcubes[9]
+	SaveFileReadArray( skin_glow, ReadSkin ); // const idDeclSkin * skin_glow[9];
+	SaveFileReadArray( transitions, ReadInt ); // int transitions[9];
 
-	for (int i = 0; i < 9; i++)
-	{
-		savefile->ReadObject(reinterpret_cast<idClass *&>(frobcubes[i]));
-		savefile->ReadSkin(skin_glow[i]);
-		savefile->ReadInt(transitions[i]);
-	}
+	SaveFileReadList( keys, ReadString ); // idStrList keys
 
-	int keyAmount;
-	savefile->ReadInt( keyAmount );
-	for (int i = 0; i < keyAmount; i++ )
-	{
-		idStr keyStr;
-		savefile->ReadString( keyStr );
-		keys.Append( keyStr );
-	}
+	SaveFileReadArray( keycode, ReadInt ); // int keycode[4]
+	SaveFileReadArray( input, ReadInt ); // int input[4]
 
-	for (int i = 0; i < 4; i++)
-	{
-		savefile->ReadInt(keycode[i]);
-		savefile->ReadInt(input[i]);
-	}
+	savefile->ReadInt( keyIndex ); // int keyIndex
 
-	savefile->ReadInt(keyIndex);
-	
+	savefile->ReadObject( CastClassPtrRef(zapParticle) ); // idFuncEmitter * zapParticle
 }
 
 
@@ -610,7 +587,10 @@ void idKeypad::UpdateStates( void )
 
 					if (itemEnt->IsType(idMoveableItem::Type))
 					{
-						static_cast<idMoveableItem *>(itemEnt)->SetJustDropped(true);
+						//BC 2-21-2025: make a little explosion effect.
+						idEntityFx::StartFx(spawnArgs.GetString("fx_explosion"), GetPhysics()->GetOrigin(), mat3_identity);
+
+						static_cast<idMoveableItem *>(itemEnt)->SetJustDropped(true);						
 					}
 				}
 			}			

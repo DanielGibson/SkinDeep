@@ -87,10 +87,22 @@ void idMushroom::Spawn(void)
 
 void idMushroom::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( splashEnt ); // idFuncEmitter * splashEnt
+
+	savefile->WriteInt( dripType ); // int dripType
+	savefile->WriteVec3( headPosition ); // idVec3 headPosition
+
+	savefile->WriteInt( decalTimer ); // int decalTimer
 }
 
 void idMushroom::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( CastClassPtrRef(splashEnt) ); // idFuncEmitter * splashEnt
+
+	savefile->ReadInt( dripType ); // int dripType
+	savefile->ReadVec3( headPosition ); // idVec3 headPosition
+
+	savefile->ReadInt( decalTimer ); // int decalTimer
 }
 
 void idMushroom::Think(void)

@@ -80,6 +80,9 @@ public:
 	idMeta();
 	void				Spawn();
 
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				Restore( idRestoreGame *savefile );
+
 	virtual void		Think(void);
 
 
@@ -92,9 +95,9 @@ public:
 
 	bool				SetPipeStatus(int pipeIndex, bool value);
 
-	idEntity			*lkpEnt; //last-known position
+	idEntity			*lkpEnt = nullptr; //last-known position
 	void				SetLKPPosition(idVec3 pos);
-	void				SetLKPReachablePosition(idVec3 pos);
+	void				SetLKPReachablePosition(const idVec3 &pos);
 	void				SetLKPPositionByEntity(idEntity *enemyEnt);
 
 	void				UpdateMetaLKP(bool hasGainedLOS);
@@ -136,7 +139,7 @@ public:
 
 	void				SetLKPVisible(bool visible);
 
-	bool				StartVentPurge();
+	bool				StartVentPurge(idEntity *interestpoint);
 	bool				IsPurging();
 
 	//for the signal lamp. This keeps track of whether signal lamp stuff is currently happening or not. Refer to this to deterine what gui to render on the signal lamp weapon gui.
@@ -173,8 +176,9 @@ public:
 	int					GetCryoexitLocationEntnum();
 	int					GetCryoExitTime();
 
-	void				StartAllClearSequence(int delayTime);
+	void				StartAllClearSequence(int delayTime, int voiceprint = VOICEPRINT_A);
 	bool				StartPlayerWalkietalkieSequence(int *_voLength);
+	int					dispatchVoiceprint; //The last voiceprint used. This is so we can re-use the same voiceprint after a purge is done to say "purge is complete, good job fellow pirates"
 
 	void				SetWalkietalkieLure(idEntity *ent);
 
@@ -182,10 +186,11 @@ public:
 	void				SetAllInfostationsMode(int mode);
 	void				InfostationsLockdisplayUpdate();
 
+	void				LimitActiveGlassPieces();
 	void				DestroyNearbyGlassPieces(idVec3 position);
 
-	class idRadioCheckin *radioCheckinEnt;
-	class idHighlighter* highlighterEnt;
+	class idRadioCheckin *radioCheckinEnt = nullptr;
+	class idHighlighter* highlighterEnt = nullptr;
 
 	void				GotoCombatSearchState();
 	int					GetCombatStartTime();
@@ -249,6 +254,7 @@ public:
 	void				DoHightlighterThink();
 	void				DrawHighlighterBars();
 	void				SkipHighlighter();
+	void				Event_DoHighlighter(idEntity* e1, idEntity* e2);
 
 	int					GetTotalCatCages();
 
@@ -288,7 +294,7 @@ private:
 	
 	
 	void				GetLKPPosition();	
-	idEntity			*lkpEnt_Eye; //last-known position	
+	idEntity			*lkpEnt_Eye = nullptr; //last-known position	
 
 	idVec3				lkpReachablePosition;
 	void				Event_GetLKPReachable();
@@ -392,7 +398,7 @@ private:
 	int					killcamTimer;
 	bool				SetupKillcam();
 	idEntityPtr<idEntity> killcamTarget;
-	idEntity *			killcamCamera;
+	idEntity *			killcamCamera = nullptr;
 	idVec3				FindKillcamPosition();
 	bool				ValidateKillcamPosition(idVec3 position);
 	int					lastKilltime;
@@ -422,9 +428,9 @@ private:
 	int					enemiesEliminatedInCurrentPhase;
 
 	idEntityPtr<idEntity> walkietalkieLureTask;
-	idBeam*				beamLure;
-	idBeam*				beamLureTarget;
-	idEntity*			beamRectangle;
+	idBeam*				beamLure = nullptr;
+	idBeam*				beamLureTarget = nullptr;
+	idEntity*			beamRectangle = nullptr;
 
 
 
@@ -459,7 +465,8 @@ private:
 
 	void				Event_StartGlobalStunState(const char* aiDamageDef);
 
-	void				Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, idVec3 spawnPos, idVec3 spawnTrajectory);
+	void				Event_LaunchScriptedProjectile(idEntity* owner, char* damageDef, const idVec3 &spawnPos, const idVec3 &spawnTrajectory);
+	void				Event_SetDebrisBurst(const char* defName, idVec3 position, int count, float radius, float speed, idVec3 direction);
 
 	void				ReinforcementEndgameCheck();
 
@@ -510,6 +517,9 @@ private:
 	bool				signalkitDepletionCheckActive;
 
 	int					swordfishTimer;
+
+	//BC 3-24-2025: locbox.
+	idEntity* lkpLocbox = nullptr;
 
 	//BC PRIVATE END
 };

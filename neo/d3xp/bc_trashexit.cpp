@@ -27,6 +27,9 @@ idTrashExit::idTrashExit(void)
 	spacenudgeNode.AddToEnd(gameLocal.spacenudgeEntities);
 
 	gameLocal.trashexitEntities.Append(this);
+
+	peekEnt = nullptr;
+	gateModel = nullptr;
 }
 
 idTrashExit::~idTrashExit(void)
@@ -118,10 +121,16 @@ void idTrashExit::SetupChute(idEntity * ent, bool isOpen)
 
 void idTrashExit::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( myChute ); // idEntityPtr<idEntity> myChute
+	savefile->WriteObject( peekEnt ); // class idVentpeek * peekEnt
+	savefile->WriteObject( gateModel ); // idEntity * gateModel
 }
 
 void idTrashExit::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( myChute ); // idEntityPtr<idEntity> myChute
+	savefile->ReadObject( CastClassPtrRef(peekEnt) ); // class idVentpeek * peekEnt
+	savefile->ReadObject( gateModel ); // idEntity * gateModel
 }
 
 

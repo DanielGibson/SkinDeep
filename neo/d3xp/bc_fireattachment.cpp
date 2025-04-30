@@ -18,10 +18,30 @@ END_CLASS
 
 void idFireAttachment::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( lifetimer ); //  int lifetimer
+	savefile->WriteInt( lifetimeMax ); //  int lifetimeMax
+	savefile->WriteInt( damageTimerMax ); //  int damageTimerMax
+
+	savefile->WriteString( damageDefname ); // idStr damageDefname
+
+	savefile->WriteObject( attachOwner ); //  idEntityPtr<idEntity> attachOwner
+	savefile->WriteObject( particleEmitter ); //  idFuncEmitter			* particleEmitter
+
+	savefile->WriteBounds( damageBounds ); //  idBounds damageBounds
 }
 
 void idFireAttachment::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( lifetimer ); //  int lifetimer
+	savefile->ReadInt( lifetimeMax ); //  int lifetimeMax
+	savefile->ReadInt( damageTimerMax ); //  int damageTimerMax
+
+	savefile->ReadString( damageDefname ); // idStr damageDefname
+
+	savefile->ReadObject( attachOwner ); //  idEntityPtr<idEntity> attachOwner
+	savefile->ReadObject( CastClassPtrRef(particleEmitter) ); //  idFuncEmitter			* particleEmitter
+
+	savefile->ReadBounds( damageBounds ); //  idBounds damageBounds
 }
 
 idFireAttachment::idFireAttachment(void)

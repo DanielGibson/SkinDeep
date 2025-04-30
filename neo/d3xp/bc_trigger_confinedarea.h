@@ -8,6 +8,8 @@ public:
 						idTrigger_confinedarea();
 	virtual				~idTrigger_confinedarea(void);
 	void				Spawn();
+	void				Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void				Restore(idRestoreGame *savefile);
 
 	float				adjustedBaseAngle;
 	float				baseAngle;

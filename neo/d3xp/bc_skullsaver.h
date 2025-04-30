@@ -15,7 +15,7 @@ public:
 	virtual					~idSkullsaver(void);
 
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -42,10 +42,15 @@ public:
 
 	void					ResetConveyTime();
 	bool					IsConveying() const { return state == SKULLSAVER_CONVEYING || state == SKULLSAVER_CONVEYJUMP; }
+	bool					IsRespawning() const { return state == SKULLSAVER_STARTRESPAWN; }
 
 	void					SetBodyOwner(idEntity* ent);
 
 	void					SetSpawnLocOrig(idLocationEntity * locEnt){ aiSpawnLocOrig = locEnt; }
+
+	virtual void			JustThrown();
+
+	//public end
 
 private:
 
@@ -61,12 +66,14 @@ private:
     renderLight_t			headlight;
 	qhandle_t				headlightHandle;
 
-	const idDeclParticle *	idleSmoke;
+	const idDeclParticle *	idleSmoke = nullptr;
 	int						idleSmokeFlyTime;
 
 	int						heybarkTimer;
 
-	idFuncEmitter			*soundwaves;
+	idFuncEmitter			*soundwaves = nullptr;
+
+	idFuncEmitter*			regnerationParticle = nullptr;
 
 
 	
@@ -78,26 +85,33 @@ private:
 	int						conveyorStartMoveTime;
 	idVec3					conveyorDestPosition;
 	idVec3					conveyorRespawnPos;
-	idAAS*					aas;
+	idAAS*					aas = nullptr;
 	int						destinationArea;
 
 	void					SetupPath();
 	idList<idVec3>			pathPoints;
-	idBeam*					pathBeamOrigin[CONVEY_MAX_PATH];
-	idBeam*					pathBeamTarget[CONVEY_MAX_PATH];
+	idBeam*					pathBeamOrigin[CONVEY_MAX_PATH] = {};
+	idBeam*					pathBeamTarget[CONVEY_MAX_PATH] = {};
 
 	bool					hasStoredSkull;
 
 
 	bool					isLowHealthState;
-	const idDeclParticle *	damageParticle;
+	const idDeclParticle *	damageParticle = nullptr;
 	int						damageParticleFlyTime;
-	idFuncEmitter			*damageEmitter;
+	idFuncEmitter			*damageEmitter = nullptr;
 
 	idEntityPtr<idEntity>	lostandfoundMachine;
 	idEntity*				FindLostandfoundMachine();
 
 
 	idEntityPtr<idLocationEntity>	aiSpawnLocOrig;
+
+	bool					waitingForNinaReply;
+	int						ninaReplyTimer;
+
+	bool					rantcheckDone;
+
+	//private end
 };
 //#pragma once

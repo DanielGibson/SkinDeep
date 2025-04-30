@@ -49,10 +49,12 @@ void idSupplyStation::Spawn(void)
 
 void idSupplyStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( podOwner ); // idEntityPtr<idEntity> podOwner
 }
 
 void idSupplyStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( podOwner ); // idEntityPtr<idEntity> podOwner
 }
 
 void idSupplyStation::Think(void)

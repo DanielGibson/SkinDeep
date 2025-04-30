@@ -215,7 +215,7 @@ public:
 
 						idTarget_FadeEntity( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Think( void );
@@ -399,7 +399,7 @@ class idTarget_SetFov : public idTarget {
 public:
 	CLASS_PROTOTYPE( idTarget_SetFov );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Think( void );
@@ -493,7 +493,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 private:

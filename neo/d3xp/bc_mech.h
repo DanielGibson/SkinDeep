@@ -11,6 +11,8 @@ public:
 
 	
 	void					Spawn(void);
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
 
 	virtual void			Think(void);
 	
@@ -66,12 +68,12 @@ private:
 	int					deathCountdownState;
 	int					deathTimer;
 
-	const idDeclParticle *	fireParticles;
+	const idDeclParticle *	fireParticles = nullptr;
 	int						fireParticlesFlyTime;
 
-	idEntity*				countdownGui;
+	idEntity*				countdownGui = nullptr;
 
-	idLight *				fireLight;
+	idLight *				fireLight = nullptr;
 
 	// For player firing
 	float					playerWeaponLastFireTime;
@@ -81,13 +83,13 @@ private:
 	float					playerWeaponRackDuration;
 	float					playerWeaponRackFinishTime;
 
-	const idDict*			playerProjectile;
+	const idDict*			playerProjectile = nullptr;
 
-	const idSoundShader*	playerSoundFireWeapon;
-	const idSoundShader*	playerSoundLastShot;
-	const idSoundShader*	playerSoundDryFire;
-	const idSoundShader*	playerSoundReload;
-	const idSoundShader*	playerSoundRack;
+	const idSoundShader*	playerSoundFireWeapon = nullptr;
+	const idSoundShader*	playerSoundLastShot = nullptr;
+	const idSoundShader*	playerSoundDryFire = nullptr;
+	const idSoundShader*	playerSoundReload = nullptr;
+	const idSoundShader*	playerSoundRack = nullptr;
 	int						playerAmmo;
 	int						playerClip;
 	int						playerClipSize;

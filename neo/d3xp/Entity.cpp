@@ -56,6 +56,11 @@ If you have questions concerning this license or the applicable additional terms
 //#define GRAVITYFLOATSPEED		8	//when idle in zero g environment, nudge it up a little.
 #define GRAVITYFLOATANGULAR		4
 
+// SW 3rd March 2025
+// Before we made this a tuneable parameter, this was the hardcoded value.
+// I could not possibly tell you why.
+#define DEFAULT_DIRECT_DAMAGE_RADIUS 15
+
 
 const int HEALTHBAR_DISPLAYTIME = 1000;
 const int SECURITYCAMERA_DISPLAYTIME = 30000;
@@ -165,6 +170,7 @@ const idEventDef EV_RepairEntity("setRepair", NULL);
 const idEventDef EV_EntityTeleport("entityTeleport", "vv");
 const idEventDef EV_SetSystemicVOEnabled("setSystemicVOEnabled", "d");
 const idEventDef EV_IsPlayingSound("isPlayingSound", "d", 'd');
+const idEventDef EV_PostSaveRestore("<postsaverestore>", NULL);
 
 ABSTRACT_DECLARATION(idClass, idEntity)
 EVENT(EV_GetName, idEntity::Event_GetName)
@@ -259,6 +265,7 @@ EVENT(EV_RepairEntity,			idEntity::Event_RepairEntity)
 EVENT(EV_EntityTeleport,		idEntity::Event_EntityTeleport)
 EVENT(EV_SetSystemicVOEnabled,	idEntity::Event_SetSystemicVoEnabled)
 EVENT(EV_IsPlayingSound,		idEntity::Event_IsPlayingSound)
+EVENT(EV_PostSaveRestore,		idEntity::Event_PostSaveRestore)
 
 END_CLASS
 
@@ -334,6 +341,10 @@ void idGameEdit::ParseSpawnArgsToRenderEntity( const idDict *args, renderEntity_
 	}
 
 	temp = args->GetString( "skin" );
+	if (!g_bloodEffects.GetBool() && args->FindKey("skin_noblood"))
+	{
+		temp = args->GetString("skin_noblood");
+	}
 	if ( temp[0] != '\0' ) {
 		renderEntity->customSkin = declManager->FindSkin( temp );
 	} else if ( modelDef ) {
@@ -586,6 +597,9 @@ idEntity::idEntity() {
 	systemicVoEnabled = true;
 
 	infomapPositionOffset = vec2_zero;
+
+	// SW 3rd March 2025
+	directDamageRadius = DEFAULT_DIRECT_DAMAGE_RADIUS;
 }
 
 /*
@@ -857,7 +871,8 @@ void idEntity::Spawn( void ) {
 		SetDepthHack(true);
 	}
 
-    team = 0; //default to player team.
+	// SW 11th March 2025: adding support for team override (default is friendly)
+	team = spawnArgs.GetInt("team", "0");
 	throwTime = 0;
 
 	if (spawnArgs.GetBool("zerog", "0"))
@@ -919,13 +934,16 @@ void idEntity::Spawn( void ) {
 		//if it's a debug object, hide it at game start.
 		Hide();
 	}
+
+	// SW 3rd March 2025
+	float radius = spawnArgs.GetFloat("directDamageRadius");
+	directDamageRadius = (radius > 0) ? radius : DEFAULT_DIRECT_DAMAGE_RADIUS;
 }
 
 void idEntity::Event_PostSpawn()
 {
 	UpdateGravity();
 }
-
 
 /*
 ================
@@ -950,6 +968,7 @@ idEntity::~idEntity( void ) {
 	if ( thinkFlags ) {
 		BecomeInactive( thinkFlags );
 	}
+	thinkFlags = TH_DISABLED;
 	activeNode.Remove();
 
 	Signal( SIG_REMOVED );
@@ -991,6 +1010,8 @@ idEntity::~idEntity( void ) {
 		gameLocal.GetLocalPlayer()->SetFrobEnt(NULL);
 	}
 	
+	assert( !activeNode.InList() );
+	assert( !spawnNode.InList() );
 }
 
 /*
@@ -1001,64 +1022,163 @@ idEntity::Save
 void idEntity::Save( idSaveGame *savefile ) const {
 	int i, j;
 
-	savefile->WriteInt( entityNumber );
-	savefile->WriteInt( entityDefNumber );
+	savefile->WriteInt(entityNumber); // int entityNumber
+	savefile->WriteInt( entityDefNumber ); // int entityDefNumber
 
-	// spawnNode and activeNode are restored by gameLocal
+	// idLinkList<idEntity>	spawnNode; // spawnNode and activeNode are restored by gameLocal
+	// idLinkList<idEntity>	activeNode; // spawnNode and activeNode are restored by gameLocal
+	
+	// idLinkList<idEntity>	aimAssistNode; // blendo eric: linked upon init in actor.cpp?
+	// idLinkList<idEntity>	snapshotNode; // blendo eric: network only?
 
-	savefile->WriteInt( snapshotSequence );
-	savefile->WriteInt( snapshotBits );
+	savefile->WriteInt( snapshotSequence ); // int snapshotSequence
+	savefile->WriteInt( snapshotBits ); // int snapshotBits
 
-	savefile->WriteDict( &spawnArgs );
-	savefile->WriteString( name );
-	scriptObject.Save( savefile );
+	savefile->WriteString( name ); //  idString name
+	savefile->WriteDict( &spawnArgs ); //  idDict spawnArgs
+	savefile->WriteScriptObject( scriptObject ); //  idScriptObject scriptObject
 
-	savefile->WriteInt( thinkFlags );
-	savefile->WriteInt( dormantStart );
-	savefile->WriteBool( cinematic );
+	savefile->WriteInt( thinkFlags ); // int thinkFlags
+	savefile->WriteInt( dormantStart ); // int dormantStart
+	savefile->WriteBool( cinematic ); // bool cinematic
 
-	savefile->WriteObject( cameraTarget );
+	// savefile->WriteRenderView(renderView); // blendo eric: this is currently init by GetRenderView()
 
-	savefile->WriteInt( health );
+	savefile->WriteObject( cameraTarget ); // idEntity * cameraTarget
 
-	savefile->WriteInt( targets.Num() );
+	savefile->WriteInt( targets.Num() ); // idList< idEntityPtr<idEntity> >	targets
 	for( i = 0; i < targets.Num(); i++ ) {
 		targets[ i ].Save( savefile );
 	}
 
-	entityFlags_s flags = fl;
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( health ); // int health
+	savefile->WriteBool( dynamicSpectrum ); // bool dynamicSpectrum
+	savefile->WriteInt( spectrum ); // int spectrum
+
+	entityFlags_s flags = fl; // entityFlags_s fl
 	LittleBitField( &flags, sizeof( flags ) );
 	savefile->Write( &flags, sizeof( flags ) );
 
-#ifdef _D3XP
-	savefile->WriteInt( timeGroup );
-	savefile->WriteBool( noGrab );
-	savefile->WriteRenderEntity( xrayEntity );
-	savefile->WriteInt( xrayEntityHandle );
-	savefile->WriteSkin( xraySkin );
-#endif
+	savefile->WriteInt( timeGroup ); // int timeGroup
+	savefile->WriteBool( noGrab ); // bool noGrab
 
-	savefile->WriteRenderEntity( renderEntity );
-	savefile->WriteInt( modelDefHandle );
-	savefile->WriteRefSound( refSound );
+	savefile->WriteRenderEntity( xrayEntity ); // RenderEntity xrayEntity
+	savefile->WriteInt( xrayEntityHandle ); // int xrayEntityHandle
+	savefile->WriteSkin( xraySkin ); // Skin xraySkin
 
-	savefile->WriteObject( bindMaster );
-	savefile->WriteJoint( bindJoint );
-	savefile->WriteInt( bindBody );
-	savefile->WriteObject( teamMaster );
-	savefile->WriteObject( teamChain );
+	savefile->WriteBool( isFrobbable ); //  bool isFrobbable
+	savefile->WriteString( displayName ); //  idString displayName
+	savefile->WriteString( displayNameHold ); //  idString displayNameHold
 
-	savefile->WriteStaticObject( defaultPhysicsObj );
+	// idLinkList<idEntity>	bafflerNode //  blendo eric: regened by derived ents
 
-	savefile->WriteInt( numPVSAreas );
-	for( i = 0; i < MAX_PVS_AREAS; i++ ) {
-		savefile->WriteInt( PVSAreas[ i ] );
+	savefile->WriteInt( maxHealth ); //  int maxHealth
+	//idLinkList<idEntity>	aiSearchNodes; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	interestNode; //  blendo eric: regened by derived ents
+
+	savefile->WriteInt( team ); //  int team
+	savefile->WriteInt( throwTime ); //  int throwTime
+	savefile->WriteInt( healthbarDisplaytime ); //  int healthbarDisplaytime
+	savefile->WriteInt( cameraiconDisplaytime ); //  int cameraiconDisplaytime
+	savefile->WriteBool( needsRepair ); //  bool needsRepair
+	savefile->WriteVec3( repairWorldposition ); //  idVec3 repairWorldposition
+	savefile->WriteInt( repairrequestTimestamp ); //  int repairrequestTimestamp
+	savefile->WriteBool( repairRequestVerified ); //  bool repairRequestVerified
+
+	//idLinkList<idEntity>	confinedNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	ventdoorNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	repairNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	hatchNode;  //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	turretNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	petNode //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	securitycameraNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	airlockNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	catfriendNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	landmineNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	skullsaverNode;  // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	catcageNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	spacenudgeNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	memorypalaceNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	dynatipNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	idletaskNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	windowshutterNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	electricalboxNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	spectatenodeNode; // blendo eric: regened by derived ents
+
+	savefile->WriteInt( lastFireattachmentDamagetime ); //  int lastFireattachmentDamagetime
+	savefile->WriteFloat( itemDamageVelocityMin ); //  float itemDamageVelocityMin
+
+	savefile->WriteInt( lastHealth ); //  int lastHealth
+	savefile->WriteInt( lastHealthTimer ); //  int lastHealthTimer
+
+	savefile->WriteInt( lastDamageTime ); //  int lastDamageTime
+
+	savefile->WriteString( locID ); //  idString locID
+
+	savefile->WriteBool( systemicVoEnabled ); //  bool systemicVoEnabled
+
+	savefile->WriteVec2( infomapPositionOffset ); //  idVec2 infomapPositionOffset
+
+	savefile->WriteRenderEntity( renderEntity ); //  renderEntity_t renderEntity
+	savefile->WriteInt( modelDefHandle ); //  int modelDefHandle
+	savefile->WriteRefSound( refSound ); //  refSound_t refSound
+	
+	savefile->WriteBool( isFrobHoldable ); //  bool isFrobHoldable
+	savefile->WriteInt( jockeyFrobDebounceMax ); //  int jockeyFrobDebounceMax
+	savefile->WriteInt( jockeyFrobDebounceTimer ); //  int jockeyFrobDebounceTimer
+	savefile->WriteBool( canClamber ); //  bool canClamber
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( GuiParamStr.Num() ); //idHashTable<idStr> GuiParamStr;
+	for (int idx = 0; idx < GuiParamStr.Num(); idx++) {
+	idStr outKey;
+		idStr outVal;
+		GuiParamStr.GetIndex(idx, &outKey, &outVal);
+		savefile->WriteString( outKey );
+		savefile->WriteString( outVal );
 	}
 
-	if ( !signals ) {
-		savefile->WriteBool( false );
-	} else {
-		savefile->WriteBool( true );
+	savefile->WriteInt( GuiParamInt.Num() ); //idHashTable<int>		GuiParamInt
+	for (int idx = 0; idx < GuiParamInt.Num(); idx++) {
+		idStr outKey;
+		int outVal;
+		GuiParamInt.GetIndex(idx, &outKey, &outVal);
+		savefile->WriteString( outKey );
+		savefile->WriteInt( outVal );
+	}
+
+	savefile->WriteInt( GuiParamFloat.Num() ); //idHashTable<float>		GuiParamFloat
+	for (int idx = 0; idx < GuiParamFloat.Num(); idx++) {
+		idStr outKey;
+		float outVal;
+		GuiParamFloat.GetIndex(idx, &outKey, &outVal);
+		savefile->WriteString( outKey );
+		savefile->WriteFloat( outVal );
+	}
+
+	savefile->WriteStaticObject( idEntity::defaultPhysicsObj ); //  idPhysics_Static defaultPhysicsObj
+	bool restorePhysics = &defaultPhysicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics ); //  idPhysics * physics
+	if (!restorePhysics) {
+		savefile->WriteObject( physics );
+	}
+
+	savefile->WriteObject( bindMaster ); //  idEntity * bindMaster
+	savefile->WriteJoint( bindJoint ); //  saveJoint_t bindJoint
+	savefile->WriteInt( bindBody ); //  int bindBody
+	savefile->WriteObject( teamMaster ); //  idEntity * teamMaster
+	savefile->WriteObject( teamChain ); //  idEntity * teamChain
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( numPVSAreas ); // int numPVSAreas
+	SaveFileWriteArray(PVSAreas, MAX_PVS_AREAS, WriteInt);  // int PVSAreas[MAX_PVS_AREAS]
+
+	savefile->WriteBool( signals != nullptr ); // signalList_t * signals, custom data
+	if ( signals ) {
 		for( i = 0; i < NUM_SIGNALS; i++ ) {
 			savefile->WriteInt( signals->signal[ i ].Num() );
 			for( j = 0; j < signals->signal[ i ].Num(); j++ ) {
@@ -1068,7 +1188,23 @@ void idEntity::Save( idSaveGame *savefile ) const {
 		}
 	}
 
-	savefile->WriteInt( mpGUIState );
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( mpGUIState ); //  int mpGUIState
+
+	savefile->WriteBool( lastGravityState ); //  bool lastGravityState
+	savefile->WriteBool( forceNoGravity ); //  bool forceNoGravity
+	savefile->WriteBool( zeroGravityNudge ); //  bool zeroGravityNudge
+
+
+	savefile->WriteBool( isFrozen ); //  bool isFrozen
+
+	savefile->WriteString( speakerName ); //  idString speakerName
+
+	savefile->WriteFloat( directDamageRadius ); //  float directDamageRadius
+
+
+	savefile->WriteCheckSizeMarker();
 }
 
 /*
@@ -1081,70 +1217,182 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 	int			num;
 	idStr		funcname;
 
-	savefile->ReadInt( entityNumber );
-	savefile->ReadInt( entityDefNumber );
+	savefile->ReadInt( entityNumber ); // int entityNumber
+	savefile->ReadInt( entityDefNumber );  // int entityDefNumber
 
-	// spawnNode and activeNode are restored by gameLocal
+	// idLinkList<idEntity>	spawnNode; // spawnNode and activeNode are restored by gameLocal
+	// idLinkList<idEntity>	activeNode; // spawnNode and activeNode are restored by gameLocal
 
-	savefile->ReadInt( snapshotSequence );
-	savefile->ReadInt( snapshotBits );
+	// idLinkList<idEntity>	aimAssistNode; //  blendo eric: regened by derived ents
+	// idLinkList<idEntity>	snapshotNode; // blendo eric: network only?
 
-	savefile->ReadDict( &spawnArgs );
-	savefile->ReadString( name );
-	SetName( name );
+	savefile->ReadInt( snapshotSequence ); // int snapshotSequence
+	savefile->ReadInt( snapshotBits ); // int snapshotBits
 
-	scriptObject.Restore( savefile );
+	savefile->ReadString(name); //  idString name
+	SetName(name); // blendo eric: sets up entityhash in gamelocal
+	savefile->ReadDict( &spawnArgs ); //  idDict spawnArgs
+	savefile->ReadScriptObject(scriptObject); //  idScriptObject scriptObject
 
-	savefile->ReadInt( thinkFlags );
-	savefile->ReadInt( dormantStart );
-	savefile->ReadBool( cinematic );
+	savefile->ReadInt( thinkFlags ); // int thinkFlags
+	savefile->ReadInt( dormantStart ); // int dormantStart
+	savefile->ReadBool( cinematic ); // bool cinematic
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( cameraTarget ) );
+	// savefile->WriteRenderView(renderView); // blendo eric: this is currently init by GetRenderView()
 
-	savefile->ReadInt( health );
+	savefile->ReadObject( cameraTarget ); // idEntity * cameraTarget
 
-	targets.Clear();
+	targets.Clear(); // idList< idEntityPtr<idEntity> >	targets
 	savefile->ReadInt( num );
 	targets.SetNum( num );
 	for( i = 0; i < num; i++ ) {
 		targets[ i ].Restore( savefile );
 	}
 
-	savefile->Read( &fl, sizeof( fl ) );
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( health ); // int health
+	savefile->ReadBool( dynamicSpectrum ); // bool dynamicSpectrum
+	savefile->ReadInt( spectrum ); // int spectrum
+
+
+	savefile->Read( &fl, sizeof( fl ) ); // entityFlags_s fl
 	LittleBitField( &fl, sizeof( fl ) );
 
-#ifdef _D3XP
-	savefile->ReadInt( timeGroup );
-	savefile->ReadBool( noGrab );
-	savefile->ReadRenderEntity( xrayEntity );
-	savefile->ReadInt( xrayEntityHandle );
+
+	savefile->ReadInt( timeGroup );  // int timeGroup
+	savefile->ReadBool( noGrab ); // bool noGrab
+
+	savefile->ReadRenderEntity( xrayEntity ); // RenderEntity xrayEntity
+	savefile->ReadInt( xrayEntityHandle ); // int xrayEntityHandle
 	if ( xrayEntityHandle != -1 ) {
-		xrayEntityHandle =  gameRenderWorld->AddEntityDef( &xrayEntity );
+		gameRenderWorld->UpdateEntityDef( xrayEntityHandle, &xrayEntity );
 	}
-	savefile->ReadSkin( xraySkin );
-#endif
+	savefile->ReadSkin( xraySkin ); // Skin xraySkin
 
-	savefile->ReadRenderEntity( renderEntity );
-	savefile->ReadInt( modelDefHandle );
-	savefile->ReadRefSound( refSound );
+	savefile->ReadBool( isFrobbable ); //  bool isFrobbable
+	savefile->ReadString( displayName ); //  idString displayName
+	savefile->ReadString( displayNameHold ); //  idString displayNameHold
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( bindMaster ) );
-	savefile->ReadJoint( bindJoint );
-	savefile->ReadInt( bindBody );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( teamMaster ) );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( teamChain ) );
 
-	savefile->ReadStaticObject( defaultPhysicsObj );
-	RestorePhysics( &defaultPhysicsObj );
+	// idLinkList<idEntity>	bafflerNode //  blendo eric: regened by derived ents
 
-	savefile->ReadInt( numPVSAreas );
-	for( i = 0; i < MAX_PVS_AREAS; i++ ) {
-		savefile->ReadInt( PVSAreas[ i ] );
+	savefile->ReadInt( maxHealth ); //  int maxHealth
+	//idLinkList<idEntity>	aiSearchNodes; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	interestNode; //  blendo eric: regened by derived ents
+
+	savefile->ReadInt( team ); //  int team
+	savefile->ReadInt( throwTime ); //  int throwTime
+	savefile->ReadInt( healthbarDisplaytime ); //  int healthbarDisplaytime
+	savefile->ReadInt( cameraiconDisplaytime ); //  int cameraiconDisplaytime
+	savefile->ReadBool( needsRepair ); //  bool needsRepair
+	savefile->ReadVec3( repairWorldposition ); //  idVec3 repairWorldposition
+	savefile->ReadInt( repairrequestTimestamp ); //  int repairrequestTimestamp
+	savefile->ReadBool( repairRequestVerified ); //  bool repairRequestVerified
+
+	//idLinkList<idEntity>	confinedNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	ventdoorNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	repairNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	hatchNode;  //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	turretNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	petNode //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	securitycameraNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	airlockNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	catfriendNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	landmineNode; //  blendo eric: regened by derived ents
+	//idLinkList<idEntity>	skullsaverNode;  // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	catcageNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	spacenudgeNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	memorypalaceNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	dynatipNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	idletaskNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	windowshutterNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	electricalboxNode; // blendo eric: regened by derived ents
+	//idLinkList<idEntity>	spectatenodeNode; // blendo eric: regened by derived ents
+
+
+	savefile->ReadInt( lastFireattachmentDamagetime ); //  int lastFireattachmentDamagetime
+	savefile->ReadFloat( itemDamageVelocityMin ); //  float itemDamageVelocityMin
+
+	savefile->ReadInt( lastHealth ); //  int lastHealth
+	savefile->ReadInt( lastHealthTimer ); //  int lastHealthTimer
+
+	savefile->ReadInt( lastDamageTime ); //  int lastDamageTime
+
+	savefile->ReadString( locID ); //  idString locID
+
+	savefile->ReadBool( systemicVoEnabled ); //  bool systemicVoEnabled
+
+	savefile->ReadVec2( infomapPositionOffset ); //  idVec2 infomapPositionOffset
+
+	savefile->ReadRenderEntity( renderEntity ); //  renderEntity_t renderEntity
+	savefile->ReadInt( modelDefHandle ); //  int modelDefHandle
+	if ( modelDefHandle != -1 ) {
+		gameRenderWorld->UpdateEntityDef( modelDefHandle, &renderEntity );
+		if (fl.drawGlobally) {
+			gameRenderWorld->AddGlobalRenderEnt(modelDefHandle); 
+		}
 	}
+	savefile->ReadRefSound( refSound ); //  refSound_t refSound
+
+	savefile->ReadBool( isFrobHoldable ); //  bool isFrobHoldable
+	savefile->ReadInt( jockeyFrobDebounceMax ); //  int jockeyFrobDebounceMax
+	savefile->ReadInt( jockeyFrobDebounceTimer ); //  int jockeyFrobDebounceTimer
+	savefile->ReadBool( canClamber ); //  bool canClamber
+
+
+	savefile->ReadCheckSizeMarker();
+
+	int count;
+	idStr outKey;
+	savefile->ReadInt( count ); //idHashTable<idStr> GuiParamStr;
+	for (int idx = 0; idx < count; idx++) {
+		idStr outVal;
+		savefile->ReadString( outKey );
+		savefile->ReadString( outVal );
+		GuiParamStr.Set( outKey, outVal );
+	}
+
+	savefile->ReadInt( count ); //idHashTable<int> GuiParamInt
+	for (int idx = 0; idx < count; idx++) {
+		int outVal;
+		savefile->ReadString( outKey );
+		savefile->ReadInt( outVal );
+		GuiParamInt.Set( outKey, outVal );
+	}
+
+	savefile->ReadInt( count ); //  idHashTable<float> GuiParamFloat
+	for (int idx = 0; idx < count; idx++) {
+		float outVal;
+		savefile->ReadString( outKey );
+		savefile->ReadFloat( outVal );
+		GuiParamFloat.Set( outKey, outVal );
+	}
+
+	savefile->ReadStaticObject( defaultPhysicsObj ); //  idPhysics_Static defaultPhysicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );  //  idPhysics * physics
+	if (restorePhys) {
+		RestorePhysics( &defaultPhysicsObj );
+	} else { 
+		savefile->ReadObject( CastClassPtrRef(physics) );
+	}
+
+	savefile->ReadObject( bindMaster ); //  idEntity * bindMaster
+	savefile->ReadJoint( bindJoint ); //  saveJoint_t bindJoint
+	savefile->ReadInt( bindBody ); //  int bindBody
+	savefile->ReadObject( teamMaster ); //  idEntity * teamMaster
+	savefile->ReadObject( teamChain ); //  idEntity * teamChain
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( numPVSAreas ); // int numPVSAreas
+	SaveFileReadArray(PVSAreas, ReadInt); // int PVSAreas[MAX_PVS_AREAS]
 
 	bool readsignals;
-	savefile->ReadBool( readsignals );
-	if ( readsignals ) {
+	savefile->ReadBool( readsignals ); // signalList_t * signals, custom data
+	signals = nullptr;
+	if ( readsignals ) { 
 		signals = new signalList_t;
 		for( i = 0; i < NUM_SIGNALS; i++ ) {
 			savefile->ReadInt( num );
@@ -1160,12 +1408,24 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 		}
 	}
 
-	savefile->ReadInt( mpGUIState );
+	savefile->ReadCheckSizeMarker();
 
-	// restore must retrieve modelDefHandle from the renderer
-	if ( modelDefHandle != -1 ) {
-		modelDefHandle = gameRenderWorld->AddEntityDef( &renderEntity );
-	}
+	savefile->ReadInt( mpGUIState ); //  int mpGUIState
+
+	savefile->ReadBool( lastGravityState ); //  bool lastGravityState
+	savefile->ReadBool( forceNoGravity ); //  bool forceNoGravity
+	savefile->ReadBool( zeroGravityNudge ); //  bool zeroGravityNudge
+
+	savefile->ReadBool( isFrozen ); //  bool isFrozen
+
+	savefile->ReadString( speakerName ); //  idString speakerName
+
+	savefile->ReadFloat( directDamageRadius ); //  float directDamageRadius
+
+	savefile->ReadCheckSizeMarker();
+
+	if (renderEntity.trackInteractions && g_luminance_enabled.GetBool())
+		renderEntity.interactionCallback = idEntity::UpdateTrackedInteractions;
 }
 
 /*
@@ -1322,10 +1582,14 @@ bool idEntity::IsActive( void ) const {
 
 /*
 ================
-idEntity::BecomeActive
+idEntity::BecomeActive 
 ================
 */
 void idEntity::BecomeActive( int flags ) {
+	if (thinkFlags == TH_DISABLED) {
+		return;
+	}
+
 	if ( ( flags & TH_PHYSICS ) ) {
 		// enable the team master if this entity is part of a physics team
 		if ( teamMaster && teamMaster != this ) {
@@ -1356,6 +1620,10 @@ idEntity::BecomeInactive
 ================
 */
 void idEntity::BecomeInactive( int flags ) {
+	if (thinkFlags == TH_DISABLED) {
+		return;
+	}
+
 	if ( ( flags & TH_PHYSICS ) ) {
 		// may only disable physics on a team master if no team members are running physics or bound to a joints
 		if ( teamMaster == this ) {
@@ -2093,17 +2361,18 @@ bool idEntity::StartSoundShader( const idSoundShader *shader, const s_channelTyp
 
 	UpdateSound();
 
+	idStr outSampleName;
 	//BC
 	//if (!gameLocal.IsBaffled(GetPhysics()->GetOrigin()) || channel == SND_CHANNEL_HEART)
 	{
-		len = refSound.referenceSound->StartSound(shader, channel, diversity, soundShaderFlags, !timeGroup /*_D3XP*/, gameLocal.time);
+		len = refSound.referenceSound->StartSound(shader, channel, diversity, soundShaderFlags, !timeGroup /*_D3XP*/, gameLocal.time, &outSampleName);
 		if (length)
 		{
 			*length = len;
 		}
 	}
 
-	HandleSubtitle(shader->GetName(), len);
+	HandleSubtitle(shader->GetName(), len, outSampleName, channel);
 
 	// set reference to the sound for shader synced effects
 	renderEntity.referenceSound = refSound.referenceSound;
@@ -3057,6 +3326,10 @@ bool idEntity::RunPhysics( void ) {
 	idEntity *	part, *blockedPart, *blockingEntity = nullptr;
 	bool		moved;
 
+	if ( thinkFlags == TH_DISABLED ) {
+		return false;
+	}
+
 	// don't run physics if not enabled
 	if ( !( thinkFlags & TH_PHYSICS ) ) {
 		// however do update any animation controllers
@@ -3440,8 +3713,8 @@ bool idEntity::CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const {
 
 	// this should probably check in the plane of projection, rather than in world coordinate
 	dest = midpoint;
-	dest[0] += 15.0;
-	dest[1] += 15.0;
+	dest[0] += directDamageRadius;
+	dest[1] += directDamageRadius;
 	gameLocal.clip.TracePoint( tr, origin, dest, MASK_SOLID, NULL );
 	if ( tr.fraction == 1.0 || ( gameLocal.GetTraceEntity( tr ) == this ) ) {
 		damagePoint = tr.endpos;
@@ -3449,8 +3722,8 @@ bool idEntity::CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const {
 	}
 
 	dest = midpoint;
-	dest[0] += 15.0;
-	dest[1] -= 15.0;
+	dest[0] += directDamageRadius;
+	dest[1] -= directDamageRadius;
 	gameLocal.clip.TracePoint( tr, origin, dest, MASK_SOLID, NULL );
 	if ( tr.fraction == 1.0 || ( gameLocal.GetTraceEntity( tr ) == this ) ) {
 		damagePoint = tr.endpos;
@@ -3458,8 +3731,8 @@ bool idEntity::CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const {
 	}
 
 	dest = midpoint;
-	dest[0] -= 15.0;
-	dest[1] += 15.0;
+	dest[0] -= directDamageRadius;
+	dest[1] += directDamageRadius;
 	gameLocal.clip.TracePoint( tr, origin, dest, MASK_SOLID, NULL );
 	if ( tr.fraction == 1.0 || ( gameLocal.GetTraceEntity( tr ) == this ) ) {
 		damagePoint = tr.endpos;
@@ -3467,8 +3740,8 @@ bool idEntity::CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const {
 	}
 
 	dest = midpoint;
-	dest[0] -= 15.0;
-	dest[1] -= 15.0;
+	dest[0] -= directDamageRadius;
+	dest[1] -= directDamageRadius;
 	gameLocal.clip.TracePoint( tr, origin, dest, MASK_SOLID, NULL );
 	if ( tr.fraction == 1.0 || ( gameLocal.GetTraceEntity( tr ) == this ) ) {
 		damagePoint = tr.endpos;
@@ -3476,7 +3749,7 @@ bool idEntity::CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const {
 	}
 
 	dest = midpoint;
-	dest[2] += 15.0;
+	dest[2] += directDamageRadius;
 	gameLocal.clip.TracePoint( tr, origin, dest, MASK_SOLID, NULL );
 	if ( tr.fraction == 1.0 || ( gameLocal.GetTraceEntity( tr ) == this ) ) {
 		damagePoint = tr.endpos;
@@ -3484,7 +3757,7 @@ bool idEntity::CanDamage( const idVec3 &origin, idVec3 &damagePoint ) const {
 	}
 
 	dest = midpoint;
-	dest[2] -= 15.0;
+	dest[2] -= directDamageRadius;
 	gameLocal.clip.TracePoint( tr, origin, dest, MASK_SOLID, NULL );
 	if ( tr.fraction == 1.0 || ( gameLocal.GetTraceEntity( tr ) == this ) ) {
 		damagePoint = tr.endpos;
@@ -3648,7 +3921,7 @@ void idEntity::AddDamageEffect( const trace_t &collision, const idVec3 &velocity
 		StartSoundShader( declManager->FindSound( sound ), SND_CHANNEL_BODY, 0, false, NULL );
 	}
 
-	if ( g_decals.GetBool() ) {
+	if ( g_decals.GetBool() && g_bloodEffects.GetBool()) {
 		// place a wound overlay on the model
 		key = va( "mtr_wound_%s", materialType );
 		decal = spawnArgs.RandomPrefix( key, gameLocal.random );
@@ -3663,7 +3936,7 @@ void idEntity::AddDamageEffect( const trace_t &collision, const idVec3 &velocity
 		}
 	}
 
-	if (1)
+	if (g_bloodEffects.GetBool())
 	{
 		//BC particle effects on taking damage.
 		const char *bleed;
@@ -4381,7 +4654,7 @@ Exposes teleport method to scripting.
 Using this instead of setOrigin() ensures that the entity correctly updates its gravity to match the destination.
 ================
 */
-void idEntity::Event_EntityTeleport(idVec3 origin, idVec3 angleVec)
+void idEntity::Event_EntityTeleport(const idVec3 &origin, const idVec3 &angleVec)
 {
 	idAngles angles = idAngles(angleVec);
 	Teleport(origin, angles, NULL);
@@ -4769,13 +5042,28 @@ void idEntity::Event_StartSoundShader( const char *soundName, int channel ) {
 }
 
 //Check if we need to display a subtitle.
-void idEntity::HandleSubtitle(const char* soundName, int length)
+void idEntity::HandleSubtitle(const char* soundName, int length, idStr& sampleName, s_channelType channel)
 {
 	const char* subtitle = common->GetLanguageDict()->GetString(va("#str_%s", soundName), false);
+	
+	// SM: If we didn't find a subtitle for the soundName, maybe we can get one for the sample name?
+	if (!subtitle || subtitle[0] == '#')
+	{
+		idStrList splits = sampleName.Split('/');
+		if (splits.Num() > 0)
+		{
+			splits = splits[splits.Num() - 1].Split('.');
+			if (splits.Num() > 0)
+			{
+				subtitle = common->GetLanguageDict()->GetString(va("#str_%s", splits[0].c_str()), false);
+			}
+		}
+	}
+	
 	if (subtitle && subtitle[0] != '#')
 	{
 		// blendo eric: use estimated sound intensity to check if subtitle should be played
-		float intensity = refSound.referenceSound->OverallIntensity();
+		float intensity = refSound.referenceSound->OverallIntensity(channel);
 		if (intensity > gui_subtitleCutoffIntensity.GetFloat())
 		{
 			gameLocal.AddSubtitle(speakerName, subtitle, length);
@@ -5225,7 +5513,7 @@ void idEntity::Event_DistanceTo( idEntity *ent ) {
 idEntity::Event_DistanceToPoint
 ================
 */
-void idEntity::Event_DistanceToPoint( const idVec3 &point ) {
+void idEntity::Event_DistanceToPoint(const idVec3 &point) {
 	float dist = ( GetPhysics()->GetOrigin() - point ).LengthFast();
 	idThread::ReturnFloat( dist );
 }
@@ -5785,10 +6073,25 @@ archives object for save game file
 ================
 */
 void idAnimatedEntity::Save( idSaveGame *savefile ) const {
-	animator.Save( savefile );
+	animator.Save( savefile ); // idAnimator animator
 
-	// Wounds are very temporary, ignored at this time
-	//damageEffect_t			*damageEffects;
+	// prev note: Wounds are very temporary, ignored at this time // blendo eric: trying anyway, needs testing
+	damageEffect_t * curFx = damageEffects; // damageEffect_t * damageEffects;
+	while  (true) {
+		savefile->WriteBool(curFx != nullptr);
+		if (curFx) {
+			savefile->WriteJoint( curFx->jointNum ); //  saveJoint_t jointNum
+			savefile->WriteVec3( curFx->localOrigin ); //  idVec3 localOrigin
+			savefile->WriteVec3( curFx->localNormal ); //  idVec3 localNormal
+			savefile->WriteInt( curFx->time ); //  int time
+			savefile->WriteParticle( curFx->type ); // const  idDeclParticle*	 type
+			curFx = curFx->next;
+		}
+		else
+		{
+			break;
+		}
+	}
 }
 
 /*
@@ -5799,7 +6102,7 @@ unarchives object from save game file
 ================
 */
 void idAnimatedEntity::Restore( idRestoreGame *savefile ) {
-	animator.Restore( savefile );
+	animator.Restore( savefile );  // idAnimator animator
 
 	// check if the entity has an MD5 model
 	if ( animator.ModelHandle() ) {
@@ -5809,6 +6112,29 @@ void idAnimatedEntity::Restore( idRestoreGame *savefile ) {
 		animator.GetBounds( gameLocal.time, renderEntity.bounds );
 		if ( modelDefHandle != -1 ) {
 			gameRenderWorld->UpdateEntityDef( modelDefHandle, &renderEntity );
+		}
+	}
+
+	// prev note: Wounds are very temporary, ignored at this time // blendo eric: trying anyway, needs testing
+	damageEffect_t * curFx = nullptr; // damageEffect_t * damageEffects;
+	while  (true) {
+		bool hasNext;
+		savefile->ReadBool(hasNext);
+		if (hasNext) {
+			if(curFx){
+				curFx->next = new damageEffect_t;
+				curFx = curFx->next;
+			} else {
+				curFx = new damageEffect_t;
+				damageEffects = curFx;
+			}
+			savefile->ReadJoint( curFx->jointNum ); //  saveJoint_t jointNum
+			savefile->ReadVec3( curFx->localOrigin ); //  idVec3 localOrigin
+			savefile->ReadVec3( curFx->localNormal ); //  idVec3 localNormal
+			savefile->ReadInt( curFx->time ); //  int time
+			savefile->ReadParticle( curFx->type ); // const  idDeclParticle*	 type
+		} else {
+			break;
 		}
 	}
 }
@@ -6083,11 +6409,11 @@ void idAnimatedEntity::AddLocalDamageEffect( jointHandle_t jointNum, const idVec
 		gameLocal.BloodSplat( origin, dir, 128.0f /*decalsize*/, splat );
 	}
 
-	// can't see wounds on the player model in single player mode
-	//if ( !( IsType( idPlayer::Type ) && !gameLocal.isMultiplayer ) )
 
-	//BC allow wound decals on player model.
-	if ( !gameLocal.isMultiplayer)
+	// SW 25th Feb 2025
+	// Reintroducing the check that excludes the player from receiving wound decals.
+	// This is regrettable but it's the only quick fix that'll prevent the issue with floating blood decals on invisible arms
+	if ( !gameLocal.isMultiplayer && g_bloodEffects.GetBool() && !(IsType(idPlayer::Type)))
 	{
 		// place a wound overlay on the model
 		key = va( "mtr_wound_%s", materialType );
@@ -6111,6 +6437,8 @@ void idAnimatedEntity::AddLocalDamageEffect( jointHandle_t jointNum, const idVec
 	if (!g_hiteffects.GetBool() && this == gameLocal.GetLocalPlayer())
 		return;
 
+	if (!g_bloodEffects.GetBool())
+		return;
 
 	key = va( "smoke_wound_%s", materialType );
 	bleed = spawnArgs.GetString( key );
@@ -6483,7 +6811,8 @@ void idEntity::UpdateGravity(bool forceUpdate)
 
 			if (this->IsType(idSkullsaver::Type))
 			{
-				if (static_cast<idSkullsaver *>(this)->IsConveying())
+				// SW 27th Feb 2025: Check for respawn state too
+				if (static_cast<idSkullsaver *>(this)->IsConveying() || static_cast<idSkullsaver*>(this)->IsRespawning())
 				{
 					static_cast<idSkullsaver *>(this)->ResetConveyTime();
 				}
@@ -6588,9 +6917,45 @@ bool idEntity::DoesPlayerHaveLOStoMe()
 	return false;
 }
 
+//BC 2-13-2025: This is a simpler version of the LOS check, that just checks the origin and has a tighter FOV check.
+bool idEntity::DoesPlayerHaveLOStoMe_Simple()
+{
+	idVec3 dirPlayerToMe = GetPhysics()->GetOrigin() - gameLocal.GetLocalPlayer()->firstPersonViewOrigin;
+
+	dirPlayerToMe.Normalize();
+	float facingResult = DotProduct(dirPlayerToMe, gameLocal.GetLocalPlayer()->viewAngles.ToForward()); // 1.0 = look directly at it , -1.0 = looking directly away
+	if (facingResult < 0.5f)
+		return false;
+
+	trace_t tr;
+	gameLocal.clip.TracePoint(tr, gameLocal.GetLocalPlayer()->firstPersonViewOrigin, GetPhysics()->GetOrigin() + idVec3(0,0,.1f), MASK_SOLID, NULL);
+	if (tr.fraction >= 1)
+	{
+		//has LOS.
+		return true;
+	}
+
+	return false;
+}
+
+
+
+
+
+
 void idEntity::DoHack()
 {
-	//BC for the hack grenade.
+	// SW 11th March 2025:
+	// Adding functionality for any entity to be 'hackable' for scripted map stuff (i.e. the safe in sh_vault).
+	// This should be safe since it was always intended to be a virtual function that the children override anyway.
+	if (spawnArgs.GetBool("hackable", "0"))
+	{
+		idStr hackScript = spawnArgs.GetString("call_onhack");
+		if (hackScript.Length() > 0)
+		{
+			gameLocal.RunMapScriptArgs(hackScript.c_str(), this, this);
+		}
+	}
 }
 
 void idEntity::SetPostFlag(customPostFlag_t flag, bool enable)
@@ -6607,9 +6972,12 @@ void idEntity::SetPostFlag(customPostFlag_t flag, bool enable)
 
 		UpdateVisuals();
 
-		for (idEntity* childEnt = GetNextTeamEntity(); childEnt != nullptr; childEnt = childEnt->GetNextTeamEntity())
+		if (GetTeamMaster() == this)
 		{
-			childEnt->SetPostFlag(flag, enable);
+			for (idEntity* childEnt = GetNextTeamEntity(); childEnt != nullptr; childEnt = childEnt->GetNextTeamEntity())
+			{
+				childEnt->SetPostFlag(flag, enable);
+			}
 		}
 	}
 }

@@ -39,10 +39,21 @@ void idSecurityKey::Spawn(void)
 
 void idSecurityKey::Save(idSaveGame *savefile) const
 {
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
 }
 
 void idSecurityKey::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
 }
 
 void idSecurityKey::Think(void)

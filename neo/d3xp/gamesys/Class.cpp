@@ -319,6 +319,31 @@ idClass::~idClass() {
 	isRemoved = true;
 }
 
+
+/*
+================
+idClass::Save
+================
+*/
+// blendo eric
+void idClass::Save(idSaveGame* savefile) const
+{
+	savefile->WriteCheckType(SG_CHECK_CLASS);
+	savefile->WriteBool(isRemoved); // bool isRemoved
+}
+
+/*
+================
+idClass::Restore
+================
+*/
+// blendo eric
+void idClass::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadCheckType(SG_CHECK_CLASS);
+	savefile->ReadBool(isRemoved); // bool isRemoved
+}
+
 /*
 ================
 idClass::DisplayInfo_f

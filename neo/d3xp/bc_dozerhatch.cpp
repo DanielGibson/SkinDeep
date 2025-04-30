@@ -46,10 +46,14 @@ void idDozerhatch::Spawn(void)
 
 void idDozerhatch::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+	savefile->WriteInt( hatchState ); //  int hatchState
 }
 
 void idDozerhatch::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+	savefile->ReadInt( hatchState ); //  int hatchState
 }
 
 //botType:  0 = "def_spawndef", 1 = "def_securitybot"

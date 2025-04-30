@@ -13,7 +13,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -29,10 +29,10 @@ private:
     //int                     damageTimer;
     int                     damageTimerMax;
 
-    const char *            damageDefname;
+    idStr					damageDefname;
 
 	idEntityPtr<idEntity>	attachOwner;
-	idFuncEmitter			*particleEmitter;
+	idFuncEmitter			*particleEmitter = nullptr;
 
 	idBounds				damageBounds;
 

@@ -64,10 +64,15 @@ If you have questions concerning this license or the applicable additional terms
 #include <commdlg.h>
 #include <ctime>
 #include "framework/miniz/miniz.h"
+#include "framework/Session_local.h"
+
+#include "framework/FileSystem.h"
 
 idCVar Win32Vars_t::win_outputDebugString( "win_outputDebugString", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar Win32Vars_t::win_outputEditString( "win_outputEditString", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar Win32Vars_t::win_viewlog( "win_viewlog", "0", CVAR_SYSTEM | CVAR_INTEGER, "" );
+idCVar Win32Vars_t::win_mindiskspace("win_mindiskspace", "1024", CVAR_SYSTEM | CVAR_ARCHIVE, "Minimum disk space (in MB) required to launch");
+idCVar win_dumploglines("win_dumploglines", "50", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE, "Number of recent log lines to show in crash dump");
 
 Win32Vars_t	win32;
 
@@ -221,8 +226,18 @@ bool Sys_IsWindowActive( void ) {
 Sys_Mkdir
 ==============
 */
-void Sys_Mkdir( const char *path ) {
-	_mkdir (path);
+int Sys_Mkdir( const char *path ) {
+	return _mkdir (path);
+}
+
+/*
+==============
+Sys_Access
+==============
+*/
+// modes: 00 Existence, 02 Write, 04 Read, 06 Read+write
+int Sys_Access( const char *path, SYS_ACCESS_MODE mode ) {
+	return _access(path, mode);
 }
 
 /*
@@ -304,23 +319,63 @@ Based on (with kind permission) Yamagi Quake II's Sys_GetHomeDir()
 Returns the number of characters written to dst
 ==============
  */
-static int GetHomeDir(char *dst, size_t size)
+ // blendo eric: windows "known" folders for save sorted by priority
+enum saveWindowsKnownFolders_t
 {
+	WKF_DEFAULT = 0,
+	WKF_APPDATA_ROAMING = 0,
+	WKF_MYDOCS,
+	WKF_APPDATA_LOCAL,
+	WKF_MAX
+};
+const int SAVE_WKF_WINIDS[3] = {
+	CSIDL_APPDATA,
+	CSIDL_PERSONAL,
+	CSIDL_LOCAL_APPDATA
+};
+const char* SAVE_WKF_SUB_PATHS[3] = {
+	"/skindeep",
+	"/My Games/skindeep",
+	"/skindeep"
+};
+
+static int GetHomeDir( char *dst, size_t size, saveWindowsKnownFolders_t knownFolder = WKF_DEFAULT )
+{
+	if (knownFolder >= WKF_MAX || knownFolder < 0) { return 0;  } // unknown folder, return length 0
+
 	int len;
 	WCHAR profile[MAX_OSPATH];
-
-	/* Get the path to "My Documents" directory */
-	SHGetFolderPathW(NULL, CSIDL_PERSONAL, NULL, 0, profile);
+	SHGetFolderPathW(NULL, SAVE_WKF_WINIDS[knownFolder], NULL, 0, profile);
 
 	len = WPath2A(dst, size, profile);
 	if (len == 0)
 		return 0;
 
-	idStr::Append(dst, size, "/My Games/skindeep");
+	ULARGE_INTEGER minBytes;
+	minBytes.QuadPart = win32.win_mindiskspace.GetInteger();
+	minBytes.QuadPart *= 1024 * 1024;
 
+	ULARGE_INTEGER bytesFree;
+	GetDiskFreeSpaceEx(dst, &bytesFree, nullptr, nullptr);
 
+	if (bytesFree.QuadPart < minBytes.QuadPart)
+	{
+		idStr errorMsg = idStr::Format("Insufficient disk space for My Documents path %s. Skin deep requires at least %d MB free.", dst, win32.win_mindiskspace.GetInteger());
+		MessageBox(NULL, errorMsg.c_str(), "Fatal Error", MB_OK | MB_ICONERROR);
+		exit(1);
+	}
 
-	return len;
+	idStr::Append( dst, size, SAVE_WKF_SUB_PATHS[knownFolder] );
+
+#if STEAM
+	idStr steamID = common->g_SteamUtilities->GetSteamID();
+	if (steamID.Length() > 0)
+	{
+		idStr::Append(dst, size, "/");
+		idStr::Append(dst, size, steamID.c_str());
+	}
+#endif
+	return strlen(dst);
 }
 
 static int GetRegistryPath(char *dst, size_t size, const WCHAR *subkey, const WCHAR *name) {
@@ -397,13 +452,41 @@ bool Sys_GetPath(sysPath_t type, idStr &path) {
 
 	case PATH_CONFIG:
 	case PATH_SAVE:
-		if (GetHomeDir(buf, sizeof(buf)) < 1) {
+
+	#if 0
+		// use only default save folder
+		if (GetHomeDir(buf, sizeof(buf), knownFolder) < 1) {
 			Sys_Error("ERROR: Couldn't get dir to home path");
 			return false;
 		}
 
 		path = buf;
 		return true;
+	#else
+		// blendo eric: test if the path is actually useable, or fallback to others
+		// (a bit messy including filesystem in here, but it had the function needed)
+		{
+			for (int knownFolder = WKF_DEFAULT; knownFolder < WKF_MAX; knownFolder++) {
+				if (GetHomeDir(buf, sizeof(buf), (saveWindowsKnownFolders_t)knownFolder) > 0) {
+					idStr tempPath = idStr(buf);
+					tempPath.ReplaceChar( '/', PATHSEPERATOR_CHAR );
+					tempPath.StripTrailing( PATHSEPERATOR_CHAR );
+					tempPath += PATHSEPERATOR_CHAR;
+					if ( !fileSystem->CreateOSPath( tempPath.c_str() ) ) {
+						common->Warning("Cannot access potential save folder: %s", buf);
+						continue;
+					}
+					if (type == PATH_SAVE) {
+						common->Printf("Using save folder: %s\n", buf);
+					}
+					path = buf;
+					return true;
+				}
+			}
+			Sys_Error("FATAL ERROR:\n\nSkin Deep was unable to access any potential save folder.\nThis may be because of anti-virus or firewall software. For solutions, please visit: https://blendogames.com/skindeep/support.htm");
+			return false;
+		}
+	#endif
 
 	case PATH_EXE:
 		GetModuleFileName(NULL, buf, sizeof(buf) - 1);
@@ -672,6 +755,8 @@ static mz_bool AddFileToZip( mz_zip_archive* zip, const char* fileName )
 	return mz_zip_writer_add_file( zip, fileName, fileName, nullptr, 0, 9 );
 }
 
+idStr outputMsg;
+
 static _EXCEPTION_POINTERS* crashExPtr = nullptr;
 BOOL CALLBACK CrashHandlerProc( HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam )
 {
@@ -720,6 +805,14 @@ BOOL CALLBACK CrashHandlerProc( HWND hwndDlg, UINT message, WPARAM wParam, LPARA
 
 			SendDlgItemMessage(hwndDlg, IDC_ERRORICON, STM_SETICON, (WPARAM)LoadIcon( nullptr, IDI_ERROR ), 0);
 
+			if (common && common->g_SteamUtilities && common->g_SteamUtilities->IsOnSteamDeck())
+			{
+				HWND breakButton = GetDlgItem(hwndDlg, IDC_BREAK);
+				ShowWindow(breakButton, SW_HIDE);
+
+				HWND dumpButton = GetDlgItem(hwndDlg, IDC_DUMP);
+				ShowWindow(dumpButton, SW_HIDE);
+			}
 			return TRUE;
 		}
 	case WM_COMMAND:
@@ -732,10 +825,18 @@ BOOL CALLBACK CrashHandlerProc( HWND hwndDlg, UINT message, WPARAM wParam, LPARA
 		}
 		case IDC_COPY:
 		{
-			HWND editText = GetDlgItem( hwndDlg, IDC_STACK );
-			SetFocus( editText );
-			SendMessage( editText, EM_SETSEL, 0, -1 );
-			SendMessage( editText, WM_COPY, 0, 0 );
+			idStr crashStr = sessLocal.GetSanitizedURLArgument(outputMsg);
+			idStr locationStr = sessLocal.GetPlayerLocationString();
+			idStr URL = idStr::Format("https://docs.google.com/forms/d/e/1FAIpQLScejbJ0SFfkHb0iWhFagXAikLwnyHOSie-n7tHUtFheFQ6oiQ/viewform?usp=dialog&entry.561524408=%s&entry.1770058426=%s", locationStr.c_str(), crashStr.c_str());
+			if (common && common->g_SteamUtilities && common->g_SteamUtilities->IsOnSteamDeck())
+			{
+				common->g_SteamUtilities->OpenSteamOverlaypage(URL.c_str());
+			}
+			else
+			{
+				ShellExecute(nullptr, nullptr, URL.c_str(), nullptr, nullptr, SW_SHOW);
+			}
+
 			return TRUE;
 		}
 		case IDC_DUMP:
@@ -764,7 +865,7 @@ BOOL CALLBACK CrashHandlerProc( HWND hwndDlg, UINT message, WPARAM wParam, LPARA
 			// Get the current time
 			time_t currTime = std::time( nullptr );
 			char dateStr[256];
-			strftime( dateStr, 256, "%F-%H.%M.%S", std::localtime( &currTime ) );
+			strftime( dateStr, 256, "%F-%H-%M-%S", std::localtime( &currTime ) );
 
 			// Have to save the original CWD as the path will change after the save file dialog
 			char originalCWD[1024];
@@ -867,8 +968,6 @@ int SEH_Filter( _EXCEPTION_POINTERS* ex, bool isMainThread = true )
 
 	disableAssertPrintf = true;
 
-	idStr outputMsg;
-
 	idCVar* versionCvar = cvarSystem->Find( "g_version" );
 	outputMsg += "Build: ";
 	outputMsg += versionCvar->GetString();
@@ -926,7 +1025,7 @@ int SEH_Filter( _EXCEPTION_POINTERS* ex, bool isMainThread = true )
 
 	outputMsg += "===================RECENT LOG====================\n";
 
-	outputMsg += console->GetLastLines( 50 );
+	outputMsg += console->GetLastLines(win_dumploglines.GetInteger(), true);
 
 	outputMsg += "====================HARDWARE=====================\n";
 
@@ -963,6 +1062,51 @@ int SEH_Filter( _EXCEPTION_POINTERS* ex, bool isMainThread = true )
 // SM: End code for stack traces/catch exceptions
 // ==========================================================================================
 
+// SM: High DPI aware code from newer version of dhewm3
+typedef enum D3_PROCESS_DPI_AWARENESS {
+	D3_PROCESS_DPI_UNAWARE = 0,
+	D3_PROCESS_SYSTEM_DPI_AWARE = 1,
+	D3_PROCESS_PER_MONITOR_DPI_AWARE = 2
+} D3_PROCESS_DPI_AWARENESS;
+
+
+static void setHighDPIMode(void)
+{
+	/* For Vista, Win7 and Win8 */
+	BOOL(WINAPI * SetProcessDPIAware)(void) = NULL;
+
+
+	/* Win8.1 and later */
+	HRESULT(WINAPI * SetProcessDpiAwareness)(D3_PROCESS_DPI_AWARENESS dpiAwareness) = NULL;
+
+
+	HINSTANCE userDLL = LoadLibrary("USER32.DLL");
+
+
+	if (userDLL)
+	{
+		SetProcessDPIAware = (BOOL(WINAPI*)(void)) GetProcAddress(userDLL, "SetProcessDPIAware");
+	}
+
+
+	HINSTANCE shcoreDLL = LoadLibrary("SHCORE.DLL");
+
+
+	if (shcoreDLL)
+	{
+		SetProcessDpiAwareness = (HRESULT(WINAPI*)(D3_PROCESS_DPI_AWARENESS))
+			GetProcAddress(shcoreDLL, "SetProcessDpiAwareness");
+	}
+
+
+	if (SetProcessDpiAwareness) {
+		SetProcessDpiAwareness(D3_PROCESS_PER_MONITOR_DPI_AWARE);
+	}
+	else if (SetProcessDPIAware) {
+		SetProcessDPIAware();
+	}
+}
+
 /*
 ==================
 WinMain
@@ -974,6 +1118,8 @@ __try{ // SM: Use __try/__except to catch unhandled exceptions
 
 #ifdef ID_DEDICATED
 	MSG msg;
+#else
+	setHighDPIMode();
 #endif
 
 	Sys_SetPhysicalWorkMemory( 192 << 20, 1024 << 20 );

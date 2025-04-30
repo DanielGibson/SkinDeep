@@ -34,7 +34,20 @@ idWalkietalkie::idWalkietalkie(void)
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
 
-	batteryAmount = BATTERYMAX;
+	walkietalkieState = 0;
+	timer = 0;
+
+	lureAvailable = false;
+
+	visualTimer = 0;
+	radarUpdateTimer = 0;
+	unitsDrawOnRadar = 0;
+
+	buttonDisplayState = 0;
+
+	flagModel = nullptr;
+
+	batteryAmount = 0;
 
 }
 
@@ -82,20 +95,58 @@ void idWalkietalkie::Spawn(void)
 
 	buttonDisplayState = WB_UNITIALIZED;
 
+	// SW 24th Feb 2025: walkie-talkie can spawn with less than maximum battery,
+	// if it is a dupe of another walkie-talkie
+	batteryAmount = spawnArgs.GetInt("initialbattery", "3");
 
-	
-
-	Event_SetGuiInt("batterycount", BATTERYMAX);
+	Event_SetGuiInt("batterycount", batteryAmount);
 
 	//gameRenderWorld->DebugArrowSimple(flagPos);
 }
 
 void idWalkietalkie::Save(idSaveGame *savefile) const
 {
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
+	savefile->WriteInt( walkietalkieState ); //  int walkietalkieState
+	savefile->WriteInt( timer ); //  int timer
+
+	savefile->WriteBool( lureAvailable ); //  bool lureAvailable
+
+	savefile->WriteInt( visualTimer ); //  int visualTimer
+	savefile->WriteInt( radarUpdateTimer ); //  int radarUpdateTimer
+	savefile->WriteInt( unitsDrawOnRadar ); //  int unitsDrawOnRadar
+
+	savefile->WriteInt( buttonDisplayState ); //  int buttonDisplayState
+
+	savefile->WriteObject( flagModel ); //  idAnimatedEntity* flagModel
+
+	savefile->WriteInt( batteryAmount ); //  int batteryAmount
 }
 
 void idWalkietalkie::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadInt( walkietalkieState ); //  int walkietalkieState
+	savefile->ReadInt( timer ); //  int timer
+
+	savefile->ReadBool( lureAvailable ); //  bool lureAvailable
+
+	savefile->ReadInt( visualTimer ); //  int visualTimer
+	savefile->ReadInt( radarUpdateTimer ); //  int radarUpdateTimer
+	savefile->ReadInt( unitsDrawOnRadar ); //  int unitsDrawOnRadar
+
+	savefile->ReadInt( buttonDisplayState ); //  int buttonDisplayState
+
+	savefile->ReadObject( CastClassPtrRef( flagModel ) ); //  idAnimatedEntity* flagModel
+
+	savefile->ReadInt( batteryAmount ); //  int batteryAmount
 }
 
 bool idWalkietalkie::DoBatteryLogic()
@@ -180,6 +231,12 @@ bool idWalkietalkie::DoFrob(int index, idEntity * frobber)
 				Event_GuiNamedEvent(1, "nearby_error");
 				return true;
 			}
+			else if (batteryAmount <= 0) //BC 4-16-2025: fix logic with being able to use walkietalkie with zero battery.
+			{
+				//No more battery left.
+				Event_GuiNamedEvent(1, "battery_error");
+				return false;
+			}
 			else if (static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->StartPlayerWalkietalkieSequence(&walkieVoDuration) && DoBatteryLogic())
 			{
 				//Using walkie talkie during WORLD SEARCH state. End search state.
@@ -221,7 +278,9 @@ void idWalkietalkie::Think(void)
 		{
 			headlight.shader = declManager->FindMaterial("lights/defaultProjectedLight", false);
 			headlight.pointLight = true;
-			headlight.lightRadius[0] = headlight.lightRadius[1] = headlight.lightRadius[2] = 24.0f;
+			headlight.lightRadius[0] = headlight.lightRadius[1] = headlight.lightRadius[2] = spawnArgs.GetFloat("glow_radius", "24");
+
+			
 
 			if (batteryAmount > 0)
 			{
@@ -506,4 +565,9 @@ void idWalkietalkie::Hide(void)
 		gameRenderWorld->FreeLightDef(headlightHandle);
 		headlightHandle = -1;
 	}
+}
+
+int idWalkietalkie::GetBatteryAmount(void)
+{
+	return batteryAmount;
 }

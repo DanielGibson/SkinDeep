@@ -44,9 +44,14 @@ idBeaconLogic::~idBeaconLogic()
 	lasersightbeamTarget->PostEventMS(&EV_Remove, 0);
 	placerEnt->PostEventMS(&EV_Remove, 0);
 
+	lasersightbeam = nullptr;
+	lasersightbeamTarget = nullptr;
+	placerEnt = nullptr;
+
 	if (tubeEnt != NULL)
 	{
 		delete tubeEnt;
+		tubeEnt = nullptr;
 	}
 }
 
@@ -97,6 +102,62 @@ void idBeaconLogic::Spawn()
 	lastAimDir = vec3_zero;
 	lastEyePosition = vec3_zero;
 	podType = 0;
+}
+
+void idBeaconLogic::Save(idSaveGame* savefile) const
+{
+	savefile->WriteBool( validLandingPosition ); //  bool validLandingPosition
+	savefile->WriteObject( placerEnt ); //  idEntity * placerEnt
+
+
+	savefile->WriteObject( lasersightbeam ); //  idBeam* lasersightbeam
+	savefile->WriteObject( lasersightbeamTarget ); //  idBeam* lasersightbeamTarget
+
+
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+
+
+	savefile->WriteObject( tubeEnt ); //  idEntity * tubeEnt
+
+	savefile->WriteVec3( podLaunchPosition ); //  idVec3 podLaunchPosition
+	savefile->WriteVec3( podLaunch_lerpStart ); //  idVec3 podLaunch_lerpStart
+	savefile->WriteVec3( podLaunch_lerpEnd ); //  idVec3 podLaunch_lerpEnd
+	savefile->WriteBool( podLaunch_isLerping ); //  bool podLaunch_isLerping
+	savefile->WriteInt( podLaunch_lerpTimer ); //  int podLaunch_lerpTimer
+
+	savefile->WriteVec3( lastAimDir ); //  idVec3 lastAimDir
+	savefile->WriteVec3( lastEyePosition ); //  idVec3 lastEyePosition
+
+	savefile->WriteInt( podType ); //  int podType
+}
+
+void idBeaconLogic::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadBool( validLandingPosition ); //  bool validLandingPosition
+	savefile->ReadObject( placerEnt ); //  idEntity * placerEnt
+
+
+	savefile->ReadObject( CastClassPtrRef(lasersightbeam)); //  idBeam* lasersightbeam
+	savefile->ReadObject( CastClassPtrRef(lasersightbeamTarget) ); //  idBeam* lasersightbeamTarget
+
+
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+
+
+	savefile->ReadObject( tubeEnt ); //  idEntity * tubeEnt
+
+	savefile->ReadVec3( podLaunchPosition ); //  idVec3 podLaunchPosition
+	savefile->ReadVec3( podLaunch_lerpStart ); //  idVec3 podLaunch_lerpStart
+	savefile->ReadVec3( podLaunch_lerpEnd ); //  idVec3 podLaunch_lerpEnd
+	savefile->ReadBool( podLaunch_isLerping ); //  bool podLaunch_isLerping
+	savefile->ReadInt( podLaunch_lerpTimer ); //  int podLaunch_lerpTimer
+
+	savefile->ReadVec3( lastAimDir ); //  idVec3 lastAimDir
+	savefile->ReadVec3( lastEyePosition ); //  idVec3 lastEyePosition
+
+	savefile->ReadInt( podType ); //  int podType
 }
 
 //Spawn the lifeboat.

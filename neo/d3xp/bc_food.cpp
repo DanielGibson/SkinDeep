@@ -30,10 +30,12 @@ void idFood::Spawn(void)
 
 void idFood::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( collideSpawn );// bool collideSpawn;
 }
 
 void idFood::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( collideSpawn );// bool collideSpawn;
 }
 
 bool idFood::DoFrob(int index, idEntity * frobber)

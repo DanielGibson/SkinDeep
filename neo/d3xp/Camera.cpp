@@ -114,9 +114,28 @@ idCameraView::Save
 ================
 */
 void idCameraView::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( fov );
-	savefile->WriteObject( attachedTo );
-	savefile->WriteObject( attachedView );
+	savefile->WriteFloat( fov ); // float fov
+	savefile->WriteFloat( fov_v ); // float fov_v
+	savefile->WriteObject( attachedTo ); // idEntity * attachedTo
+	savefile->WriteObject( attachedView ); // idEntity * attachedView
+
+	savefile->WriteFloat( fovLerpStart ); // float fovLerpStart
+	savefile->WriteFloat( fovLerpEnd ); // float fovLerpEnd
+	savefile->WriteInt( fovLerpStartTime ); // int fovLerpStartTime
+	savefile->WriteInt( fovLerpEndTime ); // int fovLerpEndTime
+	savefile->WriteInt( fovLerpType ); // int fovLerpType
+
+
+	savefile->WriteBool( dollyZoomActive ); // bool dollyZoomActive
+	savefile->WriteObject( dollyZoomTarget ); // idEntity* dollyZoomTarget
+	savefile->WriteFloat( dollyZoomWidth ); // float dollyZoomWidth
+
+	savefile->WriteFloat( overrideRoll ); // float overrideRoll
+	savefile->WriteFloat( rollLerpStart ); // float rollLerpStart
+	savefile->WriteFloat( rollLerpEnd ); // float rollLerpEnd
+	savefile->WriteInt( rollLerpStartTime ); // int rollLerpStartTime
+	savefile->WriteInt( rollLerpEndTime ); // int rollLerpEndTime
+	savefile->WriteInt( rollLerpType ); // int rollLerpType
 }
 
 /*
@@ -125,9 +144,28 @@ idCameraView::Restore
 ================
 */
 void idCameraView::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( fov );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( attachedTo ) );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( attachedView ) );
+	savefile->ReadFloat( fov ); // float fov
+	savefile->ReadFloat( fov_v ); // float fov_v
+	savefile->ReadObject( attachedTo ); // idEntity * attachedTo
+	savefile->ReadObject( attachedView ); // idEntity * attachedView
+
+	savefile->ReadFloat( fovLerpStart ); // float fovLerpStart
+	savefile->ReadFloat( fovLerpEnd ); // float fovLerpEnd
+	savefile->ReadInt( fovLerpStartTime ); // int fovLerpStartTime
+	savefile->ReadInt( fovLerpEndTime ); // int fovLerpEndTime
+	savefile->ReadInt( fovLerpType ); // int fovLerpType
+
+
+	savefile->ReadBool( dollyZoomActive ); // bool dollyZoomActive
+	savefile->ReadObject( dollyZoomTarget ); // idEntity* dollyZoomTarget
+	savefile->ReadFloat( dollyZoomWidth ); // float dollyZoomWidth
+
+	savefile->ReadFloat( overrideRoll ); // float overrideRoll
+	savefile->ReadFloat( rollLerpStart ); // float rollLerpStart
+	savefile->ReadFloat( rollLerpEnd ); // float rollLerpEnd
+	savefile->ReadInt( rollLerpStartTime ); // int rollLerpStartTime
+	savefile->ReadInt( rollLerpEndTime ); // int rollLerpEndTime
+	savefile->ReadInt( rollLerpType ); // int rollLerpType
 }
 
 /*
@@ -498,12 +536,22 @@ idCameraAnim::Save
 ================
 */
 void idCameraAnim::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( threadNum );
-	savefile->WriteVec3( offset );
-	savefile->WriteInt( frameRate );
-	savefile->WriteInt( starttime );
-	savefile->WriteInt( cycle );
-	activator.Save( savefile );
+	savefile->WriteInt( threadNum ); // int threadNum
+	savefile->WriteVec3( offset ); // idVec3 offset
+	savefile->WriteInt( frameRate ); // int frameRate
+	savefile->WriteInt( starttime ); // int starttime
+	savefile->WriteInt( cycle ); // int cycle
+	SaveFileWriteArray(cameraCuts,cameraCuts.Num(), WriteInt ); // idList<int> cameraCuts
+
+	savefile->WriteInt( camera.Num() );
+	for ( int idx = 0; idx < camera.Num(); idx++ )
+	{
+		savefile->WriteQuat( camera[idx].q.ToQuat() );
+		savefile->WriteVec3( camera[idx].t );
+		savefile->WriteFloat( camera[idx].fov );
+	}
+
+	savefile->WriteObject( activator ); // idEntityPtr<idEntity> activator
 }
 
 /*
@@ -512,12 +560,25 @@ idCameraAnim::Restore
 ================
 */
 void idCameraAnim::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( threadNum );
-	savefile->ReadVec3( offset );
-	savefile->ReadInt( frameRate );
-	savefile->ReadInt( starttime );
-	savefile->ReadInt( cycle );
-	activator.Restore( savefile );
+	savefile->ReadInt( threadNum ); // int threadNum
+	savefile->ReadVec3( offset ); // idVec3 offset
+	savefile->ReadInt( frameRate ); // int frameRate
+	savefile->ReadInt( starttime ); // int starttime
+	savefile->ReadInt( cycle ); // int cycle
+	SaveFileReadList(cameraCuts, ReadInt ); // idList<int> cameraCuts
+
+	int num;
+	savefile->ReadInt( num );
+	for ( int idx = 0; idx < camera.Num(); idx++ )
+	{
+		idQuat quat;
+		savefile->ReadQuat( quat );
+		camera[idx].q = idCQuat(quat.x,quat.y,quat.z);
+		savefile->ReadVec3( camera[idx].t );
+		savefile->ReadFloat( camera[idx].fov );
+	}
+
+	savefile->ReadObject( activator ); // idEntityPtr<idEntity> activator
 
 	LoadAnim();
 }

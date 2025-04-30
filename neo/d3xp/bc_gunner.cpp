@@ -121,7 +121,7 @@ const int JOCKEY_KILLENTITY_RADIUS = 72; //radius distance for context kill enti
 const int JOCKEY_WORLD_ANALYZE_INTERVAL = 100; //how often to search the world for attack opportunities
 const float JOCKEY_SLAMATTACK_DAMAGE = 1000.0f;
 const float JOCKEY_VERT_DISTANCE_MAX = 96; //objects above this vertical distance delta are ignored
-const float JOCKEY_VERT_DISTANCE_MIN = -1; //objects below this vertical distance delta are ignored
+const float JOCKEY_VERT_DISTANCE_MIN = -8; //objects below this vertical distance delta are ignored (SW 19th March 2025: Pushing this value a little lower so that objects with their origin on the floor aren't defeated by incredibly minor variations in terrain)
 
 
 //I have to be in search state for XX msec in order to call initiate a radio checkin. This is so that we avoid weird
@@ -152,6 +152,99 @@ const int HIGHLYSUSPICIOUS_TIMEINTERVAL = 2500;
 CLASS_DECLARATION(idAI, idGunnerMonster)
 	EVENT(EV_PostSpawn, idGunnerMonster::Event_PostSpawn)
 END_CLASS
+
+
+
+idGunnerMonster::idGunnerMonster()
+{
+	drawDodgeUI = false;
+
+	jockeyAttackCurrentlyAvailable = 0;
+
+	suspicionIntervalTimer = 0;
+	suspicionCounter = 0;
+	suspicionStartTime = 0;
+	lastFireablePosition = {};
+	combatFiringTimer = 0;
+	combatStalkInitialized = false;
+	stateTimer = 0;
+	intervalTimer = 0;
+
+	lastInterestPriority = 0;
+	lastInterestSwitchTime = 0;
+	ignoreInterestPoints = false;
+	interestBeam = nullptr;
+	interestBeamTarget = nullptr;
+	searchMode = 0;
+	searchWaitTimer = 0;
+	specialTraverseTimer = 0;
+	flailDamageTimer = 0;
+	searchStartTime = 0;
+
+	lastState = 0;
+
+	fidgetTimer = 0;
+
+	firstSearchnodeHint = false;
+
+	headLight = nullptr;
+
+	customidleResetTimer = 0;
+	waitingforCustomidleReset = false;
+	idletaskStartTime = 0;
+	idletaskFrobHappened = false;
+	energyshieldModuleAvailable = false;
+
+	idlenodeStartTime = 0;
+	idlenodePositionSnapped = false;
+	idlenodeSnapPosition = {};
+	idlenodeOriginalPosition = {};
+	idlenodeSnapAxis = {};
+	jockeyMoveTimer = 0;
+	jockeyBehavior = 0;
+	jockeyTurnTimer = 0;
+
+	jockeyDamageTimer = 0;
+	jockeyWorldfrobTimer = 0;
+
+	jockStateTimer = 0;
+	jockattackState = 0;
+	jocksurfacecheckTimer = 0;
+
+	lastJockeyBehavior = 0;
+	airlockLockdownCheckTimer = 0;
+
+	hasAlertedFriends = false;
+
+	sighted_flashTimer = 0;
+
+	idleSoundTimer = 0;
+
+	radiocheckinPrimed = false;
+	radiocheckinTimer = 0;
+
+	meleeAttackTimer = 0;
+	meleeChargeTimer = 0;
+	meleeModeActive = 0;
+
+	hasPathNodes = false;
+
+	icr_state = 0;
+	icr_timer = 0;
+
+	pickpocketReactionState = 0;
+	pickpocketReactionTimer = 0;
+	pickpocketReactionPosition = {};
+
+	softfailCooldown = 0;
+	lastSoftfailPosition = {};
+
+	highlySuspiciousTimer = 0;
+
+	CanDoUnvacuumableCheck = false;
+
+	memset(&jockeySmashTr, 0, sizeof(trace_t));
+}
 
 void idGunnerMonster::Spawn(void)
 {
@@ -186,7 +279,7 @@ void idGunnerMonster::Spawn(void)
 	searchStartTime = 0;
 	idletaskFrobHappened = false;
 	currentSearchNode = NULL;
-    lastIdlenodeAnim = "";
+    lastIdlenodeAnim = idStr();
 	idlenodeStartTime = 0;
 	idlenodePositionSnapped = false;
 	idlenodeOriginalPosition = vec3_zero;
@@ -221,11 +314,11 @@ void idGunnerMonster::Spawn(void)
 		idVec3 jointPos;
 		idMat3 jointAxis;
 	
-		headJoint = animator.GetJointHandle("shoulderlamp");
+		headJoint = animator.GetJointHandle(spawnArgs.GetString("lamp_joint"));
 		this->GetJointWorldTransform(headJoint, gameLocal.time, jointPos, jointAxis);
 		lightArgs.Clear();
 		lightArgs.SetVector("origin", jointPos);
-		lightArgs.Set("texture", "textures/lights/flashlight");
+		lightArgs.Set("texture", spawnArgs.GetString("mtr_flashlight"));
 		lightArgs.SetInt("noshadows", 0);
 		lightArgs.SetInt("start_off", 1);
 		lightArgs.Set("light_right", "0 0 144");
@@ -290,6 +383,8 @@ void idGunnerMonster::Spawn(void)
 	
 	highlySuspiciousTimer = 0;
 
+	CanDoUnvacuumableCheck = true;
+
 	//BC SPAWN END
 
 	PostEventMS(&EV_PostSpawn, 0);
@@ -314,6 +409,195 @@ void idGunnerMonster::Event_PostSpawn(void)
 	}
 
 	AttachBeltattachments();
+}
+
+
+void idGunnerMonster::Save(idSaveGame* savefile) const
+{
+	savefile->WriteBool( drawDodgeUI ); //  bool drawDodgeUI
+
+	savefile->WriteObject( jockeyKillEntity ); //  idEntityPtr<idEntity> jockeyKillEntity
+	savefile->WriteInt( jockeyAttackCurrentlyAvailable ); //  int jockeyAttackCurrentlyAvailable
+
+	savefile->WriteInt( suspicionIntervalTimer ); //  int suspicionIntervalTimer
+	savefile->WriteInt( suspicionCounter ); //  int suspicionCounter
+	savefile->WriteInt( suspicionStartTime ); //  int suspicionStartTime
+	savefile->WriteVec3( lastFireablePosition ); //  idVec3 lastFireablePosition
+	savefile->WriteInt( combatFiringTimer ); //  int combatFiringTimer
+	savefile->WriteBool( combatStalkInitialized ); //  bool combatStalkInitialized
+	savefile->WriteInt( stateTimer ); //  int stateTimer
+	savefile->WriteInt( intervalTimer ); //  int intervalTimer
+	savefile->WriteObject( lastInterest ); //  idEntityPtr<idEntity> lastInterest
+	savefile->WriteInt( lastInterestPriority ); //  int lastInterestPriority
+	savefile->WriteInt( lastInterestSwitchTime ); //  int lastInterestSwitchTime
+	savefile->WriteBool( ignoreInterestPoints ); //  bool ignoreInterestPoints
+	savefile->WriteObject( interestBeam ); //  idBeam* interestBeam
+	savefile->WriteObject( interestBeamTarget ); //  idBeam* interestBeamTarget
+	savefile->WriteInt( searchMode ); //  int searchMode
+	savefile->WriteInt( searchWaitTimer ); //  int searchWaitTimer
+	savefile->WriteInt( specialTraverseTimer ); //  int specialTraverseTimer
+	savefile->WriteInt( flailDamageTimer ); //  int flailDamageTimer
+	savefile->WriteInt( searchStartTime ); //  int searchStartTime
+
+	savefile->WriteInt( lastState ); //  int lastState
+
+	savefile->WriteInt( fidgetTimer ); //  int fidgetTimer
+
+	savefile->WriteBool( firstSearchnodeHint ); //  bool firstSearchnodeHint
+
+	savefile->WriteObject( headLight ); //  idLight * headLight
+
+	savefile->WriteObject( lastIdletaskEnt ); //  idEntityPtr<idEntity> lastIdletaskEnt
+	savefile->WriteInt( customidleResetTimer ); //  int customidleResetTimer
+	savefile->WriteBool( waitingforCustomidleReset ); //  bool waitingforCustomidleReset
+	savefile->WriteInt( idletaskStartTime ); //  int idletaskStartTime
+	savefile->WriteBool( idletaskFrobHappened ); //  bool idletaskFrobHappened
+	savefile->WriteBool( energyshieldModuleAvailable ); //  bool energyshieldModuleAvailable
+	savefile->WriteObject( currentSearchNode ); //  idEntityPtr<idEntity> currentSearchNode
+	savefile->WriteString( lastIdlenodeAnim ); // idStr lastIdlenodeAnim
+	savefile->WriteInt( idlenodeStartTime ); //  int idlenodeStartTime
+	savefile->WriteBool( idlenodePositionSnapped ); //  bool idlenodePositionSnapped
+	savefile->WriteVec3( idlenodeSnapPosition ); //  idVec3 idlenodeSnapPosition
+	savefile->WriteVec3( idlenodeOriginalPosition ); //  idVec3 idlenodeOriginalPosition
+	savefile->WriteMat3( idlenodeSnapAxis ); //  idMat3 idlenodeSnapAxis
+	savefile->WriteInt( jockeyMoveTimer ); //  int jockeyMoveTimer
+	savefile->WriteInt( jockeyBehavior ); //  int jockeyBehavior
+	savefile->WriteInt( jockeyTurnTimer ); //  int jockeyTurnTimer
+
+	savefile->WriteInt( jockeyDamageTimer ); //  int jockeyDamageTimer
+	savefile->WriteInt( jockeyWorldfrobTimer ); //  int jockeyWorldfrobTimer
+
+	savefile->WriteInt( jockStateTimer ); //  int jockStateTimer
+	savefile->WriteInt( jockattackState ); //  int jockattackState
+	savefile->WriteInt( jocksurfacecheckTimer ); //  int jocksurfacecheckTimer
+	savefile->WriteTrace( jockeySmashTr ); //  trace_t jockeySmashTr
+	savefile->WriteInt( lastJockeyBehavior ); //  int lastJockeyBehavior
+	savefile->WriteInt( airlockLockdownCheckTimer ); //  int airlockLockdownCheckTimer
+
+	savefile->WriteBool( hasAlertedFriends ); //  bool hasAlertedFriends
+
+	savefile->WriteInt( sighted_flashTimer ); //  int sighted_flashTimer
+
+	savefile->WriteInt( idleSoundTimer ); //  int idleSoundTimer
+
+	savefile->WriteBool( radiocheckinPrimed ); //  bool radiocheckinPrimed
+	savefile->WriteInt( radiocheckinTimer ); //  int radiocheckinTimer
+
+	savefile->WriteInt( meleeAttackTimer ); //  int meleeAttackTimer
+	savefile->WriteInt( meleeChargeTimer ); //  int meleeChargeTimer
+	savefile->WriteInt( meleeModeActive ); //  int meleeModeActive
+
+	savefile->WriteBool( hasPathNodes ); //  bool hasPathNodes
+	savefile->WriteObject( currentPathTarget ); //  idEntityPtr<idEntity> currentPathTarget
+
+	savefile->WriteInt( icr_state ); //  int icr_state
+	savefile->WriteInt( icr_timer ); //  int icr_timer
+	savefile->WriteObject( icr_responderEnt ); //  idEntityPtr<idEntity> icr_responderEnt
+
+	savefile->WriteInt( pickpocketReactionState ); //  int pickpocketReactionState
+	savefile->WriteInt( pickpocketReactionTimer ); //  int pickpocketReactionTimer
+	savefile->WriteVec3( pickpocketReactionPosition ); //  idVec3 pickpocketReactionPosition
+
+	savefile->WriteInt( softfailCooldown ); //  int softfailCooldown
+	savefile->WriteVec3( lastSoftfailPosition ); //  idVec3 lastSoftfailPosition
+
+	savefile->WriteInt( highlySuspiciousTimer ); //  int highlySuspiciousTimer
+
+	savefile->WriteBool( CanDoUnvacuumableCheck ); //  bool CanDoUnvacuumableCheck
+}
+
+void idGunnerMonster::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadBool( drawDodgeUI ); //  bool drawDodgeUI
+
+	savefile->ReadObject( jockeyKillEntity ); //  idEntityPtr<idEntity> jockeyKillEntity
+	savefile->ReadInt( jockeyAttackCurrentlyAvailable ); //  int jockeyAttackCurrentlyAvailable
+
+	savefile->ReadInt( suspicionIntervalTimer ); //  int suspicionIntervalTimer
+	savefile->ReadInt( suspicionCounter ); //  int suspicionCounter
+	savefile->ReadInt( suspicionStartTime ); //  int suspicionStartTime
+	savefile->ReadVec3( lastFireablePosition ); //  idVec3 lastFireablePosition
+	savefile->ReadInt( combatFiringTimer ); //  int combatFiringTimer
+	savefile->ReadBool( combatStalkInitialized ); //  bool combatStalkInitialized
+	savefile->ReadInt( stateTimer ); //  int stateTimer
+	savefile->ReadInt( intervalTimer ); //  int intervalTimer
+	savefile->ReadObject( lastInterest ); //  idEntityPtr<idEntity> lastInterest
+	savefile->ReadInt( lastInterestPriority ); //  int lastInterestPriority
+	savefile->ReadInt( lastInterestSwitchTime ); //  int lastInterestSwitchTime
+	savefile->ReadBool( ignoreInterestPoints ); //  bool ignoreInterestPoints
+	savefile->ReadObject( CastClassPtrRef(interestBeam) ); //  idBeam* interestBeam
+	savefile->ReadObject( CastClassPtrRef(interestBeamTarget) ); //  idBeam* interestBeamTarget
+	savefile->ReadInt( searchMode ); //  int searchMode
+	savefile->ReadInt( searchWaitTimer ); //  int searchWaitTimer
+	savefile->ReadInt( specialTraverseTimer ); //  int specialTraverseTimer
+	savefile->ReadInt( flailDamageTimer ); //  int flailDamageTimer
+	savefile->ReadInt( searchStartTime ); //  int searchStartTime
+
+	savefile->ReadInt( lastState ); //  int lastState
+
+	savefile->ReadInt( fidgetTimer ); //  int fidgetTimer
+
+	savefile->ReadBool( firstSearchnodeHint ); //  bool firstSearchnodeHint
+
+	savefile->ReadObject( CastClassPtrRef(headLight) ); //  idLight * headLight
+
+	savefile->ReadObject( lastIdletaskEnt ); //  idEntityPtr<idEntity> lastIdletaskEnt
+	savefile->ReadInt( customidleResetTimer ); //  int customidleResetTimer
+	savefile->ReadBool( waitingforCustomidleReset ); //  bool waitingforCustomidleReset
+	savefile->ReadInt( idletaskStartTime ); //  int idletaskStartTime
+	savefile->ReadBool( idletaskFrobHappened ); //  bool idletaskFrobHappened
+	savefile->ReadBool( energyshieldModuleAvailable ); //  bool energyshieldModuleAvailable
+	savefile->ReadObject( currentSearchNode ); //  idEntityPtr<idEntity> currentSearchNode
+	savefile->ReadString( lastIdlenodeAnim ); // idStr lastIdlenodeAnim
+	savefile->ReadInt( idlenodeStartTime ); //  int idlenodeStartTime
+	savefile->ReadBool( idlenodePositionSnapped ); //  bool idlenodePositionSnapped
+	savefile->ReadVec3( idlenodeSnapPosition ); //  idVec3 idlenodeSnapPosition
+	savefile->ReadVec3( idlenodeOriginalPosition ); //  idVec3 idlenodeOriginalPosition
+	savefile->ReadMat3( idlenodeSnapAxis ); //  idMat3 idlenodeSnapAxis
+	savefile->ReadInt( jockeyMoveTimer ); //  int jockeyMoveTimer
+	savefile->ReadInt( jockeyBehavior ); //  int jockeyBehavior
+	savefile->ReadInt( jockeyTurnTimer ); //  int jockeyTurnTimer
+
+	savefile->ReadInt( jockeyDamageTimer ); //  int jockeyDamageTimer
+	savefile->ReadInt( jockeyWorldfrobTimer ); //  int jockeyWorldfrobTimer
+
+	savefile->ReadInt( jockStateTimer ); //  int jockStateTimer
+	savefile->ReadInt( jockattackState ); //  int jockattackState
+	savefile->ReadInt( jocksurfacecheckTimer ); //  int jocksurfacecheckTimer
+	savefile->ReadTrace( jockeySmashTr ); //  trace_t jockeySmashTr
+	savefile->ReadInt( lastJockeyBehavior ); //  int lastJockeyBehavior
+	savefile->ReadInt( airlockLockdownCheckTimer ); //  int airlockLockdownCheckTimer
+
+	savefile->ReadBool( hasAlertedFriends ); //  bool hasAlertedFriends
+
+	savefile->ReadInt( sighted_flashTimer ); //  int sighted_flashTimer
+
+	savefile->ReadInt( idleSoundTimer ); //  int idleSoundTimer
+
+	savefile->ReadBool( radiocheckinPrimed ); //  bool radiocheckinPrimed
+	savefile->ReadInt( radiocheckinTimer ); //  int radiocheckinTimer
+
+	savefile->ReadInt( meleeAttackTimer ); //  int meleeAttackTimer
+	savefile->ReadInt( meleeChargeTimer ); //  int meleeChargeTimer
+	savefile->ReadInt( meleeModeActive ); //  int meleeModeActive
+
+	savefile->ReadBool( hasPathNodes ); //  bool hasPathNodes
+	savefile->ReadObject( currentPathTarget ); //  idEntityPtr<idEntity> currentPathTarget
+
+	savefile->ReadInt( icr_state ); //  int icr_state
+	savefile->ReadInt( icr_timer ); //  int icr_timer
+	savefile->ReadObject( icr_responderEnt ); //  idEntityPtr<idEntity> icr_responderEnt
+
+	savefile->ReadInt( pickpocketReactionState ); //  int pickpocketReactionState
+	savefile->ReadInt( pickpocketReactionTimer ); //  int pickpocketReactionTimer
+	savefile->ReadVec3( pickpocketReactionPosition ); //  idVec3 pickpocketReactionPosition
+
+	savefile->ReadInt( softfailCooldown ); //  int softfailCooldown
+	savefile->ReadVec3( lastSoftfailPosition ); //  idVec3 lastSoftfailPosition
+
+	savefile->ReadInt( highlySuspiciousTimer ); //  int highlySuspiciousTimer
+
+	savefile->ReadBool( CanDoUnvacuumableCheck ); //  bool CanDoUnvacuumableCheck
 }
 
 //This gets called when the pathnode has been reached, and I need a new pathnode to go to next.
@@ -470,6 +754,24 @@ void idGunnerMonster::Think(void)
 			State_Victory();
 			break;
 		case AISTATE_STUNNED:
+
+			//BC 3-17-2025: if player is in mid pick pocket, cancel it out.
+			if (gameLocal.GetLocalPlayer()->IsPickpocketing())
+			{
+				idEntity* pickpocketEnt = gameLocal.GetLocalPlayer()->GetPickpocketEnt();
+				if (pickpocketEnt != NULL)
+				{
+					if (pickpocketEnt->GetBindMaster() != NULL)
+					{
+						if (pickpocketEnt->GetBindMaster()->entityNumber == this->entityNumber)
+						{
+							gameLocal.GetLocalPlayer()->DoPickpocketFail(false);
+						}
+					}
+				}
+			}
+
+
 			State_Stunned();
 			break;
 		case AISTATE_JOCKEYED:
@@ -488,7 +790,9 @@ void idGunnerMonster::Think(void)
 		{
 			GotoState(AISTATE_SPACEFLAIL);
 		}
-	}	
+	}
+
+	DoZeroG_Unvacuumable_Check();
 
 	if (ai_showState.GetBool())
 	{
@@ -593,7 +897,7 @@ void idGunnerMonster::DoAirlockLockdownCheck()
 			&& airlockEnt->GetPhysics()->GetAbsBounds().ContainsPoint(playerPosition))
 		{
 			//Ent is inside airlock. Activate the lockdown.
-			idStr airlockLog = idStr::Format("#str_def_gameplay_airlock_see", displayName.c_str());
+			idStr airlockLog = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_airlock_see"), displayName.c_str());
 			gameLocal.AddEventLog(airlockLog.c_str(), GetPhysics()->GetOrigin(), true, EL_INTERESTPOINT);
 			static_cast<idAirlock *>(airlockEnt)->DoAirlockLockdown(true);
 			continue;
@@ -648,7 +952,16 @@ void idGunnerMonster::State_Idle()
 	{
 		AI_DAMAGE = false;
         AI_SHIELDHIT = false;		
-		lastFireablePosition = lastAttackerDamageOrigin;
+
+		//BC 3-14-2025: turn toward the inflictor, not the object that caused damage. This handles situation where player runs up to enemy and melees them.
+		//lastFireablePosition = lastAttackerDamageOrigin; //turn toward the object that inflicted damage.
+		if (lastDamageOrigin != vec3_zero)
+			lastFireablePosition = lastDamageOrigin;
+		else
+			lastFireablePosition = lastAttackerDamageOrigin;
+
+		TurnToward(lastFireablePosition);
+
 		meleeAttackTimer = gameLocal.time + MELEE_COOLDOWNTIME;
 
 		GotoState(AISTATE_COMBAT);
@@ -849,7 +1162,7 @@ void idGunnerMonster::State_Idle()
 					StopMove(MOVE_STATUS_DONE);
 
 					customIdleAnim = idleAnim;
-                    lastIdlenodeAnim = customIdleAnim.c_str();					
+                    lastIdlenodeAnim = customIdleAnim;					
 					AI_NODEANIM = true;
 					
 
@@ -925,12 +1238,13 @@ void idGunnerMonster::State_Idle()
 		//Only play idle sound if I'm not emitting any sound
  		if (this->refSound.referenceSound == NULL)
 		{
-			gameLocal.voManager.SayVO(this, "snd_vo_wander", VO_CATEGORY_GRUNT);
+			int remainingEnemies = static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->GetEnemiesRemaining(false);
+			gameLocal.voManager.SayVO(this, (remainingEnemies <= 1) ? "snd_vo_wanderscare" : "snd_vo_wander", VO_CATEGORY_GRUNT);
 		}		
 	}
 
 	//Check if I'm near someone, for the call and response logic.
-	if (icr_state == ICR_NONE)
+	if (icr_state == ICR_NONE && gameLocal.time > 2000)
 	{
 		//am I near someone.
 		if (gameLocal.time > icr_timer)
@@ -984,7 +1298,7 @@ idEntity * idGunnerMonster::IsNearSomeone()
 		if (!entity->IsType(idAI::Type) || entity->team != this->team || entity->entityNumber == this->entityNumber)
 			continue;
 
-		if (!entity->spawnArgs.GetBool("can_talk", "1"))
+		if (!entity->spawnArgs.GetBool("can_talk", "1") || !static_cast<idAI *>(entity)->CanAcceptStimulus())
 			continue;
 
 		float dist = (entity->GetPhysics()->GetOrigin() - GetPhysics()->GetOrigin()).LengthFast();
@@ -1116,6 +1430,16 @@ void idGunnerMonster::State_Suspicious()
 		//How many limbs is the enemy exposing to me.
 		int limbsExposed = enemyEnt->IsType(idActor::Type) ? GetSightExposure(static_cast<idActor *>(enemyEnt)) : 1;
 
+		// SW 26th March 2025:
+		// Sigh. Okay. Enemies will typically react very slowly to the player when they see Nina floating around outside the ship,
+		// because the player's number of exposed limbs is treated as "0" (the check doesn't account for glass in the way).
+		// We're running out of time here, so I'm going to implement the fast and stupid solution:
+		// If the player is in outer space, just assume we can fully see them.
+		if (enemyEnt->isInOuterSpace())
+		{
+			limbsExposed = MAX_SIGHTLIMBS;
+		}
+
 		float distanceToEnemy = (enemyEnt->GetPhysics()->GetOrigin() - this->GetPhysics()->GetOrigin()).LengthFast();
 		if (distanceToEnemy <= SUSPICION_IMMEDIATEPROXIMITY)
 		{
@@ -1230,10 +1554,6 @@ void idGunnerMonster::State_Suspicious()
 			}
 		}
 
-
-
-
-
 		//g_perceptionScale scaler.
 		float perceptionScale = g_perceptionScale.GetFloat();
 		if (perceptionScale == 1)
@@ -1346,7 +1666,7 @@ void idGunnerMonster::State_Suspicious()
 		if (gameLocal.time > softfailCooldown && suspicionCounter > (SUSPICION_MAXPIPS * SOFTFAIL_THRESHOLD))
 		{
 			softfailCooldown = gameLocal.time + SOFTFAIL_COOLDOWNTIME;
-			
+			suspicionCounter = 0; // SW 20th March 2025: Canceling out suspicion counter so they immediately notice the interestpoint (enemies no longer care about interestpoints while in suspicion state)
 			gameLocal.SpawnInterestPoint(gameLocal.GetLocalPlayer(), lastSoftfailPosition, "interest_player");
 		}
 
@@ -1487,10 +1807,36 @@ void idGunnerMonster::Killed(idEntity *inflictor, idEntity *attacker, int damage
 	{
 		if (attacker == gameLocal.GetLocalPlayer())
 		{
+			//BC 2-14-2025: determine what "nina has just killed enemy" vo line to play.
+			//there are 3 variants:
+			//- opencombat: world is in combat state.
+			//- stealth: world is unaware of nina.
+			//- kill: everything else.
+
+			idStr desiredVO = "";
+			bool isWorldIdlestate = (static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->GetCombatState() == COMBATSTATE_IDLE);
+
+			if (!isWorldIdlestate)
+			{
+				//World is NOT in idle state. So do the combat variant.
+				desiredVO = "snd_vo_kill_opencombat";
+			}
+			else if (isWorldIdlestate && !static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->GetEnemiesKnowOfNina())
+			{
+				//Idle state, and enemies don't know about nina yet.
+				desiredVO = "snd_vo_kill_stealth";
+			}
+			else
+			{
+				desiredVO = "snd_vo_kill";
+			}
+
 			//Play player VO: "I killed an enemy"
-			gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay_msDelayed("snd_vo_kill", 500);
+			gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay_msDelayed(desiredVO.c_str(), 500);
 		}
 	}
+
+	common->g_SteamUtilities->SetSteamTimelineEvent("steam_death");
 }
 
 
@@ -2858,7 +3204,7 @@ bool idGunnerMonster::IsObjectKillEntity(idEntity *ent)
 		return false;
 
 	//get vertical distance delta.
-	float distanceDelta = ent->GetPhysics()->GetOrigin().z - this->GetPhysics()->GetOrigin().z;
+	float distanceDelta = ent->GetPhysics()->GetAbsBounds().GetCenter().z - this->GetPhysics()->GetOrigin().z;
 	if (distanceDelta > JOCKEY_VERT_DISTANCE_MAX)
 		return false;
 
@@ -3109,12 +3455,15 @@ void idGunnerMonster::DoJockeyBrutalSlam()
 		TurnToward(jockeyKillEntity.GetEntity()->GetPhysics()->GetOrigin()); //force the angle to be the node's yaw.
 
 
+		gameLocal.GetLocalPlayer()->playerView.DoDurabilityFlash();
 
 		//Player is doing kill-entity attack on me.
 		SetAnimState(ANIMCHANNEL_LEGS, "Legs_jockey_exec", 2);
 		jockeyMoveTimer = gameLocal.time + GetAnimator()->AnimLength(GetAnim(ANIMCHANNEL_LEGS, "jockey_slam"));
 		jockattackState = JOCKATK_KILLENTITYATTACK;
 		jockStateTimer = jockeyMoveTimer + 300;
+
+		gameLocal.voManager.SayVO(gameLocal.GetLocalPlayer(), "snd_vo_jockeyattack", VO_CATEGORY_BARK);
 	}
 	//else if (jockeyAttackCurrentlyAvailable == JOCKATKTYPE_WALLSMASH)
 	//{
@@ -3184,6 +3533,11 @@ trace_t idGunnerMonster::FindJockeyClosestSurface()
 //Starts the stun state. 
 void idGunnerMonster::StartStunState(const char *damageDefName)
 {
+	// SW 20th Feb 2025: You can't be stunned if you're dead!
+	// (stops bleedout pirates from sneezing, as funny as it is to witness)
+	if (AI_DEAD)
+		return;
+
 	StopSound(SND_CHANNEL_VOICE); //halt any sound they may have been making.
 
 	const idDict *damageDef = gameLocal.FindEntityDefDict(damageDefName);
@@ -3279,7 +3633,9 @@ bool idGunnerMonster::InterestPointCheck(idEntity *ent)
 	
 
 	//Priority filter.
-	if ((aiState == AISTATE_COMBAT || aiState == AISTATE_COMBATOBSERVE || aiState == AISTATE_COMBATSTALK) && priority < INTEREST_COMBATPRIORITY)
+	// SW 19th March 2025: Adding AISTATE_SUSPICIOUS to this collection to avoid state thrash.
+	// The problematic scenario was where an AI was confronted with both a visible player and also a persistent interestpoint (e.g. a sound or smell) at the same time.
+	if ((aiState == AISTATE_COMBAT || aiState == AISTATE_COMBATOBSERVE || aiState == AISTATE_COMBATSTALK || aiState == AISTATE_SUSPICIOUS) && priority < INTEREST_COMBATPRIORITY)
 	{
 		//We're in combat and it's a lesser priority. Exit.
 		return false;
@@ -3327,19 +3683,25 @@ bool idGunnerMonster::InterestPointCheck(idEntity *ent)
 		{
 			return false;			
 		}
-
-		if (PointVisible(interestPos) && CheckFOV(interestPos) && (aiState == AISTATE_COMBAT || aiState == AISTATE_COMBATOBSERVE || aiState == AISTATE_COMBATSTALK))
+		
+		// SW 4th March 2025: Swapping idActor::PointVisible for the more reliable idActor::CanSee
+		if (CanSee(interestpoint, false) && CheckFOV(interestPos) && (aiState == AISTATE_COMBAT || aiState == AISTATE_COMBATOBSERVE || aiState == AISTATE_COMBATSTALK))
 		{
 			//Sound is right in front of me and I'm in combat. Ignore it.
 			return false;
 		}
-		
-		return GetSoundIntensityObstructed(interestPos,interestpoint->noticeRadius) > 0.01f;
+
+		//BC 2-14-2025: smells ignore obstructions and always return true.
+		if (interestpoint->spawnArgs.GetBool("is_smelly", "0") || !interestpoint->spawnArgs.GetBool("is_obstructed", "1"))
+			return true;
+		else
+			return GetSoundIntensityObstructed(interestPos,interestpoint->noticeRadius) > 0.01f;
 	}
 	else if (interestpoint->interesttype == IPTYPE_VISUAL)
 	{
 		//Visual disturbance.
-		if (PointVisible(interestPos) && CheckFOV(interestPos))
+		// SW 4th March 2025: Swapping idActor::PointVisible for the more reliable idActor::CanSee
+		if (CanSee(interestpoint, false) && CheckFOV(interestPos))
 		{
 			//I can see the disturbance.
 			return true;
@@ -3458,7 +3820,7 @@ void idGunnerMonster::InterestPointReact(idEntity *interestpoint, int roletype)
 
 
 
-	//this is for sneezing. if sneeze in vent, then do ventpurge.
+	//this is for detecting player in vent. Start the ventpurge.
 	if (static_cast<idInterestPoint *>(interestpoint)->breaksConfinedStealth && gameLocal.GetLocalPlayer()->inConfinedState
 		&& gameLocal.GetLocalPlayer()->confinedType == CONF_VENT
 		&& interestpoint->GetPhysics()->GetClipModel()->GetOwner() != NULL && interestpoint->GetPhysics()->GetClipModel()->GetOwner() == gameLocal.GetLocalPlayer())
@@ -3481,7 +3843,7 @@ void idGunnerMonster::InterestPointReact(idEntity *interestpoint, int roletype)
 		}
 
 		gameLocal.GetLocalPlayer()->confinedStealthActive = false;
-		static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge();
+		static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge(interestpoint);
 	}
 
 
@@ -3516,19 +3878,19 @@ void idGunnerMonster::InterestPointReact(idEntity *interestpoint, int roletype)
 				if (static_cast<idInterestPoint*>(interestpoint)->interesttype == IPTYPE_VISUAL)
 				{
 					//Visual interestpoint.			
-					airlockLog = idStr::Format("#str_def_gameplay_airlock_see", displayName.c_str());
+					airlockLog = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_airlock_see"), displayName.c_str());
 				}
 				else
 				{
 					if (interestpoint->spawnArgs.GetBool("is_smelly", "0"))
 					{
 						//Smell interestpoint.
-						airlockLog = idStr::Format("#str_def_gameplay_airlock_smell", displayName.c_str());
+						airlockLog = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_airlock_smell"), displayName.c_str());
 					}
 					else
 					{
 						//Audio interestpoint.
-						airlockLog = idStr::Format("#str_def_gameplay_airlock_hear", displayName.c_str());
+						airlockLog = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_airlock_hear"), displayName.c_str());
 					}
 				}			
 				
@@ -4557,7 +4919,12 @@ void idGunnerMonster::DoJockeySlamDamage()
 
 			if (jockeyKillEntity.IsValid())
 			{
-				gameLocal.AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_jockey_slam"), displayName.c_str(), jockeyKillEntity.GetEntity()->displayName.c_str()), jockeyKillEntity.GetEntity()->GetPhysics()->GetOrigin(), true, EL_DAMAGE);
+				//BC 3-5-2025: fixed bug with missing languagedict call.
+				gameLocal.AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_jockey_slam"),
+					common->GetLanguageDict()->GetString(displayName.c_str()),
+					common->GetLanguageDict()->GetString(jockeyKillEntity.GetEntity()->displayName.c_str())),
+					jockeyKillEntity.GetEntity()->GetPhysics()->GetOrigin(), true, EL_DAMAGE);
+
 				jockeyKillEntity.GetEntity()->SetPostFlag(POST_OUTLINE_FROB, false);
 			}
 			
@@ -4594,7 +4961,10 @@ void idGunnerMonster::DoJockeySlamDamage()
 			gameLocal.SpawnInterestPoint(this, jockeySmashTr.endpos, "interest_jockeystruggle"); //Make a loud interestpoint.
 
 			//Decal.
-			gameLocal.ProjectDecal(jockeySmashTr.c.point, -jockeySmashTr.c.normal, 8.0f, true, gameLocal.random.RandomInt(32, 64), "textures/decals/bloodsplat03");
+			if (g_bloodEffects.GetBool())
+			{
+				gameLocal.ProjectDecal(jockeySmashTr.c.point, -jockeySmashTr.c.normal, 8.0f, true, gameLocal.random.RandomInt(32, 64), "textures/decals/bloodsplat03");
+			}
 
 			//Particles.
 			idVec3 particlePos = jockeySmashTr.endpos + jockeySmashTr.c.normal * 4;
@@ -4611,7 +4981,11 @@ void idGunnerMonster::DoJockeySlamDamage()
 			//Decal.
 			trace_t tr;
 			gameLocal.clip.TracePoint(tr, GetEyePosition(), jockeyKillEntity.GetEntity()->GetPhysics()->GetOrigin(), MASK_SOLID, NULL);
-			gameLocal.ProjectDecal(tr.c.point, -tr.c.normal, 8.0f, true, 64, "textures/decals/bloodsplat03");
+			if (g_bloodEffects.GetBool())
+			{
+				gameLocal.ProjectDecal(tr.c.point, -tr.c.normal, 8.0f, true, 64, "textures/decals/bloodsplat03");
+			}
+			
 
 			//Particles.
 			idVec3 particlePos = jockeyKillEntity.GetEntity()->GetPhysics()->GetOrigin();
@@ -4708,19 +5082,19 @@ void idGunnerMonster::AddEventlog_Interestpoint(idEntity *interestpoint)
 		if (static_cast<idInterestPoint *>(interestpoint)->interesttype == IPTYPE_VISUAL)
 		{
 			//Visual interestpoint.			
-			outputStr = idStr::Format("%s saw: %s.", displayName.c_str(), interestpointDisplayname.c_str());
+			outputStr = idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_saw"), displayName.c_str(), interestpointDisplayname.c_str());
 		}
 		else
 		{
 			if (interestpoint->spawnArgs.GetBool("is_smelly", "0"))
 			{
 				//Smell interestpoint.
-				outputStr = idStr::Format("%s smelled: %s.", displayName.c_str(), interestpointDisplayname.c_str());
+				outputStr = idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_smelled"), displayName.c_str(), interestpointDisplayname.c_str());
 			}
 			else
 			{
 				//Audio interestpoint.
-				outputStr = idStr::Format("%s heard: %s.", displayName.c_str(), interestpointDisplayname.c_str());
+				outputStr = idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_heard"), displayName.c_str(), interestpointDisplayname.c_str());
 			}
 		}
 
@@ -4880,4 +5254,31 @@ void idGunnerMonster::Eventlog_StartCombatAlert()
 		return;
 
 	gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_startcombatalert"), displayName.c_str()), GetPhysics()->GetOrigin(), true, EL_ALERT);
+}
+
+void idGunnerMonster::DoZeroG_Unvacuumable_Check()
+{
+	//BC 2-15-2025: this is the visual effect that makes it more clear that heavies are not affected by vacuum suck.
+	//Make a visual magnet effect on the heavy's booties and make the heavy do a hearty laugh.
+
+	if (spawnArgs.GetBool("vacuumable", "1") || !CanAcceptStimulus() || (health <= 0))
+		return;
+
+	bool inPressurizedArea = !gameLocal.GetAirlessAtPoint(this->GetPhysics()->GetAbsBounds().GetCenter());
+
+	if (inPressurizedArea)
+	{
+		//If i'm in a pressurized area, then re-enable the vacuum check.
+		CanDoUnvacuumableCheck = true;
+	}
+
+	if (!CanDoUnvacuumableCheck)
+		return;
+
+	if (!inPressurizedArea)
+	{
+		CanDoUnvacuumableCheck = false;
+		gameLocal.voManager.SayVO(this, "snd_vo_zerog_activate", VO_CATEGORY_NARRATIVE);
+		gameLocal.DoParticleAng(spawnArgs.GetString("model_zerog_activate"), GetPhysics()->GetOrigin(), idAngles(0,0,0));
+	}
 }

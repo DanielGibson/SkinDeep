@@ -184,11 +184,9 @@ idPlayerView::Save
 ==============
 */
 void idPlayerView::Save( idSaveGame *savefile ) const {
-	int i;
-	const screenBlob_t *blob;
-
-	blob = &screenBlobs[ 0 ];
-	for( i = 0; i < MAX_SCREEN_BLOBS; i++, blob++ ) {
+	const screenBlob_t *blob = &screenBlobs[ 0 ];
+	savefile->WriteInt( MAX_SCREEN_BLOBS ); // screenBlob_t screenBlobs[MAX_SCREEN_BLOBS]
+	for( int i = 0; i < MAX_SCREEN_BLOBS; i++, blob++ ) {
 		savefile->WriteMaterial( blob->material );
 		savefile->WriteFloat( blob->x );
 		savefile->WriteFloat( blob->y );
@@ -203,36 +201,72 @@ void idPlayerView::Save( idSaveGame *savefile ) const {
 		savefile->WriteFloat( blob->driftAmount );
 	}
 
-	savefile->WriteInt( dvFinishTime );
-	savefile->WriteMaterial( dvMaterial );
-	savefile->WriteInt( kickFinishTime );
-	savefile->WriteAngles( kickAngles );
-	savefile->WriteBool( bfgVision );
+	savefile->WriteInt( sightedTimer ); // int sightedTimer
 
-	savefile->WriteMaterial( tunnelMaterial );
-	savefile->WriteMaterial( armorMaterial );
-	savefile->WriteMaterial( berserkMaterial );
-	savefile->WriteMaterial( irGogglesMaterial );
-	savefile->WriteMaterial( bloodSprayMaterial );
-	savefile->WriteMaterial( bfgMaterial );
-	savefile->WriteFloat( lastDamageTime );
+	savefile->WriteInt( hiddenTimer ); // int hiddenTimer
+	savefile->WriteBool( hiddenActive ); // bool hiddenActive
+	savefile->WriteFloat( hiddenStartAlpha ); // float hiddenStartAlpha
+	savefile->WriteFloat( hiddenEndAlpha ); // float hiddenEndAlpha
+	savefile->WriteFloat( hiddenCurrentAlpha ); // float hiddenCurrentAlpha
 
-	savefile->WriteVec4( fadeColor );
-	savefile->WriteVec4( fadeToColor );
-	savefile->WriteVec4( fadeFromColor );
-	savefile->WriteFloat( fadeRate );
-	savefile->WriteInt( fadeTime );
+	savefile->WriteInt( confinedTimer ); // int confinedTimer
+	savefile->WriteBool( confinedActive ); // bool confinedActive
+	savefile->WriteFloat( confinedStartAlpha ); // float confinedStartAlpha
+	savefile->WriteFloat( confinedEndAlpha ); // float confinedEndAlpha
+	savefile->WriteFloat( confinedCurrentAlpha ); // float confinedCurrentAlpha
 
-	savefile->WriteAngles( shakeAng );
+	savefile->WriteInt( isLightedTimer ); // int isLightedTimer
+	savefile->WriteBool( isLightedActive ); // bool isLightedActive
 
-	savefile->WriteObject( player );
-	savefile->WriteRenderView( view );
+	savefile->WriteInt( durabilityflashStartTime ); // int durabilityflashStartTime
+	savefile->WriteBool( durabilityflashActive ); // bool durabilityflashActive
+	savefile->WriteMaterial( durabilityflashMaterial ); // const idMaterial * durabilityflashMaterial
 
-#ifdef _D3XP
+	savefile->WriteBool( bloodrageLerping ); // bool bloodrageLerping
+	savefile->WriteFloat( bloodrageStartLerpValue ); // float bloodrageStartLerpValue
+	savefile->WriteFloat( bloodrageEndLerpValue ); // float bloodrageEndLerpValue
+	savefile->WriteFloat( bloodrageCurrentValue ); // float bloodrageCurrentValue
+	savefile->WriteInt( bloodrageLerpTimer ); // int bloodrageLerpTimer
+	savefile->WriteInt( bloodrageTotalLerpTime ); // int bloodrageTotalLerpTime
+
+	savefile->WriteInt( dvFinishTime ); // int dvFinishTime
+	savefile->WriteMaterial( dvMaterial ); // const idMaterial * dvMaterial
+
+	savefile->WriteInt( kickFinishTime ); // int kickFinishTime
+	savefile->WriteAngles( kickAngles ); // idAngles kickAngles
+
+	savefile->WriteBool( bfgVision ); // bool bfgVision
+
+	savefile->WriteMaterial( tunnelMaterial ); // const idMaterial * tunnelMaterial
+	savefile->WriteMaterial( armorMaterial ); // const idMaterial * armorMaterial
+	savefile->WriteMaterial( berserkMaterial ); // const idMaterial * berserkMaterial
+	savefile->WriteMaterial( irGogglesMaterial ); // const idMaterial * irGogglesMaterial
+	savefile->WriteMaterial( bloodSprayMaterial ); // const idMaterial * bloodSprayMaterial
+	savefile->WriteMaterial( bfgMaterial ); // const idMaterial * bfgMaterial
+	savefile->WriteMaterial( lagoMaterial ); // const idMaterial * lagoMaterial
+	savefile->WriteFloat( lastDamageTime ); // float lastDamageTime
+
+	savefile->WriteVec4( fadeColor ); // idVec4 fadeColor
+	savefile->WriteVec4( fadeToColor ); // idVec4 fadeToColor
+	savefile->WriteVec4( fadeFromColor ); // idVec4 fadeFromColor
+	savefile->WriteFloat( fadeRate ); // float fadeRate
+	savefile->WriteInt( fadeTime ); // int fadeTime
+
+	savefile->WriteAngles( shakeAng ); // idAngles shakeAng
+
+	savefile->WriteObject( player ); // idPlayer * player
+	savefile->WriteRenderView( view ); // renderView_t view
+
+	savefile->WriteBool( fxManager != nullptr );  // FullscreenFXManager * fxManager
 	if ( fxManager ) {
 		fxManager->Save( savefile );
 	}
-#endif
+
+	savefile->WriteMaterial( bloodedgeMaterial ); // const idMaterial * bloodedgeMaterial
+	savefile->WriteMaterial( bokehMaterial ); // const idMaterial * bokehMaterial
+	savefile->WriteBool( bloodbagOverlayActive ); // bool bloodbagOverlayActive
+	savefile->WriteInt( bloodbagState ); // int bloodbagState
+	savefile->WriteInt( bloodbagTimer ); // int bloodbagTimer
 }
 
 /*
@@ -241,11 +275,10 @@ idPlayerView::Restore
 ==============
 */
 void idPlayerView::Restore( idRestoreGame *savefile ) {
-	int i;
-	screenBlob_t *blob;
-
-	blob = &screenBlobs[ 0 ];
-	for( i = 0; i < MAX_SCREEN_BLOBS; i++, blob++ ) {
+	screenBlob_t *blob = &screenBlobs[ 0 ];
+	int num;
+	savefile->ReadInt( num );  // screenBlob_t screenBlobs[MAX_SCREEN_BLOBS]
+	for( int i = 0; i < num; i++, blob++ ) {
 		savefile->ReadMaterial( blob->material );
 		savefile->ReadFloat( blob->x );
 		savefile->ReadFloat( blob->y );
@@ -260,36 +293,73 @@ void idPlayerView::Restore( idRestoreGame *savefile ) {
 		savefile->ReadFloat( blob->driftAmount );
 	}
 
-	savefile->ReadInt( dvFinishTime );
-	savefile->ReadMaterial( dvMaterial );
-	savefile->ReadInt( kickFinishTime );
-	savefile->ReadAngles( kickAngles );
-	savefile->ReadBool( bfgVision );
+	savefile->ReadInt( sightedTimer ); // int sightedTimer
 
-	savefile->ReadMaterial( tunnelMaterial );
-	savefile->ReadMaterial( armorMaterial );
-	savefile->ReadMaterial( berserkMaterial );
-	savefile->ReadMaterial( irGogglesMaterial );
-	savefile->ReadMaterial( bloodSprayMaterial );
-	savefile->ReadMaterial( bfgMaterial );
-	savefile->ReadFloat( lastDamageTime );
+	savefile->ReadInt( hiddenTimer ); // int hiddenTimer
+	savefile->ReadBool( hiddenActive ); // bool hiddenActive
+	savefile->ReadFloat( hiddenStartAlpha ); // float hiddenStartAlpha
+	savefile->ReadFloat( hiddenEndAlpha ); // float hiddenEndAlpha
+	savefile->ReadFloat( hiddenCurrentAlpha ); // float hiddenCurrentAlpha
 
-	savefile->ReadVec4( fadeColor );
-	savefile->ReadVec4( fadeToColor );
-	savefile->ReadVec4( fadeFromColor );
-	savefile->ReadFloat( fadeRate );
-	savefile->ReadInt( fadeTime );
+	savefile->ReadInt( confinedTimer ); // int confinedTimer
+	savefile->ReadBool( confinedActive ); // bool confinedActive
+	savefile->ReadFloat( confinedStartAlpha ); // float confinedStartAlpha
+	savefile->ReadFloat( confinedEndAlpha ); // float confinedEndAlpha
+	savefile->ReadFloat( confinedCurrentAlpha ); // float confinedCurrentAlpha
 
-	savefile->ReadAngles( shakeAng );
+	savefile->ReadInt( isLightedTimer ); // int isLightedTimer
+	savefile->ReadBool( isLightedActive ); // bool isLightedActive
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( player ) );
-	savefile->ReadRenderView( view );
+	savefile->ReadInt( durabilityflashStartTime ); // int durabilityflashStartTime
+	savefile->ReadBool( durabilityflashActive ); // bool durabilityflashActive
+	savefile->ReadMaterial( durabilityflashMaterial ); // const idMaterial * durabilityflashMaterial
 
-#ifdef _D3XP
-	if ( fxManager ) {
+	savefile->ReadBool( bloodrageLerping ); // bool bloodrageLerping
+	savefile->ReadFloat( bloodrageStartLerpValue ); // float bloodrageStartLerpValue
+	savefile->ReadFloat( bloodrageEndLerpValue ); // float bloodrageEndLerpValue
+	savefile->ReadFloat( bloodrageCurrentValue ); // float bloodrageCurrentValue
+	savefile->ReadInt( bloodrageLerpTimer ); // int bloodrageLerpTimer
+	savefile->ReadInt( bloodrageTotalLerpTime ); // int bloodrageTotalLerpTime
+
+	savefile->ReadInt( dvFinishTime ); // int dvFinishTime
+	savefile->ReadMaterial( dvMaterial ); // const idMaterial * dvMaterial
+
+	savefile->ReadInt( kickFinishTime ); // int kickFinishTime
+	savefile->ReadAngles( kickAngles ); // idAngles kickAngles
+
+	savefile->ReadBool( bfgVision ); // bool bfgVision
+
+	savefile->ReadMaterial( tunnelMaterial ); // const idMaterial * tunnelMaterial
+	savefile->ReadMaterial( armorMaterial ); // const idMaterial * armorMaterial
+	savefile->ReadMaterial( berserkMaterial ); // const idMaterial * berserkMaterial
+	savefile->ReadMaterial( irGogglesMaterial ); // const idMaterial * irGogglesMaterial
+	savefile->ReadMaterial( bloodSprayMaterial ); // const idMaterial * bloodSprayMaterial
+	savefile->ReadMaterial( bfgMaterial ); // const idMaterial * bfgMaterial
+	savefile->ReadMaterial( lagoMaterial ); // const idMaterial * lagoMaterial
+	savefile->ReadFloat( lastDamageTime ); // float lastDamageTime
+
+	savefile->ReadVec4( fadeColor ); // idVec4 fadeColor
+	savefile->ReadVec4( fadeToColor ); // idVec4 fadeToColor
+	savefile->ReadVec4( fadeFromColor ); // idVec4 fadeFromColor
+	savefile->ReadFloat( fadeRate ); // float fadeRate
+	savefile->ReadInt( fadeTime ); // int fadeTime
+
+	savefile->ReadAngles( shakeAng ); // idAngles shakeAng
+
+	savefile->ReadObject( CastClassPtrRef(player) ); // idPlayer * player
+	savefile->ReadRenderView( view ); // renderView_t view
+
+	bool bExists;
+	savefile->ReadBool( bExists );  // FullscreenFXManager * fxManager
+	if ( bExists ) {
 		fxManager->Restore( savefile );
 	}
-#endif
+
+	savefile->ReadMaterial( bloodedgeMaterial ); // const idMaterial * bloodedgeMaterial
+	savefile->ReadMaterial( bokehMaterial ); // const idMaterial * bokehMaterial
+	savefile->ReadBool( bloodbagOverlayActive ); // bool bloodbagOverlayActive
+	savefile->ReadInt( bloodbagState ); // int bloodbagState
+	savefile->ReadInt( bloodbagTimer ); // int bloodbagTimer
 }
 
 /*
@@ -816,7 +886,9 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view ) 
 
 
 		//Fire fx.
-		if (player->GetOnFire())
+		// SW 26th Feb 2025:
+		// Don't continue to show this on the screen if the player dies while on fire
+		if (player->GetOnFire() && !player->AI_DEAD)
 		{
 			renderSystem->SetColor4(1, 1, 1, 1.0f);
 			renderSystem->DrawStretchPic(-50, 0, 740, 700, 0, 0, 1, 1, declManager->FindMaterial("textures/fx/screenfire"));
@@ -946,8 +1018,11 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view ) 
 			float bokehY = player->viewAngles.pitch / 90.0f;
 			bokehY *= BOKEH_Y_MAXOFFSET;
 
-			renderSystem->SetColor4(bloodColor, 0, 0, 1);
-			renderSystem->DrawStretchPic(0, bokehY, 640, 480, 0.0f, 0.0f, 1.0f, 1.0f, bokehMaterial); //the fake bokeh bloodsplots
+			if (g_bloodEffects.GetBool())
+			{
+				renderSystem->SetColor4(bloodColor, 0, 0, 1);
+				renderSystem->DrawStretchPic(0, bokehY, 640, 480, 0.0f, 0.0f, 1.0f, 1.0f, bokehMaterial); //the fake bokeh bloodsplots
+			}
 		}
 
 		//if (player->health <= 0)
@@ -1104,8 +1179,11 @@ void idPlayerView::UpdateHiddenVignette()
 
 		
 
-		renderSystem->SetColor4(.38f, .78f, .87f, hiddenCurrentAlpha);
-		renderSystem->DrawStretchPic(-boundsModifier, -boundsModifier, 640 + (boundsModifier*2), 480 + (boundsModifier*2), 0, 0, 1, 1, declManager->FindMaterial("guis/assets/vignette_unseen"));
+		if (g_showHud.GetBool())
+		{
+			renderSystem->SetColor4(.38f, .78f, .87f, hiddenCurrentAlpha);
+			renderSystem->DrawStretchPic(-boundsModifier, -boundsModifier, 640 + (boundsModifier * 2), 480 + (boundsModifier * 2), 0, 0, 1, 1, declManager->FindMaterial("guis/assets/vignette_unseen"));
+		}
 
 		//renderSystem->SetColor4(.5f, 0, 1, confinedHideCurrentAlpha * .8f);
 		//renderSystem->DrawStretchPic(0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial("textures/fx/vignette_border"));
@@ -1391,10 +1469,10 @@ FxFader::Save
 ==================
 */
 void FxFader::Save( idSaveGame *savefile ) {
-	savefile->WriteInt( time );
-	savefile->WriteInt( state );
-	savefile->WriteFloat( alpha );
-	savefile->WriteInt( msec );
+	savefile->WriteInt( time ); // int time
+	savefile->WriteInt( state ); // int state
+	savefile->WriteFloat( alpha ); // float alpha
+	savefile->WriteInt( msec ); // int msec
 }
 
 /*
@@ -1403,10 +1481,10 @@ FxFader::Restore
 ==================
 */
 void FxFader::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( time );
-	savefile->ReadInt( state );
-	savefile->ReadFloat( alpha );
-	savefile->ReadInt( msec );
+	savefile->ReadInt( time ); // int time
+	savefile->ReadInt( state ); // int state
+	savefile->ReadFloat( alpha ); // float alpha
+	savefile->ReadInt( msec ); // int msec
 }
 
 
@@ -1419,7 +1497,9 @@ FullscreenFX_Helltime::Save
 ==================
 */
 void FullscreenFX::Save( idSaveGame *savefile ) {
+	savefile->WriteString( name ); // idString name
 	fader.Save( savefile );
+//	FullscreenFXManager *fxman; // FullscreenFXManager * fxman
 }
 
 /*
@@ -1428,6 +1508,7 @@ FullscreenFX_Helltime::Restore
 ==================
 */
 void FullscreenFX::Restore( idRestoreGame *savefile ) {
+	savefile->ReadString( name ); // idString name
 	fader.Restore( savefile );
 }
 
@@ -2764,7 +2845,7 @@ void FullscreenFXManager::Initialize( idPlayerView *pv ) {
 	CreateFX( "helltime", "helltime", 1000 );
 	CreateFX( "warp", "warp", 0 );
 	CreateFX( "envirosuit", "envirosuit", 500 );
-	CreateFX( "doublevision", "doublevision", 0 );
+	//CreateFX( "doublevision", "doublevision", 0 ); // SM: Disable doublevision because it looks bad
 	CreateFX( "multiplayer", "multiplayer", 1000 );
 	CreateFX( "influencevision", "influencevision", 1000 );
 	CreateFX( "bloom", "bloom", 0 );
@@ -2813,13 +2894,19 @@ FullscreenFXManager::Save
 ==================
 */
 void FullscreenFXManager::Save( idSaveGame *savefile ) {
-	savefile->WriteBool( highQualityMode );
-	savefile->WriteVec2( shiftScale );
 
-	for ( int i = 0; i < fx.Num(); i++ ) {
+	for ( int i = 0; i < fx.Num(); i++ ) { 	//idList<FullscreenFX*>	fx;
 		FullscreenFX *pfx = fx[i];
 		pfx->Save( savefile );
 	}
+
+
+	savefile->WriteBool( highQualityMode ); // bool highQualityMode
+	savefile->WriteVec2( shiftScale ); // idVec2 shiftScale
+
+	//idPlayerView *playerView  // owned by playerview
+
+	savefile->WriteMaterial( blendBackMaterial ); //const idMaterial* blendBackMaterial;
 }
 
 /*
@@ -2828,13 +2915,19 @@ FullscreenFXManager::Restore
 ==================
 */
 void FullscreenFXManager::Restore( idRestoreGame *savefile ) {
-	savefile->ReadBool( highQualityMode );
-	savefile->ReadVec2( shiftScale );
 
-	for ( int i = 0; i < fx.Num(); i++ ) {
+	for ( int i = 0; i < fx.Num(); i++ ) {  	//idList<FullscreenFX*>	fx
 		FullscreenFX *pfx = fx[i];
 		pfx->Restore( savefile );
 	}
+
+	savefile->ReadBool( highQualityMode ); // bool highQualityMode
+	savefile->ReadVec2( shiftScale ); // idVec2 shiftScale
+
+	//idPlayerView *playerView // owned by playerview
+
+
+	savefile->ReadMaterial( blendBackMaterial ); //const idMaterial* blendBackMaterial;
 }
 
 /*

@@ -36,6 +36,18 @@ void idTrigger_healcloud::Spawn()
 	particleEmitter->SetActive(true);
 }
 
+void idTrigger_healcloud::Save(idSaveGame* savefile) const
+{
+	savefile->WriteBool( active ); // bool active
+	savefile->WriteObject( particleEmitter ); // idFuncEmitter * particleEmitter
+	savefile->WriteInt( maxlifetime ); // int maxlifetime
+}
+void idTrigger_healcloud::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadBool( active ); // bool active
+	savefile->ReadObject( CastClassPtrRef(particleEmitter) ); // idFuncEmitter * particleEmitter
+	savefile->ReadInt( maxlifetime ); // int maxlifetime
+}
 
 
 void idTrigger_healcloud::Event_Touch(idEntity* other, trace_t* trace)
@@ -80,6 +92,7 @@ void idTrigger_healcloud::Event_Touch(idEntity* other, trace_t* trace)
 		{			
 			particleEmitter->SetActive(false);
 			particleEmitter->PostEventMS(&EV_Remove, 2000); //let the particle linger a bit so that it disappears during the middle of the fireball.
+			particleEmitter = nullptr;
 		}
 
 		//Remove self.
@@ -99,6 +112,7 @@ void idTrigger_healcloud::Think()
 		//Expired, make it go away.
 		particleEmitter->SetActive(false);
 		particleEmitter->PostEventMS(&EV_Remove, 2000);
+		particleEmitter = nullptr;
 		this->PostEventMS(&EV_Remove, 0);
 	}
 }

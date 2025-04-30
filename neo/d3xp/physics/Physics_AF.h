@@ -831,7 +831,7 @@ public:
 							idPhysics_AF( void );
 							~idPhysics_AF( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1, but this whole file is confusing to save
 	void					Restore( idRestoreGame *savefile );
 
 							// initialisation
@@ -916,8 +916,9 @@ public:	// common physics interface
 	void					SetContents( int contents, int id = -1 );
 	int						GetContents( int id = -1 ) const;
 
-	const idBounds &		GetBounds( int id = -1 ) const;
-	const idBounds &		GetAbsBounds( int id = -1 ) const;
+	const idBounds &		GetBounds(int id = -1) const;
+	const idBounds &		GetAbsBounds(int id = -1) const;
+	const idBounds &		GetAbsBoundsMasked(int mask) const;
 
 	bool					Evaluate( int timeStepMSec, int endTimeMSec );
 	void					UpdateTime( int endTimeMSec );

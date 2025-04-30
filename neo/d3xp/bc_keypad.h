@@ -9,7 +9,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 
@@ -35,8 +35,8 @@ private:
 	int						nextStateTime;
 
 	//idEntity*				frobcubeMain;
-	idEntity*				frobcubes[9];
-	const idDeclSkin *		skin_glow[9];
+	idEntity*				frobcubes[9] = {};
+	const idDeclSkin *		skin_glow[9] = {};
 	int						transitions[9];
 
 	void					GenerateKeyFromKeyvalue(idStr newcode);
@@ -62,6 +62,6 @@ private:
 	void					DoCodeSuccess();
 
 	idVec3					GetAntennaPosition();
-	idFuncEmitter			*zapParticle;
+	idFuncEmitter			*zapParticle = nullptr;
 
 };

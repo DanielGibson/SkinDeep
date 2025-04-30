@@ -39,6 +39,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "PlayerIcon.h"
 #include "GameEdit.h"
 #include "ui/DeviceContext.h"
+#include "Mover.h"
 
 
 #include "Misc.h"
@@ -137,6 +138,12 @@ const int IMPACT_SLOWMO_TIME = 30; //Do a short burst of slow motion time; this 
 #define WOUNDCOUNT_MAX 5
 
 #define MAX_DOORLOCKMARKERS  10  //This is dependent on info_station.gui -- make sure the gui has enough windowdefs to handle this quantity.
+
+#ifdef _D3XP
+const int COLOR_BAR_TABLE_MAX = 8;
+#else
+const int COLOR_BAR_TABLE_MAX = 5;
+#endif
 
 enum {
 	BEACONTYPE_EXTRACTION,
@@ -379,8 +386,8 @@ public:
 							~idInventory() { Clear(); }
 
 	// save games
-	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
-	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
+	void					Save( idSaveGame *savefile ) const;	// blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );	
 
 	void					Clear( void );
 	void					GivePowerUp( idPlayer *player, int powerup, int msec );
@@ -524,8 +531,8 @@ public:
 	idInventory				inventory;
 
 	idEntityPtr<idWeapon>	weapon;
-	idUserInterface *		hud;				// MP: is NULL if not local player
-	idUserInterface *		objectiveSystem;
+	idUserInterface *		hud = 0;				// MP: is NULL if not local player
+	idUserInterface *		objectiveSystem = 0;
 	bool					objectiveSystemOpen;
 
 	int						weapon_soulcube;
@@ -553,11 +560,7 @@ public:
 	idEntityPtr<idProjectile> soulCubeProjectile;
 
 	// mp stuff
-#ifdef _D3XP
-	static idVec3			colorBarTable[ 8 ];
-#else
-	static idVec3			colorBarTable[ 5 ];
-#endif
+	static idVec3			colorBarTable[ COLOR_BAR_TABLE_MAX ];
 
 	int						spectator;
 	idVec3					colorBar;			// used for scoreboard and hud display
@@ -601,7 +604,7 @@ public:
 	idDragEntity			dragEntity;
 
 #ifdef _D3XP
-	idFuncMountedObject	*	mountedObject;
+	idFuncMountedObject	*	mountedObject = 0;
 	idEntityPtr<idLight>	enviroSuitLight;
 
 
@@ -622,8 +625,7 @@ public:
 	void					Spawn( void );
 	void					Think( void );
 
-	// save games
-	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
 	virtual void			Hide( void );
@@ -642,8 +644,8 @@ public:
 	void					SavePersistantInfo( void );
 	void					RestorePersistantInfo( void );
 	void					SetLevelTrigger( const char *levelName, const char *triggerName );
-	bool					SaveProgression(const char* nextMap);
-	void					Event_SaveProgression(const char* nextMap);
+	bool					SaveProgression(const char* nextMap = nullptr, const char* checkPoint = nullptr);
+	void					Event_SaveProgression(const char* nextMap = nullptr, const char* checkPoint = nullptr);
 
 	bool					UserInfoChanged( bool canModify );
 	idDict *				GetUserInfo( void );
@@ -850,7 +852,7 @@ public:
 	void					SetViewYawLerp(float targetYaw, int transitiontime = 250);
 	void					SetViewPitchLerp(float targetPitch, int transitiontime = 250 /*default transition time, MAKE SURE this syncs with VIEWPOS_OFFSET_MOVETIME*/  );
 	void					SetViewRollLerp(float targetPitch, int transitiontime = 250);
-	void					SetViewLerp(idVec3 targetPosition, int moveTime);
+	void					SetViewLerp(const idVec3 &targetPosition, int moveTime);
 	void					SetViewLerpAngles(idAngles angles, int moveTime);
 
 	void					SetConfinedState(float baseAngle, float sneezeMultiplier, bool isConfined);
@@ -900,7 +902,7 @@ public:
 
 	idEntityPtr<class idMech> mountedMech;
 	void					EnterMech(idEntity * mechEnt);
-	idAnimated *			mechCockpit;
+	idAnimated *			mechCockpit = 0;
 	void					ExitMech(bool flashWhite);
 	bool					IsInMech() const;
 	bool					IsInMechEvent();
@@ -934,8 +936,8 @@ public:
 	void					SetHudNamedEvent(const char * eventName);
 	void					SetHudParmInt(const char * parmName, int value);
 
-	void					SetViewposAbsLerp(idVec3 _target, int _duration);
-	void					SetViewposAbsLerp2(idVec3 _target, int _duration);
+	void					SetViewposAbsLerp(const idVec3 &_target, int _duration);
+	void					SetViewposAbsLerp2(const idVec3 &_target, int _duration);
 
 
 	idEntityPtr<idEntity>	peekObject;
@@ -956,7 +958,7 @@ public:
 
 
 
-	const char *			reverbLocation;
+	const char *			reverbLocation = 0;
 
 
 	bool					GetDefibState();
@@ -997,14 +999,14 @@ public:
 	//Returns: 0 = player in darkness, 1 = middle, 2 = in light.
 	int						GetDarknessValue();
 	
-	idUserInterface *		eventlogMenu; //BC for eventlog.
-	idUserInterface *		spectatorMenu;
+	idUserInterface *		eventlogMenu = 0; //BC for eventlog.
+	idUserInterface *		spectatorMenu = 0;
 
-	idUserInterface*		levelselectMenu; //BC for the level select menu.
-	idListGUI*				levelselectGuiList;
+	idUserInterface*		levelselectMenu = 0; //BC for the level select menu.
+	idListGUI*				levelselectGuiList = 0;
 
 
-	idUserInterface*		emailFullscreenMenu; //BC for the fullscreen email interface.
+	idUserInterface*		emailFullscreenMenu = 0; //BC for the fullscreen email interface.
 	int						emailFullscreenState;
 	enum					{EFS_OFF, EFS_TRANSITIONON, EFS_ACTIVE, EFS_TRANSITIONOFF};
 	void					UpdateEmailFullscreen();
@@ -1018,6 +1020,7 @@ public:
 	void					DrawSpectatorHUD();
 
 	bool					HasWeaponInInventory(const char *weaponName, bool ignoreMultiCarry = false);
+	void					Event_HasWeaponInInventory(const char* weaponName, int ignoreMultiCarry); // SW 14th April 2025
 	bool					HasEntityInCarryableInventory(idEntity *ent);
 	idEntity *				HasEntityInCarryableInventory_ViaInvName(idStr invName);
 	int						GetEmptyInventorySlots();
@@ -1028,6 +1031,12 @@ public:
 
 	bool					HasItemViaClassname(const char *itemClassname);
 	bool					RemoveItemViaClassname(const char *itemClassname);
+
+	// SW 12th March 2025: added support for getting items directly by name
+	// (There are some scenarios where the player has multiple of the same entity class in their inventory,
+	// but we still want to handle them independently)
+	bool					HasItemViaEntityname(const char* itemname);
+	void					Event_HasItemViaEntityname(const char* itemname);
 
 	void					Event_HasItemViaClassname(const char *itemClassname);
 	void					Event_RemoveItemViaClassname(const char *itemClassname);
@@ -1130,7 +1139,8 @@ public:
 
 	bool					IsPlayerNearSpacenudgeEnt();
 
-	void					SetObjectiveText(const char *text, bool newObjective = true);
+	void					Event_SetObjectiveText(const char* text, bool newObjective = true);
+	void					SetObjectiveText(const char* text, bool newObjective = true, idStr objectiveIcon = "");
 
 	void					DoZoominspectEntity(idEntity *ent);
 
@@ -1152,7 +1162,7 @@ public:
 
 	bool					DoInspectCurrentItem();
 
-	bool					SayVO_WithIntervalDelay(const char *sndName);
+	bool					SayVO_WithIntervalDelay(const char *sndName, int lineCategory = VO_CATEGORY_BARK);
 	void					SayVO_WithIntervalDelay_msDelayed(const char *sndName, int msDelay);
 
 	void					JustPickedupItem(idEntity *ent);
@@ -1182,6 +1192,7 @@ public:
 	void					DoLocalSoundwave(idStr particlename);
 
 	void					DoPickpocketSuccess(idEntity* ent);
+	void					DoPickpocketFail(bool doFanfare);
 	bool					IsFullscreenUIActive() const;
 	void					LevelselectMenuOpen(int value);
 
@@ -1205,6 +1216,16 @@ public:
 	void					SetupArmstatRoomLabels();
 
 	void					Event_IsFullscreenUIActive(void);
+
+	int						GetWoundCount(void);
+	void					JockeyAnimTransform(idAI* enemy, bool initRef = false);
+
+	// SW 17th Feb 2025
+	void					SetBeingVacuumSplined(bool enable, idMover* mover);
+	bool					GetBeingVacuumSplined(void);
+
+	bool					IsPickpocketing();
+	idEntity*				GetPickpocketEnt();
 
 	// ====================== BC PUBLIC END ======================
 
@@ -1241,8 +1262,8 @@ private:
 	bool					weaponEnabled;
 	bool					showWeaponViewModel;
 
-	const idDeclSkin *		skin;
-	const idDeclSkin *		powerUpSkin;
+	const idDeclSkin *		skin = 0;
+	const idDeclSkin *		powerUpSkin = 0;
 	idStr					baseSkinName;
 
 	int						numProjectilesFired;	// number of projectiles fired
@@ -1262,12 +1283,12 @@ private:
 
 	float					influenceFov;
 	int						influenceActive;		// level of influence.. 1 == no gun or hud .. 2 == 1 + no movement
-	idEntity *				influenceEntity;
-	const idMaterial *		influenceMaterial;
+	idEntity *				influenceEntity = 0;
+	const idMaterial *		influenceMaterial = 0;
 	float					influenceRadius;
-	const idDeclSkin *		influenceSkin;
+	const idDeclSkin *		influenceSkin = 0;
 
-	idCamera *				privateCameraView;
+	idCamera *				privateCameraView = 0;
 
 	static const int		NUM_LOGGED_VIEW_ANGLES = 64;		// for weapon turning angle offsets
 	idAngles				loggedViewAngles[NUM_LOGGED_VIEW_ANGLES];	// [gameLocal.framenum&(LOGGED_VIEW_ANGLES-1)]
@@ -1276,13 +1297,13 @@ private:
 	int						currentLoggedAccel;
 
 	// if there is a focusGUIent, the attack button will be changed into mouse clicks
-	idEntity *				focusGUIent;
-	idUserInterface *		focusUI;				// focusGUIent->renderEntity.gui, gui2, or gui3
-	idAI *					focusCharacter;
+	idEntity *				focusGUIent = 0;
+	idUserInterface *		focusUI = 0;				// focusGUIent->renderEntity.gui, gui2, or gui3
+	idAI *					focusCharacter = 0;
 	int						talkCursor;				// show the state of the focusCharacter (0 == can't talk/dead, 1 == ready to talk, 2 == busy talking)
 	int						focusTime;
-	idAFEntity_Vehicle *	focusVehicle;
-	idUserInterface *		cursor;
+	idAFEntity_Vehicle *	focusVehicle = 0;
+	idUserInterface *		cursor = 0;
 
 	// full screen guis track mouse movements directly
 	int						oldMouseX;
@@ -1393,7 +1414,7 @@ private:
 	void					Event_Gibbed( void );
 
 	
-	void					Event_Teleport(idVec3 destination);
+	void					Event_Teleport(const idVec3 &destination);
 	
 
 #ifdef _D3XP //BSM: Event to remove inventory items. Useful with powercells.
@@ -1417,7 +1438,7 @@ private:
 	idHashTable<int>		voIntervalTable;
 
 	//context menu.
-	idUserInterface *		contextMenu;
+	idUserInterface *		contextMenu = 0;
 	bool					contextMenuActive;
 	float					contextMenuSoundSpeed; // 0.0 to 1.0, ramps rapidly down to 0 after opening menu
 	int						soundSlowmoHandle;
@@ -1530,7 +1551,7 @@ private:
 	void					DeselectFrobItem(void);
 	bool					IsItemValidFrobbable(idEntity *ent);
 	idEntity *				UpdateMemoryPalaceFrobCursor();
-	idEntity *				frobEnt;
+	idEntity *				frobEnt = 0;
 	int						frobState;
 	int						lastFrobNumber;
 	idVec3					frobHitpos;
@@ -1620,7 +1641,7 @@ private:
 	int						burningTimer;
 	int						burningDOTTimer;
 	int						lastBurnwoundTime;
-	int						GetWoundCount(void);
+	
 
 	int						lastChemDamageTime;
 	int						playerInChemTimer;
@@ -1681,8 +1702,8 @@ private:
 
 
 	void					DoSpit(int spitType);
-	const idDict *			spitDef;
-	const idDict *			bloodspitDef;
+	const idDict *			spitDef = 0;
+	const idDict *			bloodspitDef = 0;
 
 	
 	int						downedTickTimer;
@@ -1712,12 +1733,12 @@ private:
 	int						grenadeThrowState;
 	bool					shouldDrawThrowArc;
 	bool					lastThrowArcState;
-	idBeam*					throwBeamOrigin[THROWARC_BEAMCOUNT];
-	idBeam*					throwBeamTarget[THROWARC_BEAMCOUNT];
-	idEntity*				throwdisc;
-	idODE*					throwPredictionIntegrator;
-	idPhysics_RigidBody*	throwWeaponPhysicsObj;
-	idEntity*				throwPredictionModel;
+	idBeam*					throwBeamOrigin[THROWARC_BEAMCOUNT] = {};
+	idBeam*					throwBeamTarget[THROWARC_BEAMCOUNT] = {};
+	idEntity*				throwdisc = 0;
+	idODE*					throwPredictionIntegrator = 0;
+	idPhysics_RigidBody*	throwWeaponPhysicsObj = 0;
+	idEntity*				throwPredictionModel = 0;
 	void					UpdateThrownWeapon(const idDeclEntityDef* weapDef);
 	void					DrawThrowArc(void);
 	bool					GetThrowArcVisible(void);
@@ -1730,10 +1751,10 @@ private:
 	void					Event_getPlacerPos(void);
 	void					Event_getPlacerValid(void);
 	void					Event_getPlacerRotation(void);
-	idEntity				*placerEnt;
-	idEntity				*placerEntLine;
-	idEntity				*placerEntArrow;
-	bool					placerClearance;
+	idEntity				*placerEnt = 0;
+	idEntity				*placerEntLine = 0;
+	idEntity				*placerEntArrow = 0;
+	bool					placerClearance = 0;
 	void					UpdatePlacerSticky(void);
 	int						placerEntityNumber;
 	int						placerEntityCollisionID;
@@ -1754,9 +1775,9 @@ private:
 	int						defibState;
 	void					UpdateDefib();
 	int						defibTimer;
-	idEntity *				defibCamera;
-	idEntity *				defibMover;
-	idEntity *				defibCameraTarget;
+	idEntity *				defibCamera = 0;
+	idEntity *				defibMover = 0;
+	idEntity *				defibCameraTarget = 0;
 	bool					defibFadeDone;
 	float					defibYaw;
 
@@ -1775,8 +1796,8 @@ private:
 
 
 
-	idUserInterface *		videoMenu;
-	idUserInterface*		cameraGuiMenu;
+	idUserInterface *		videoMenu = 0;
+	idUserInterface*		cameraGuiMenu = 0;
 
 	void					BindStickyItem(idEntity *stickyItem);
 
@@ -1790,14 +1811,14 @@ private:
 
 	void					AttachBloodbag();
 	int						bloodbagState;
-	idAnimated *			bloodbagMesh;
+	idAnimated *			bloodbagMesh = 0;
 	int						bloodbagTimer;
 	int						bloodbagMaxTime;
 	int						bloodbagHealth;
-	const idDeclParticle *	bloodbagParticles;
+	const idDeclParticle *	bloodbagParticles = 0;
 	int						bloodbagParticleFlytime;
 	jointHandle_t			bloodbagJoint;
-	idFuncEmitter			*bloodbagEmitter;
+	idFuncEmitter			*bloodbagEmitter = 0;
 	int						bloodbagDamageTimer;
 	void					HideBloodbag();
 	int						bloodbagHealthFXState;
@@ -1854,7 +1875,7 @@ private:
 	bool					signalLock; // Is signal locked on?
 	int						lastSignalLockUpdate; // When did we last update the signal lock-on state?
 	idVec3					lastBeaconPosition; // What is the beacon vector's position?
-	void					ActivateBeacon(int beaconType, idVec3 beaconSpawnPos);
+	void					ActivateBeacon(int beaconType, const idVec3 &beaconSpawnPos);
 	bool					beaconFlashState;
 	int						beaconFlashTimer;
 	bool					beaconUIBlink;
@@ -1980,7 +2001,7 @@ private:
 
 	//player wristwatch.
 	bool					armstatsActive;
-	idAnimatedEntity*		armstatsModel;
+	idAnimatedEntity*		armstatsModel = 0;
 	enum					{ARMST_DORMANT, ARMST_RAISING, ARMST_ACTIVE, ARMST_LOWERING};
 	int						armstatsState;
 	int						armstatsTimer;
@@ -2013,8 +2034,12 @@ private:
 	int						jockeyState;
 	enum					{ JCK_INACTIVE, JCK_ATTACHED };
 	idVec3					GetJockeyDismountLocation();
-	bool					CheckDismountViability(idVec3 _position);
-	idEntity *				jockeyArrow;
+	bool					CheckDismountViability(idVec3 _position, bool doFloorCheck);
+	idEntity *				jockeyArrow = 0;
+	idVec3					jockeyJointIdlePos;
+	idQuat					jockeyJointIdleRot;
+	idVec3					jockeyJointModPos;
+	idQuat					jockeyJointModRot;
 
 	void					Weapon_Jockey(void);
 	void					DrawAIDodgeUI();
@@ -2039,8 +2064,8 @@ private:
 
 	
 
-	idEntity*				tele_ui_entity;
-    idEntity*				tele_ui_disc;
+	idEntity*				tele_ui_entity = 0;
+    idEntity*				tele_ui_disc = 0;
 
 	int						gascloud_timer;
 	int						gascloud_coughtimer;
@@ -2092,7 +2117,7 @@ private:
 
 	bool					DoCarryablePlacerLogic();
 
-	idEntity*				lastPlayerLookTrigger;
+	idEntityPtr<idEntity>	lastPlayerLookTrigger;
 	void					UpdatePlayerLookTriggers();
 	void					DebugUnassignedLocations();
 
@@ -2141,7 +2166,7 @@ private:
 	int						vo_reloadchecktimer;
 	bool					hasSaidReloadcheckVO;
 
-	void					Event_flytext(idVec3 position, const char *text);
+	void					Event_flytext(const idVec3 &position, const char *text);
 
 	
 	void					EventlogMenuOpen(bool value);
@@ -2157,8 +2182,7 @@ private:
 	int						pickpocketState;
 	enum					{PP_NONE, PP_PICKING, PP_OUTOFRANGE_DELAY};
 	idEntityPtr<idEntity>	pickpocketEnt;
-	void					DrawPickpocketUI();
-	void					DoPickpocketFail();	
+	void					DrawPickpocketUI();	
 	float					GetPickpocketDistance();
 
 	int						statsPickpocketAttempts;
@@ -2189,7 +2213,6 @@ private:
 	int						memorypalaceState;
 	int						memorypalaceTimer;
 	idVec3					memorypalacePlayerPos;
-	idLight					*memoryLight;
 	idVec3					memorypalaceForwardView;
 	void					ExitMemoryPalace();
 
@@ -2260,7 +2283,7 @@ private:
 	bool					spectateUIActive;
 	bool					spectateStatsActive;
 
-	idEntity*				spectateTimelineEnt;
+	idEntity*				spectateTimelineEnt = 0;
 
 	void					UpdateSpectatenodes();
 
@@ -2276,7 +2299,7 @@ private:
 	void					EnterDownedState(const idDeclEntityDef* damageDef);
 	void					CancelDownedState(void);
 
-	idAnimatedEntity*		ninaOrgansModel;
+	idAnimatedEntity*		ninaOrgansModel = 0;
 	idVec3					ninaOrgansPosStart;
 	idVec3					ninaOrgansPosEnd;
 	int						ninaOrgansTimer;
@@ -2314,10 +2337,10 @@ private:
 
 
 
-	void					Event_ParticleStream(const char* particlename, idVec3 destination, int duration);
+	void					Event_ParticleStream(const char* particlename, const idVec3 &destination, int duration);
 	int						particlestreamTimer;
 	idVec3					particleStreamDestination;
-	idEntity*				particleStreamEnt;
+	idEntity*				particleStreamEnt = 0;
 
 	void					Event_ForceSpatterFx(int enable, float amount);
 
@@ -2331,7 +2354,10 @@ private:
 	bool					ShouldShowLocBox();
 
 	void					UpdatePlayerLocboxTriggers();
-	bool					lastLocboxtriggerState;
+
+	// SW 2nd April: converting this from a bool to an entity pointer so we know *what* the previous locbox was,
+	// not just *whether* a locbox was active. This lets us handle switching directly from one locbox to another.
+	idEntityPtr<idEntity>	lastLocboxTriggered; 
 
 	void					DisplayCatBox(idStr name, idStr title, idStr blurb);
 	void					Event_DisplayCatBox(const char* name, const char* title, const char* blurb);
@@ -2340,6 +2366,10 @@ private:
 	void					Event_SetCinematicHUD(int value);
 
 	void					Event_EnableHeartBeat(int value);
+	void					RestorePDAEmails(bool clean = false);
+
+	// SW 17th Feb 2025
+	idMover*				vacuumSplineMover = 0;
 
 	//BC PRIVATE END ===============================================================
 

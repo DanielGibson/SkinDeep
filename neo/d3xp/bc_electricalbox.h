@@ -13,7 +13,7 @@ public:
 							idElectricalBox(void);
 	virtual					~idElectricalBox(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -36,7 +36,7 @@ private:
 
 	virtual void			Event_PostSpawn(void);
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	idList<int>				pipeIndexes;
 	idList<int>				lightIndexes;

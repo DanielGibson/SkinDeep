@@ -64,9 +64,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "bc_meta.h"
 #include "bc_ventdoor.h"
 
+#include "framework/Session.h"
+
 #include "Game_local.h"
-
-
 
 
 const int NUM_RENDER_PORTAL_BITS	= idMath::BitsForInteger( PS_BLOCK_ALL );
@@ -386,6 +386,11 @@ void idGameLocal::Clear( void ) {
 	loadCount = 0;
 
 	lastDebugNoteIndex = -1;
+
+	metaEnt = nullptr;
+
+	eventlogGuiList = nullptr;
+	eventLogAlerts = nullptr;
 }
 
 /*
@@ -436,6 +441,9 @@ void idGameLocal::Init( void ) {
 
 	cmdSystem->AddCommand( "gamepad_rumble", GamePadFXSystem::Rumble_f, CMD_FL_SYSTEM|CMD_FL_GAME, "attempts add gamepad/controller rumble/vibrate, time excludes spin-up/down time" );
 	cmdSystem->AddCommand( "gamepad_light", GamePadFXSystem::Light_f, CMD_FL_SYSTEM|CMD_FL_GAME, "attempts to add controller led light, excludes min light" );
+
+
+	cmdSystem->AddCommand( "testfunc", idGameLocal::TestTimedFunc_f, CMD_FL_SYSTEM|CMD_FL_GAME, "developer only test func for random code" );
 
 	Clear();
 
@@ -504,24 +512,39 @@ void idGameLocal::Init( void ) {
 
 
 	{
+		controllerButtonDicts[CT_XBOX360].Clear();
 		idParser buttonParser("misc/controller_360.dict", LEXFL_ALLOWMULTICHARLITERALS);
 		controllerButtonDicts[CT_XBOX360].Parse(buttonParser);
 	}
 	{
+		controllerButtonDicts[CT_XBOXONE].Clear();
 		idParser buttonParser("misc/controller_xboxone.dict", LEXFL_ALLOWMULTICHARLITERALS);
 		controllerButtonDicts[CT_XBOXONE].Parse(buttonParser);
 	}
 	{
+		controllerButtonDicts[CT_PS4].Clear();
 		idParser buttonParser("misc/controller_ps4.dict", LEXFL_ALLOWMULTICHARLITERALS);
 		controllerButtonDicts[CT_PS4].Parse(buttonParser);
 	}
 	{
+		controllerButtonDicts[CT_PS5].Clear();
 		idParser buttonParser("misc/controller_ps5.dict", LEXFL_ALLOWMULTICHARLITERALS);
 		controllerButtonDicts[CT_PS5].Parse(buttonParser);
 	}
 	{
+		controllerButtonDicts[CT_SWITCHPRO].Clear();
 		idParser buttonParser("misc/controller_switch.dict", LEXFL_ALLOWMULTICHARLITERALS);
 		controllerButtonDicts[CT_SWITCHPRO].Parse(buttonParser);
+	}
+	{
+		controllerButtonDicts[CT_STEAMDECK].Clear();
+		idParser buttonParser("misc/controller_steamdeck.dict", LEXFL_ALLOWMULTICHARLITERALS);
+		controllerButtonDicts[CT_STEAMDECK].Parse(buttonParser);
+	}
+	{
+		mouseButtonDict.Clear();
+		idParser buttonParser("misc/mouse.dict", LEXFL_ALLOWMULTICHARLITERALS);
+		mouseButtonDict.Parse(buttonParser);
 	}
 }
 
@@ -599,6 +622,7 @@ void idGameLocal::Shutdown( void ) {
 #endif
 }
 
+
 /*
 ===========
 idGameLocal::SaveGame
@@ -608,189 +632,368 @@ the session may have written some data to the file already
 ============
 */
 void idGameLocal::SaveGame( idFile *f ) {
-	int i;
-	idEntity *ent;
-	idEntity *link;
 
-	idSaveGame savegame( f );
-
-	if (g_flushSave.GetBool( ) == true ) {
+	if (g_flushSave.GetBool( ) == true || sg_debugchecks.GetBool() ) {
 		// force flushing with each write... for tracking down
 		// save game bugs.
 		f->ForceFlush();
 	}
 
-	savegame.WriteBuildNumber( BUILD_NUMBER );
+	idSaveGame savegame = idSaveGame::Begin( f, SAVEGAME_VERSION, MAX_GENTITIES, idThread::GetThreads().Num() );
+
+	savegame.WriteCheckString("post start");
+
+	savegame.WriteInt(numClients);  // int numClients
+	for (int i = 0; i < numClients; i++) {
+		savegame.WriteDict(&userInfo[i]);  // idDict userInfo[MAX_CLIENTS]
+		savegame.WriteDict(&persistentPlayerInfo[i]);  // idDict persistentPlayerInfo[MAX_CLIENTS]
+	}
+
+	savegame.WriteDict(&persistentLevelInfo); // idDict persistentLevelInfo
+
+	savegame.WriteCheckString("post persistent");
+
+	// SM: If this is an autosave, bail out immediately after persistent info is saved,
+	// since that's all we need to write
+	if (idStr::FindText(f->GetName(), "autosave") != -1) {
+		return;
+	}
 
 	// go through all entities and threads and add them to the object list
-	for( i = 0; i < MAX_GENTITIES; i++ ) {
-		ent = entities[i];
+	for( int idx = 0; idx < MAX_GENTITIES; idx++ ) { // idEntity * entities[MAX_GENTITIES] part 1
+		idEntity * ent = entities[idx];
 
-		if ( ent ) {
+		if ( ent && !ent->IsRemoved() ) {
 			if ( ent->GetTeamMaster() && ent->GetTeamMaster() != ent ) {
-				continue;
+				continue; // will get added later
 			}
-			for ( link = ent; link != NULL; link = link->GetNextTeamEntity() ) {
-				savegame.AddObject( link );
+			for ( idEntity *link = ent; link != NULL; link = link->GetNextTeamEntity() ) {
+				int linkIdx = -1;
+				for ( int idxFind = 0; idxFind < MAX_GENTITIES; idxFind++ ) {
+					if ( entities[idxFind] == link ) {
+						linkIdx = idxFind;
+						break;
+					}
+				}
+				savegame.AddObjectToList( link, linkIdx);
 			}
+		} else {
+			savegame.AddObjectToList( nullptr, idx );
 		}
 	}
 
-	idList<idThread *> threads;
-	threads = idThread::GetThreads();
+	idList<idThread *> threads = idThread::GetThreads();
 
-	for( i = 0; i < threads.Num(); i++ ) {
-		savegame.AddObject( threads[i] );
+	for( int i = 0; i < threads.Num(); i++ ) {
+		savegame.AddObjectToList( threads[i], i+MAX_GENTITIES );
 	}
 
 	// write out complete object list
-	savegame.WriteObjectList();
+	savegame.WriteObjectListTypes();
 
-	program.Save( &savegame );
+	savegame.WriteCheckString("post objects");
+
+	program.Save( &savegame ); // idProgram program
+
+	savegame.WriteCheckString("post program");
 
 	savegame.WriteInt( g_skill.GetInteger() );
 
-	savegame.WriteDict( &serverInfo );
+	savegame.WriteDict( &serverInfo );  // idDict serverInfo
 
-	savegame.WriteInt( numClients );
-	for( i = 0; i < numClients; i++ ) {
-		savegame.WriteDict( &userInfo[ i ] );
-		savegame.WriteUsercmd( usercmds[ i ] );
-		savegame.WriteDict( &persistentPlayerInfo[ i ] );
+	savegame.WriteCheckString("post server");
+
+	for( int i = 0; i < numClients; i++ ) {
+		savegame.WriteUsercmd( usercmds[ i ] );  // usercmd_t usercmds[MAX_CLIENTS]
 	}
 
-	for( i = 0; i < MAX_GENTITIES; i++ ) {
-		savegame.WriteObject( entities[ i ] );
-		savegame.WriteInt( spawnIds[ i ] );
+	savegame.WriteCheckString("post user");
+
+	for( int i = 0; i < MAX_GENTITIES; i++ ) {
+		if (entities[i] && !entities[i]->IsRemoved()) { // blendo eric: checked for removed objs
+			savegame.WriteObject( entities[ i ] ); // idEntity * entities[MAX_GENTITIES] part 2
+			savegame.WriteInt( spawnIds[ i ] ); // int spawnIds[MAX_GENTITIES]
+		} else {
+			savegame.WriteObject( nullptr );
+			savegame.WriteInt( -1 );
+		}
 	}
 
-	savegame.WriteInt( firstFreeIndex );
-	savegame.WriteInt( num_entities );
+	savegame.WriteInt( firstFreeIndex );  // int firstFreeIndex
+	savegame.WriteInt( num_entities );  // int num_entities
+	// idHashIndex entityHash // blendo eric: gen'd on entity restore
 
+	savegame.WriteCheckString("post entities");
 	// enityHash is restored by idEntity::Restore setting the entity name.
 
-	savegame.WriteObject( world );
+	savegame.WriteObject( world ); // idWorldspawn * world
 
-	savegame.WriteInt( spawnedEntities.Num() );
-	for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+	savegame.WriteCheckString("post world");
+
+	savegame.WriteInt( spawnedEntities.Num() );  // idLinkList<idEntity> spawnedEntities
+	for( idEntity *ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+		savegame.WriteObject( ent );
+	}
+	savegame.WriteCheckString("post spawned");
+
+	savegame.WriteInt( activeEntities.Num() );  // idLinkList<idEntity> activeEntities
+	for( idEntity *ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
 		savegame.WriteObject( ent );
 	}
 
-	savegame.WriteInt( activeEntities.Num() );
-	for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() ) {
-		savegame.WriteObject( ent );
-	}
+	// idLinkList<idEntity> aimAssistEntities // blendo eric: gen'd by actors
 
-	savegame.WriteInt( numEntitiesToDeactivate );
-	savegame.WriteBool( sortPushers );
-	savegame.WriteBool( sortTeamMasters );
-	savegame.WriteDict( &persistentLevelInfo );
+	savegame.WriteCheckString("post active");
 
-	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
+	savegame.WriteInt( numEntitiesToDeactivate );  // int numEntitiesToDeactivate
+	savegame.WriteBool( sortPushers );  // bool sortPushers
+	savegame.WriteBool( sortTeamMasters );  // bool sortTeamMasters
+
+	for( int i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) { // float globalShaderParms[ MAX_GLOBAL_SHADER_PARMS ]
 		savegame.WriteFloat( globalShaderParms[ i ] );
 	}
 
-	savegame.WriteInt( random.GetSeed() );
-	savegame.WriteObject( frameCommandThread );
+	savegame.WriteCheckString("post shader");
 
-	// clip
-	// push
-	// pvs
+	savegame.WriteInt( random.GetSeed() ); // idRandom random
+	savegame.WriteObject( frameCommandThread ); // idThread * frameCommandThread
 
-	testmodel = NULL;
-	testFx = NULL;
 
-	savegame.WriteString( sessionCommand );
+	//idClip clip; // regened on mapload
+	//idPush push; // stack?
+	//idPVS pvs; // map load
+
+	testmodel = NULL; // idTestModel * testmodel // blendo eric: spawned by command
+	testFx = NULL; // idEntityFx * testFx // blendo eric: spawned by command
+
+	savegame.WriteString( sessionCommand ); // idString sessionCommand
+
+	savegame.WriteCheckString("post commands");
 
 	// FIXME: save smoke particles
 
-	savegame.WriteInt( cinematicSkipTime );
-	savegame.WriteInt( cinematicStopTime );
-	savegame.WriteInt( cinematicMaxSkipTime );
-	savegame.WriteBool( inCinematic );
-	savegame.WriteBool( skipCinematic );
+	savegame.WriteInt( cinematicSkipTime ); // int cinematicSkipTime
+	savegame.WriteInt( cinematicStopTime ); // int cinematicStopTime
+	savegame.WriteInt( cinematicMaxSkipTime ); // int cinematicMaxSkipTime
+	savegame.WriteBool( inCinematic ); // bool inCinematic
+	savegame.WriteBool( skipCinematic ); // bool skipCinematic
 
-	savegame.WriteBool( isMultiplayer );
-	savegame.WriteInt( gameType );
+	savegame.WriteBool( isMultiplayer ); // bool isMultiplayer
+	savegame.WriteInt( gameType ); // gameType_t gameType
 
-	savegame.WriteInt( framenum );
-	savegame.WriteInt( previousTime );
-	savegame.WriteInt( time );
 
-#ifdef _D3XP
-	savegame.WriteInt( msec );
-#endif
+	savegame.WriteCheckString("pre frametime");
 
-	savegame.WriteInt( vacuumAreaNum );
+	savegame.WriteInt( framenum ); // int framenum
+	savegame.WriteInt( previousTime ); // int previousTime
+	savegame.WriteInt( time ); // int time
 
-	savegame.WriteInt( entityDefBits );
-	savegame.WriteBool( isServer );
-	savegame.WriteBool( isClient );
+	savegame.WriteInt( msec ); // int msec
 
-	savegame.WriteInt( localClientNum );
+	savegame.WriteInt( hudTime ); // int hudTime
 
-	// snapshotEntities is used for multiplayer only
+	savegame.WriteCheckString("post frametime");
 
-	savegame.WriteInt( realClientTime );
-	savegame.WriteBool( isNewFrame );
-	savegame.WriteFloat( clientSmoothing );
+	savegame.WriteInt( vacuumAreaNum ); // int vacuumAreaNum
 
-#ifdef _D3XP
-	portalSkyEnt.Save( &savegame );
-	savegame.WriteBool( portalSkyActive );
+	savegame.WriteInt( entityDefBits ); // int entityDefBits
+	savegame.WriteBool( isServer ); // bool isServer
+	savegame.WriteBool( isClient ); // bool isClient
 
-	fast.Save( &savegame );
-	slow.Save( &savegame );
+	savegame.WriteInt( localClientNum ) ;// int localClientNum
 
-	savegame.WriteInt( slowmoState );
-	savegame.WriteFloat( slowmoMsec );
-	savegame.WriteBool( quickSlowmoReset );
-#endif
+	// idLinkList<idEntity> snapshotEntities // snapshotEntities is used for multiplayer only
 
-	savegame.WriteBool( mapCycleLoaded );
-	savegame.WriteInt( spawnCount );
+	savegame.WriteInt( realClientTime ); // int realClientTime
+	savegame.WriteBool( isNewFrame ); // bool isNewFrame
+	savegame.WriteFloat( clientSmoothing ); // float clientSmoothing
 
-	if ( !locationEntities ) {
+
+	//savefile->WriteObject( lastGUIEnt ); // idEntityPtr<idEntity> lastGUIEnt // debug only?
+	//savefile->WriteInt( lastGUI ); // int lastGUI
+
+
+	portalSkyEnt.Save( &savegame ); // idEntityPtr<idEntity> portalSkyEnt
+	savegame.WriteBool( portalSkyActive ); // bool portalSkyActive
+
+
+	savegame.WriteCheckString("post portal");
+
+	fast.Save( &savegame ); // timeState_t fast
+	slow.Save( &savegame ); // timeState_t slow
+
+	savegame.WriteInt( slowmoState ); // slowmoState_t slowmoState
+	savegame.WriteFloat( slowmoMsec ); // float slowmoMsec
+
+	// savefile->WriteInt( soundSlowmoHandle ); // int soundSlowmoHandle // blendo eric: sounds aren't restored?
+	// savefile->WriteInt( soundSlowmoHandle ); // int soundSlowmoHandle // blendo eric: sounds aren't restored?
+	// soundSlowmoActive = false;  // bool soundSlowmoActive // blendo eric: restored
+
+	savegame.WriteBool( quickSlowmoReset ); // bool quickSlowmoReset
+
+	savegame.WriteVec3( suspiciousNoisePos ); // idVec3 suspiciousNoisePos
+	savegame.WriteInt( suspiciousNoiseRadius ); // int suspiciousNoiseRadius
+	savegame.WriteInt( lastSuspiciousNoiseTime ); // int lastSuspiciousNoiseTime
+	savegame.WriteInt( lastSuspiciousNoisePriority ); // int lastSuspiciousNoisePriority
+
+
+	savegame.WriteObject( metaEnt ); // idEntityPtr<idEntity> metaEnt // blendo eric: set in player, but can be saved here
+
+	savegame.WriteInt( lastExpensiveObservationCallTime ); // int lastExpensiveObservationCallTime
+
+
+	// blendo eric: these should be linked upon entity creation (not spawn!)
+
+	// idLinkList<idEntity> bafflerEntities
+	// idLinkList<idEntity> interestEntities
+	// idLinkList<idEntity> searchnodeEntities
+	// idLinkList<idEntity> confinedEntities
+	// idLinkList<idEntity> ventdoorEntities
+	// idLinkList<idEntity> repairEntities
+	// idLinkList<idEntity> hatchEntities
+	// idLinkList<idEntity> idletaskEntities
+	// idLinkList<idEntity> turretEntities
+	// idLinkList<idEntity> petEntities
+	// idLinkList<idEntity> securitycameraEntities
+	// idLinkList<idEntity> airlockEntities
+	// idLinkList<idEntity> catfriendsEntities
+	// idLinkList<idEntity> landmineEntities
+	// idLinkList<idEntity> skullsaverEntities
+	// idLinkList<idEntity> catcageEntities
+	// idLinkList<idEntity> spacenudgeEntities
+	// idLinkList<idEntity> memorypalaceEntities
+	// idLinkList<idEntity> dynatipEntities
+	// idLinkList<idEntity> windowshutterEntities
+	// idLinkList<idEntity> electricalboxEntities
+	// idLinkList<idEntity> spectatenodeEntities
+
+
+	// idStaticList<idEntity *, MAX_GENTITIES> repairpatrolEntities
+	// idStaticList<idEntity *, MAX_GENTITIES> upgradecargoEntities
+	// idStaticList<idEntity *, MAX_GENTITIES> healthstationEntities
+	// idStaticList<idEntity *, MAX_GENTITIES> trashexitEntities
+
+	savegame.WriteBool( menuPause ); // bool menuPause
+	savegame.WriteBool( spectatePause ); // bool spectatePause
+	savegame.WriteBool( requestPauseMenu ); // bool requestPauseMenu
+
+	savegame.WriteInt( nextGrenadeTime ); // int nextGrenadeTime
+	savegame.WriteInt( nextPetTime ); // int nextPetTime
+
+
+	// blendo eric: this inited from file
+	//savegame.WriteBool( eventlogGuiList != nullptr ); // idListGUI * eventlogGuiList
+	//if (eventlogGuiList)
+	//{
+	//	eventlogGuiList->Save(&savegame);
+	//}
+
+	// idList<eventlog_t> eventLogList // blendo eric: TODO this should get synced with eventlogGuiList, but isn't?
+
+	// idVOManager voManager // unnecessary
+
+	// int lastDebugNoteIndex // debug only
+
+	// idDict mouseButtonDict // regend
+	// idDict controllerButtonDicts[CT_NUM] // regened
+
+	// idString mapFileName // regened
+	// idMapFile * mapFile // regened
+
+
+	savegame.WriteBool( mapCycleLoaded ); // bool mapCycleLoaded
+	savegame.WriteInt( spawnCount ); // int spawnCount
+	// int mapSpawnCount // regened
+
+	savegame.WriteCheckString("pre areas");
+
+	if ( !locationEntities ) { // idLocationEntity ** locationEntities
 		savegame.WriteInt( 0 );
 	} else {
 		savegame.WriteInt( gameRenderWorld->NumAreas() );
-		for( i = 0; i < gameRenderWorld->NumAreas(); i++ ) {
+		for( int i = 0; i < gameRenderWorld->NumAreas(); i++ ) {
 			savegame.WriteObject( locationEntities[ i ] );
 		}
 	}
 
-	savegame.WriteObject( camera );
+	savegame.WriteCheckString("post areas");
 
-	savegame.WriteMaterial( globalMaterial );
+	savegame.WriteObject( camera ); // idCamera * camera
+
+	savegame.WriteMaterial( globalMaterial ); // const idMaterial * globalMaterial
 
 	//lastAIAlertEntity.Save( &savegame );
 	//savegame.WriteInt( lastAIAlertTime );
 
-	savegame.WriteDict( &spawnArgs );
+	// idList<idAAS *> aasList // regened
+	// idStrList aasNames // regened
 
-	savegame.WriteInt( playerPVS.i );
+	savegame.WriteDict( &spawnArgs ); // idDict spawnArgs
+
+
+	savegame.WriteCheckString("pre player");
+
+
+	savegame.WriteInt( playerPVS.i ); // pvsHandle_t playerPVS
 	savegame.WriteInt( playerPVS.h );
-	savegame.WriteInt( playerConnectedAreas.i );
+	savegame.WriteInt( playerConnectedAreas.i ); // pvsHandle_t playerConnectedAreas
 	savegame.WriteInt( playerConnectedAreas.h );
 
-	savegame.WriteVec3( gravity );
 
-	// gamestate
+	savegame.WriteCheckString("post player");
 
-	savegame.WriteBool( influenceActive );
-	savegame.WriteInt( nextGibTime );
+	savegame.WriteVec3( gravity ); // idVec3 gravity
 
-	// spawnSpots
-	// initialSpots
-	// currentInitialSpot
-	// newInfo
+	// gameState_t gamestate // blendo eric: set after restore
+
+	savegame.WriteBool( influenceActive ); // bool influenceActive
+	savegame.WriteInt( nextGibTime ); // int nextGibTime
+
+	// network only
+	//	idList<int> clientDeclRemap[MAX_CLIENTS][DECL_MAX_TYPES]
+	// entityState_t * clientEntityStates[MAX_CLIENTS][MAX_GENTITIES]
+	// int clientPVS[MAX_CLIENTS][ENTITY_PVS_SIZE]
+	// snapshot_t * clientSnapshots[MAX_CLIENTS]
+	// idBlockAlloc<entityState_t,256> entityStateAllocator
+	// idBlockAlloc<snapshot_t,64> snapshotAllocator
+
+	// more network?
+	// idEventQueue eventQueue
+	// idEventQueue savedEventQueue
+	// idStaticList<spawnSpot_t, MAX_GENTITIES> spawnSpots
+	// idStaticList<idEntity *, MAX_GENTITIES> initialSpots
+	// int currentInitialSpot
+
+	// idStaticList<spawnSpot_t, MAX_GENTITIES> teamSpawnSpots[2]
+	// idStaticList<idEntity *, MAX_GENTITIES> teamInitialSpots[2]
+	// int teamCurrentInitialSpot[2]
+
+	// meta sys info
+	// idDict newInfo
 	// makingBuild
-	// shakeSounds
+	// idStrList shakeSounds
+	// byte lagometer[ LAGO_IMG_HEIGHT ][ LAGO_IMG_WIDTH ][ 4 ]
+
+	savegame.WriteBool( menuSlowmo ); // bool menuSlowmo
+
+	/// int lastEditstate // debug only
+
+	savegame.WriteCheckString("pre events");
+
+	// idFile* eventLogFile // regened
+
+	// blendo eric: unnecessary to save out subtitles
+	// int slotCircularIterator
+	// idSubtitleItem subtitleItems[MAX_SUBTITLES];
+
+	// int loadCount // meta?
 
 	// write out pending events
 	idEvent::Save( &savegame );
 
-	savegame.Close();
+	savegame.WriteCheckString("post events");
+
+	savegame.WriteObjectListData();
 }
 
 /*
@@ -1481,11 +1684,6 @@ idGameLocal::InitFromSaveGame
 =================
 */
 bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWorld, idSoundWorld *soundWorld, idFile *saveGameFile ) {
-	int i;
-	int num;
-	idEntity *ent;
-	idDict si;
-
 	if ( mapFileName.Length() ) {
 		MapShutdown();
 	}
@@ -1497,35 +1695,64 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	gameRenderWorld = renderWorld;
 	gameSoundWorld = soundWorld;
 
-	idRestoreGame savegame( saveGameFile );
+	idRestoreGame savegame = idRestoreGame::Begin( saveGameFile );
 
-	savegame.ReadBuildNumber();
+	if (!savegame.ReadCheckString("post start")) { return false; }
+
+	savegame.ReadInt(numClients);   // int numClients
+	int numClientsFromSave = numClients;
+	for (int i = 0; i < numClients; i++) {
+		savegame.ReadDict(&userInfo[i]); // idDict userInfo[MAX_CLIENTS]
+		savegame.ReadDict(&persistentPlayerInfo[i]); // idDict persistentPlayerInfo[MAX_CLIENTS]
+	}
+
+	savegame.ReadDict(&persistentLevelInfo); // persistentLevelInfo
+	if (!savegame.ReadCheckString("post persistent")) { return false; }
+
+	// SM: If this is an autosave, bail out immediately after persistent info is loaded
+	// to force full level load with updated persistent info
+	if (savegame.GetFileName().Find("autosave") != -1) {
+		return false;
+	}
+
+	// SM: If the save game version is invalidated, also force full reload
+	if (session->GetSaveGameVersion() <= SAVEGAME_VERSION_INVALID) {
+		return false;
+	}
 
 	// Create the list of all objects in the game
-	savegame.CreateObjects();
+	savegame.ReadAndCreateObjectsListTypes(); // idEntity * entities[MAX_GENTITIES] part 1
+
+	if (!savegame.ReadCheckString("post objects")) { return false; }
 
 	// Load the idProgram, also checking to make sure scripting hasn't changed since the savegame
-	if ( program.Restore( &savegame ) == false ) {
+	bool programOK = program.Restore(&savegame);  // idProgram program
+	if ( !programOK ) {
 
 		// Abort the load process, and let the session know so that it can restart the level
 		// with the player persistent data.
 		savegame.DeleteObjects();
 		program.Restart();
 
+		gameLocal.Error("save game script program did not match");
+
 		return false;
 	}
+
+	if (!savegame.ReadCheckString("post program")) { return false; }
 
 	// load the map needed for this savegame
 	LoadMap( mapName, 0 );
 
-	savegame.ReadInt( i );
-	g_skill.SetInteger( i );
+	int num;
+	savegame.ReadInt( num );
+	g_skill.SetInteger( num );
 
 	// precache the player
 	FindEntityDef( "player_doommarine", false );
 
 	// precache any media specified in the map
-	for ( i = 0; i < mapFile->GetNumEntities(); i++ ) {
+	for ( int i = 0; i < mapFile->GetNumEntities(); i++ ) {
 		idMapEntity *mapEnt = mapFile->GetEntity( i );
 
 		if ( !InhibitEntitySpawn( mapEnt->epairs ) ) {
@@ -1537,44 +1764,60 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		}
 	}
 
-	savegame.ReadDict( &si );
-	SetServerInfo( si );
+	idDict tempDict;
+	savegame.ReadDict( &tempDict );   // idDict serverInfo
+	SetServerInfo( tempDict );
 
-	savegame.ReadInt( numClients );
-	for( i = 0; i < numClients; i++ ) {
-		savegame.ReadDict( &userInfo[ i ] );
-		savegame.ReadUsercmd( usercmds[ i ] );
-		savegame.ReadDict( &persistentPlayerInfo[ i ] );
+	if (!savegame.ReadCheckString("post server")) { return false; }
+
+	numClients = numClientsFromSave; // SM: Need to restore this because map change nixed it
+	for( int i = 0; i < numClients; i++ ) {
+		savegame.ReadUsercmd( usercmds[ i ] ); // usercmd_t usercmds[MAX_CLIENTS]
 	}
 
-	for( i = 0; i < MAX_GENTITIES; i++ ) {
-		savegame.ReadObject( reinterpret_cast<idClass *&>( entities[ i ] ) );
-		savegame.ReadInt( spawnIds[ i ] );
+	if (!savegame.ReadCheckString("post user")) { return false; }
+
+	for (int i = 0; i < MAX_GENTITIES; i++) {
+		savegame.ReadObject(reinterpret_cast<idClass*&>(entities[i]));  // idEntity * entities[MAX_GENTITIES] part 2
+		savegame.ReadInt(spawnIds[i]); // int spawnIds[MAX_GENTITIES]
 
 		// restore the entityNumber
-		if ( entities[ i ] != NULL ) {
-			entities[ i ]->entityNumber = i;
+		if (entities[i] != NULL) {
+			entities[i]->entityNumber = i;
+		} else if( spawnIds[ i ] != -1 ) {
+			Warning( "idGameLocal::InitFromSaveGame() null entity %d had incorrect spawn type", i);
+			spawnIds[ i ] = -1;
 		}
 	}
 
-	savegame.ReadInt( firstFreeIndex );
-	savegame.ReadInt( num_entities );
+	savegame.ReadInt( firstFreeIndex ); // int firstFreeIndex
+	savegame.ReadInt( num_entities ); // int num_entities
 
-	// enityHash is restored by idEntity::Restore setting the entity name.
+	if (!savegame.ReadCheckString("post entities")) { return false; }
 
-	savegame.ReadObject( reinterpret_cast<idClass *&>( world ) );
+	// idHashIndex entityHash // enityHash is restored by idEntity::Restore setting the entity name.
 
-	savegame.ReadInt( num );
-	for( i = 0; i < num; i++ ) {
+	savegame.ReadObject( reinterpret_cast<idClass *&>( world ) );  // idWorldspawn * world
+
+	if (!savegame.ReadCheckString("post world")) { return false; }
+
+	assert(spawnedEntities.Num() == 0);
+	savegame.ReadInt( num );  // idLinkList<idEntity> spawnedEntities
+	for( int i = 0; i < num; i++ ) { 
+		idEntity* ent = nullptr;
 		savegame.ReadObject( reinterpret_cast<idClass *&>( ent ) );
 		assert( ent );
 		if ( ent ) {
-			ent->spawnNode.AddToEnd( spawnedEntities );
+			ent->spawnNode.AddToEnd(spawnedEntities);
 		}
 	}
 
-	savegame.ReadInt( num );
-	for( i = 0; i < num; i++ ) {
+	if (!savegame.ReadCheckString("post spawned")) { return false; }
+
+	assert(activeEntities.Num() == 0);
+	savegame.ReadInt( num );  // idLinkList<idEntity> activeEntities
+	for( int i = 0; i < num; i++ ) {
+		idEntity* ent = nullptr;
 		savegame.ReadObject( reinterpret_cast<idClass *&>( ent ) );
 		assert( ent );
 		if ( ent ) {
@@ -1582,124 +1825,272 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		}
 	}
 
-	savegame.ReadInt( numEntitiesToDeactivate );
-	savegame.ReadBool( sortPushers );
-	savegame.ReadBool( sortTeamMasters );
-	savegame.ReadDict( &persistentLevelInfo );
+	// idLinkList<idEntity> aimAssistEntities // blendo eric: gen'd by actors
 
-	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
+	if (!savegame.ReadCheckString("post active")) { return false; }
+
+	savegame.ReadInt( numEntitiesToDeactivate ); // int numEntitiesToDeactivate
+	savegame.ReadBool( sortPushers ); // bool sortPushers
+	savegame.ReadBool( sortTeamMasters ); // bool sortTeamMasters
+
+	for( int i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) { // // float globalShaderParms[ MAX_GLOBAL_SHADER_PARMS ]
 		savegame.ReadFloat( globalShaderParms[ i ] );
 	}
 
-	savegame.ReadInt( i );
-	random.SetSeed( i );
-
-	savegame.ReadObject( reinterpret_cast<idClass *&>( frameCommandThread ) );
-
-	// clip
-	// push
-	// pvs
-
-	// testmodel = "<NULL>"
-	// testFx = "<NULL>"
-
-	savegame.ReadString( sessionCommand );
-
-	// FIXME: save smoke particles
-
-	savegame.ReadInt( cinematicSkipTime );
-	savegame.ReadInt( cinematicStopTime );
-	savegame.ReadInt( cinematicMaxSkipTime );
-	savegame.ReadBool( inCinematic );
-	savegame.ReadBool( skipCinematic );
-
-	savegame.ReadBool( isMultiplayer );
-	savegame.ReadInt( (int &)gameType );
-
-	savegame.ReadInt( framenum );
-	savegame.ReadInt( previousTime );
-	savegame.ReadInt( time );
-
-#ifdef _D3XP
-	savegame.ReadInt( msec );
-#endif
-
-	savegame.ReadInt( vacuumAreaNum );
-
-	savegame.ReadInt( entityDefBits );
-	savegame.ReadBool( isServer );
-	savegame.ReadBool( isClient );
-
-	savegame.ReadInt( localClientNum );
-
-	// snapshotEntities is used for multiplayer only
-
-	savegame.ReadInt( realClientTime );
-	savegame.ReadBool( isNewFrame );
-	savegame.ReadFloat( clientSmoothing );
-
-#ifdef _D3XP
-	portalSkyEnt.Restore( &savegame );
-	savegame.ReadBool( portalSkyActive );
-
-	fast.Restore( &savegame );
-	slow.Restore( &savegame );
-
-	int blah;
-	savegame.ReadInt( blah );
-	slowmoState = (slowmoState_t)blah;
-
-	savegame.ReadFloat( slowmoMsec );
-	savegame.ReadBool( quickSlowmoReset );
-#endif
-
-	savegame.ReadBool( mapCycleLoaded );
-	savegame.ReadInt( spawnCount );
+	if (!savegame.ReadCheckString("post shader")) { return false; }
 
 	savegame.ReadInt( num );
-	if ( num ) {
+	random.SetSeed( num ); // idRandom random
+
+	savegame.ReadObject( reinterpret_cast<idClass *&>( frameCommandThread ) ); // idThread * frameCommandThread
+
+	//idClip clip; // regened on mapload
+	//idPush push; // stack?
+	//idPVS pvs; // map load
+
+	testmodel = NULL; // idTestModel * testmodel // blendo eric: spawned by command
+	testFx = NULL; // idEntityFx * testFx // blendo eric: spawned by command
+
+	savegame.ReadString( sessionCommand ); // idString sessionCommand
+
+	if (!savegame.ReadCheckString("post commands")) { return false; }
+
+	// FIXME: save smoke particles // blendo eric: probably isn't necessary to restore smoke
+
+	savegame.ReadInt( cinematicSkipTime ); // int cinematicSkipTime
+	savegame.ReadInt( cinematicStopTime ); // int cinematicStopTime
+	savegame.ReadInt( cinematicMaxSkipTime ); // int cinematicMaxSkipTime
+	savegame.ReadBool( inCinematic ); // bool inCinematic
+	savegame.ReadBool( skipCinematic ); // bool skipCinematic
+
+	savegame.ReadBool( isMultiplayer ); // bool isMultiplayer
+	savegame.ReadInt( (int &)gameType ); // gameType_t gameType
+
+
+	if (!savegame.ReadCheckString("pre frametime")) { return false; }
+
+	savegame.ReadInt( framenum ); // int framenum
+	savegame.ReadInt( previousTime ); // int previousTime
+	savegame.ReadInt( time ); // int time
+
+
+	savegame.ReadInt( msec ); // int msec
+
+
+	savegame.ReadInt( hudTime ); // int hudTime // blendo eric: possibly error prone?
+
+
+	if (!savegame.ReadCheckString("post frametime")) { return false; }
+
+	savegame.ReadInt( vacuumAreaNum ); // int vacuumAreaNum
+
+	savegame.ReadInt( entityDefBits ); // int entityDefBits
+	savegame.ReadBool( isServer ); // bool isServer
+	savegame.ReadBool( isClient ); // bool isClient
+
+	savegame.ReadInt( localClientNum );// int localClientNum
+
+	// idLinkList<idEntity> snapshotEntities // snapshotEntities is used for multiplayer only
+
+	savegame.ReadInt( realClientTime ); // int realClientTime
+	savegame.ReadBool( isNewFrame );// bool isNewFrame
+	savegame.ReadFloat( clientSmoothing ); // float clientSmoothing
+
+	//savefile->WriteObject( lastGUIEnt ); // idEntityPtr<idEntity> lastGUIEnt  // debug only?
+	//savefile->WriteInt( lastGUI ); // int lastGUI
+
+	portalSkyEnt.Restore( &savegame ); // idEntityPtr<idEntity> portalSkyEnt
+	savegame.ReadBool( portalSkyActive ); // bool portalSkyActive
+
+
+	if (!savegame.ReadCheckString("post portal")) { return false; }
+
+	fast.Restore( &savegame ); // timeState_t fast
+	slow.Restore( &savegame ); // timeState_t slow
+
+	int blah;
+	savegame.ReadInt( blah );  // slowmoState_t slowmoState
+	slowmoState = (slowmoState_t)blah;
+
+	savegame.ReadFloat( slowmoMsec ); // float slowmoMsec
+
+	// savefile->WriteInt( soundSlowmoHandle ); // int soundSlowmoHandle // blendo eric: sounds aren't restored?
+	// savefile->WriteInt( soundSlowmoHandle ); // int soundSlowmoHandle // blendo eric: sounds aren't restored?
+	soundSlowmoActive = false;  // bool soundSlowmoActive // blendo eric: should cause regen of slowmo sound
+
+	savegame.ReadBool( quickSlowmoReset ); // bool quickSlowmoReset
+
+	savegame.ReadVec3( suspiciousNoisePos ); // idVec3 suspiciousNoisePos
+	savegame.ReadInt( suspiciousNoiseRadius ); // int suspiciousNoiseRadius
+	savegame.ReadInt( lastSuspiciousNoiseTime ); // int lastSuspiciousNoiseTime
+	savegame.ReadInt( lastSuspiciousNoisePriority ); // int lastSuspiciousNoisePriority
+
+	savegame.ReadObject( metaEnt ); // idEntityPtr<idEntity> metaEnt // blendo eric: set in player, but can be saved here
+
+	savegame.ReadInt( lastExpensiveObservationCallTime ); // int lastExpensiveObservationCallTime
+
+	// blendo eric: these should be linked upon entity creation (not spawn!)
+
+	// idLinkList<idEntity> bafflerEntities
+	// idLinkList<idEntity> interestEntities
+	// idLinkList<idEntity> searchnodeEntities
+	// idLinkList<idEntity> confinedEntities
+	// idLinkList<idEntity> ventdoorEntities
+	// idLinkList<idEntity> repairEntities
+	// idLinkList<idEntity> hatchEntities
+	// idLinkList<idEntity> idletaskEntities
+	// idLinkList<idEntity> turretEntities
+	// idLinkList<idEntity> petEntities
+	// idLinkList<idEntity> securitycameraEntities
+	// idLinkList<idEntity> airlockEntities
+	// idLinkList<idEntity> catfriendsEntities
+	// idLinkList<idEntity> landmineEntities
+	// idLinkList<idEntity> skullsaverEntities
+	// idLinkList<idEntity> catcageEntities
+	// idLinkList<idEntity> spacenudgeEntities
+	// idLinkList<idEntity> memorypalaceEntities
+	// idLinkList<idEntity> dynatipEntities
+	// idLinkList<idEntity> windowshutterEntities
+	// idLinkList<idEntity> electricalboxEntities
+	// idLinkList<idEntity> spectatenodeEntities
+
+
+	// idStaticList<idEntity *, MAX_GENTITIES> repairpatrolEntities
+	// idStaticList<idEntity *, MAX_GENTITIES> upgradecargoEntities
+	// idStaticList<idEntity *, MAX_GENTITIES> healthstationEntities
+	// idStaticList<idEntity *, MAX_GENTITIES> trashexitEntities
+
+
+	savegame.ReadBool( menuPause ); // bool menuPause
+	savegame.ReadBool( spectatePause ); // bool spectatePause
+	savegame.ReadBool( requestPauseMenu ); // bool requestPauseMenu
+
+	savegame.ReadInt( nextGrenadeTime ); // int nextGrenadeTime
+	savegame.ReadInt( nextPetTime ); // int nextPetTime
+
+
+	// blendo eric: this inited from file
+	// idListGUI * eventlogGuiList
+
+	// idList<eventlog_t> eventLogList // blendo eric: TODO this should get synced with eventlogGuiList, but isn't?
+
+	// idVOManager voManager // unnecessary
+
+	// int lastDebugNoteIndex // debug only
+
+	// idDict mouseButtonDict // regend
+	// idDict controllerButtonDicts[CT_NUM] // regened
+
+	// idString mapFileName // regened
+	// idMapFile * mapFile // regened
+
+	savegame.ReadBool( mapCycleLoaded ); // bool mapCycleLoaded
+	savegame.ReadInt( spawnCount ); // int spawnCount
+	// int mapSpawnCount // regened
+
+	if (!savegame.ReadCheckString("pre areas")) { return false; }
+
+	savegame.ReadInt( num );
+	if ( num ) {  // idLocationEntity ** locationEntities
 		if ( num != gameRenderWorld->NumAreas() ) {
 			savegame.Error( "idGameLocal::InitFromSaveGame: number of areas in map differs from save game." );
 		}
 
 		locationEntities = new idLocationEntity *[ num ];
-		for( i = 0; i < num; i++ ) {
+		memset( locationEntities, 0, sizeof(idLocationEntity*)*num );
+		for( int i = 0; i < num; i++ ) {
 			savegame.ReadObject( reinterpret_cast<idClass *&>( locationEntities[ i ] ) );
 		}
 	}
 
-	savegame.ReadObject( reinterpret_cast<idClass *&>( camera ) );
+	if (!savegame.ReadCheckString("post areas")) { return false; }
 
-	savegame.ReadMaterial( globalMaterial );
+	savegame.ReadObject( reinterpret_cast<idClass *&>( camera ) ); // idCamera * camera
+
+	savegame.ReadMaterial( globalMaterial ); // const idMaterial * globalMaterial
 
 	//lastAIAlertEntity.Restore( &savegame );
 	//savegame.ReadInt( lastAIAlertTime );
 
-	savegame.ReadDict( &spawnArgs );
+	savegame.ReadDict( &spawnArgs ); // idDict spawnArgs
 
-	savegame.ReadInt( playerPVS.i );
+
+	if (!savegame.ReadCheckString("pre player")) { return false; }
+
+	savegame.ReadInt( playerPVS.i ); // pvsHandle_t playerPVS
 	savegame.ReadInt( (int &)playerPVS.h );
-	savegame.ReadInt( playerConnectedAreas.i );
+	savegame.ReadInt( playerConnectedAreas.i ); // pvsHandle_t playerConnectedAreas
 	savegame.ReadInt( (int &)playerConnectedAreas.h );
 
-	savegame.ReadVec3( gravity );
+	if (!savegame.ReadCheckString("post player")) { return false; }
+
+	savegame.ReadVec3( gravity ); // idVec3 gravity
 
 	// gamestate is restored after restoring everything else
 
-	savegame.ReadBool( influenceActive );
-	savegame.ReadInt( nextGibTime );
+	savegame.ReadBool( influenceActive ); // bool influenceActive
+	savegame.ReadInt( nextGibTime ); // int nextGibTime
 
-	// spawnSpots
-	// initialSpots
-	// currentInitialSpot
-	// newInfo
+	// network only
+	//	idList<int> clientDeclRemap[MAX_CLIENTS][DECL_MAX_TYPES]
+	// entityState_t * clientEntityStates[MAX_CLIENTS][MAX_GENTITIES]
+	// int clientPVS[MAX_CLIENTS][ENTITY_PVS_SIZE]
+	// snapshot_t * clientSnapshots[MAX_CLIENTS]
+	// idBlockAlloc<entityState_t,256> entityStateAllocator
+	// idBlockAlloc<snapshot_t,64> snapshotAllocator
+
+	// more network?
+	// idEventQueue eventQueue
+	// idEventQueue savedEventQueue
+	// idStaticList<spawnSpot_t, MAX_GENTITIES> spawnSpots
+	// idStaticList<idEntity *, MAX_GENTITIES> initialSpots
+	// int currentInitialSpot
+
+	// idStaticList<spawnSpot_t, MAX_GENTITIES> teamSpawnSpots[2]
+	// idStaticList<idEntity *, MAX_GENTITIES> teamInitialSpots[2]
+	// int teamCurrentInitialSpot[2]
+
+	// meta sys info
+	// idDict newInfo
 	// makingBuild
-	// shakeSounds
+	// idStrList shakeSounds
+	// byte lagometer[ LAGO_IMG_HEIGHT ][ LAGO_IMG_WIDTH ][ 4 ]
+
+	savegame.ReadBool( menuSlowmo ); // bool menuSlowmo
+
+	/// int lastEditstate // debug only
+
+
+	if (!savegame.ReadCheckString("pre events")) { return false; }
+
+	// idFile* eventLogFile // regened
+
+	// blendo eric: unnecessary to save out subtitles
+	// int slotCircularIterator
+	// idSubtitleItem subtitleItems[MAX_SUBTITLES];
+
+	// int loadCount
 
 	// Read out pending events
 	idEvent::Restore( &savegame );
 
-	savegame.RestoreObjects();
+	if (!savegame.ReadCheckString("post events")) { return false; }
+
+	bool restoreOK = savegame.ReadAndRestoreObjectsListData();
+
+	if(!restoreOK) {
+		savegame.Error( "idGameLocal::InitFromSaveGame: restore objects failed" );
+		return false;
+	}
+
+#if 0
+	// blendo eric: added for post setup, similar to spawn
+	for (i = 0; i < MAX_GENTITIES; i++) {
+		if (entities[i] != NULL) {
+			entities[i]->Event_PostSaveRestore();
+		}
+	}
+#endif
 
 	mpGame.Reset();
 
@@ -1721,10 +2112,35 @@ idGameLocal::MapClear
 void idGameLocal::MapClear( bool clearClients ) {
 	int i;
 
+	// blendo eric: clear all nodes
+	//bafflerEntities.Clear();
+	//interestEntities.Clear();
+	//searchnodeEntities.Clear();
+	//confinedEntities.Clear();
+	//ventdoorEntities.Clear();
+	//repairEntities.Clear();
+	//hatchEntities.Clear();
+	//idletaskEntities.Clear();
+	//turretEntities.Clear();
+	//petEntities.Clear();
+	//securitycameraEntities.Clear();
+	//airlockEntities.Clear();
+	//catfriendsEntities.Clear();
+	//landmineEntities.Clear();
+	//skullsaverEntities.Clear();
+	//catcageEntities.Clear();
+	//spacenudgeEntities.Clear();
+	//memorypalaceEntities.Clear();
+	//dynatipEntities.Clear();
+	//windowshutterEntities.Clear();
+	//electricalboxEntities.Clear();
+	//spectatenodeEntities.Clear();
+
 	repairpatrolEntities.Clear();
 	upgradecargoEntities.Clear();
 	healthstationEntities.Clear();
 	trashexitEntities.Clear();
+
 
 	for( i = ( clearClients ? 0 : MAX_CLIENTS ); i < MAX_GENTITIES; i++ ) {
 		delete entities[ i ];
@@ -1762,6 +2178,9 @@ void idGameLocal::MapClear( bool clearClients ) {
 	
 	menuPause = false;
 	spectatePause = false;
+	requestPauseMenu = false;
+
+	eventLogAlerts = nullptr;
 }
 
 /*
@@ -1813,6 +2232,7 @@ void idGameLocal::MapShutdown( void ) {
 	{
 		CloseEventLogFile();
 	}
+	ShutdownEventLog();
 
 	// Reenable blendo ambience if it's disabled
 	renderSystem->SetUseBlendoAmbience( true );
@@ -2641,8 +3061,14 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds ) {
 
 	player = GetLocalPlayer();
 
+	// SM: This is intentionally static because we DO NOT want to save/load this since
+	// common->FrameTime() is session-specific. So instead we need to know the diff between
+	// previous frame time and the current, and add that to hudTime (which is save/loaded)
+	static int s_prevFrameTime = common->FrameTime();
 	// SW: HUD time runs independent of slow-mo or even stopped time, so we can still update it even when the player is in the context menu, etc
-	hudTime = common->FrameTime();
+	int currentFrameTime = common->FrameTime();
+	hudTime += currentFrameTime - s_prevFrameTime;
+	s_prevFrameTime = currentFrameTime;
 
 #ifdef _D3XP
 	ComputeSlowMsec();
@@ -5303,7 +5729,31 @@ idLocationEntity *idGameLocal::LocationForEntity( const idEntity *ent )
 	} else if ( numAreas > 1 ) {
 		// Complex case - Bounds intersect with multiple areas
 		// The best guess is the one that contains the origin of the entity, so use LocationForPoint
-		return LocationForPoint( ent->GetPhysics()->GetOrigin() );
+
+		//BC 3-3-2025: do a fallback failsafe in case the location is null.
+		idLocationEntity* locEnt = LocationForPoint( ent->GetPhysics()->GetOrigin() );
+		if (locEnt != nullptr)
+		{
+			return locEnt;
+		}
+
+		//BC 3-3-2025 fallback check: 1 unit upward.
+		locEnt = LocationForPoint(ent->GetPhysics()->GetOrigin() + idVec3(0,0,1)); 
+		if (locEnt != nullptr)
+		{
+			return locEnt;
+		}
+
+		//BC 3-3-2025 fallback check: 1 unit forwards.
+		idVec3 forward;
+		ent->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, NULL);
+		locEnt = LocationForPoint(ent->GetPhysics()->GetOrigin() + (forward * 1));
+		//if (locEnt == nullptr)
+		//{
+		//	gameLocal.Warning("Failed to get locationEnt for '%s'\n", ent->GetName());
+		//}
+
+		return locEnt;
 	}
 
 	if ( areaNum < 0 ) {
@@ -6264,12 +6714,12 @@ idStr idGameLocal::ParseTimeVerbose(int durationMS)
 	
 	int deciseconds = (seconds - (int)seconds) * 100.0f;
 	idStr deciStr = idStr::Format("%d", deciseconds);
-	if (deciStr.Length() > 1)
+	if (deciStr.Length() <= 1)
 	{
-		deciStr = idStr::Format("%s", deciStr.Left(1).c_str());
+		deciStr = idStr::Format("0%s", deciStr.c_str());
 	}
 
-	return idStr::Format("%d min %d.%s sec", minutes, (int)(seconds + .2f), deciStr.c_str());
+	return idStr::Format("%d %s %d.%s %s", minutes, common->GetLanguageDict()->GetString("#str_def_gameplay_minutes"), (int)(seconds ), deciStr.c_str(), common->GetLanguageDict()->GetString("#str_def_gameplay_seconds"));
 }
 
 void idGameLocal::SetDebrisBurst(const char *defName, idVec3 position, int count, float radius, float speed, idVec3 direction)
@@ -6726,6 +7176,12 @@ void idGameLocal::ClearInterestPoints(void)
 	static_cast<idMeta*>(metaEnt.GetEntity())->ClearInterestPoints();
 }
 
+bool idGameLocal::IsInEndGame()
+{
+	// SM: Super hack
+	return persistentLevelInfo.GetInt("levelProgressIndex", "0") >= 22;
+}
+
 idEntity * idGameLocal::SpawnInterestPoint(idEntity *ownerEnt, idVec3 position, const char *interestDef)
 {
 	if (interestDef[0] == '\0' || gameLocal.time <= 500) //ignore interestpoints that happen immediately at game start. ignore if it has no definition name.
@@ -6793,8 +7249,8 @@ void idGameLocal::OnMapChange()
 			}
 		}
 	}
-
 	InitEventLog();
+	GetLocalPlayer()->UpdatePDAInfo( false );
 }
 
 void idGameLocal::CloseEventLogFile(void)
@@ -6819,6 +7275,26 @@ void idGameLocal::InitEventLog(void)
 
 	if (g_eventLog_logToFile.GetBool())
 		InitEventLogFile(true);
+
+
+	idWindow* newHud = static_cast<idUserInterfaceLocal*>(gameLocal.GetLocalPlayer()->hud)->GetDesktop();
+	if (drawWin_t* alertDef = newHud->FindChildByName(LOG_FEED_ALERT_WINDOW))
+	{
+		eventLogAlerts = static_cast<idFeedAlertWindow*>(alertDef->win);
+		assert(!eventLogAlerts->WasDisposed());
+	} else {
+		Warning("Missing LOG_FEED_ALERT_WINDOW: \"%s\" ", LOG_FEED_ALERT_WINDOW);
+	}
+}
+
+void idGameLocal::ShutdownEventLog()
+{
+	if (eventlogGuiList)
+	{
+		eventLogList.Clear();
+		uiManager->FreeListGUI(eventlogGuiList);
+		eventlogGuiList = nullptr;
+	}
 }
 
 void idGameLocal::InitEventLogFile(bool startOfSession)
@@ -6916,28 +7392,7 @@ void idGameLocal::DisplayEventLogAlert(const char *text, const char * icon, idVe
 		return;
 	}
 
-	static idFeedAlertWindow * eventLogAlerts = nullptr;
-	static idWindow* lastHud = nullptr;
-
-	idWindow* newHud = static_cast<idUserInterfaceLocal*>(localPlayer->hud)->GetDesktop();
-	if(!newHud)
-	{
-		Warning("Missing player hud and LOG_FEED_ALERT_WINDOW: \"%s\" ", LOG_FEED_ALERT_WINDOW);
-		return;
-	}
-
-	if(lastHud != newHud || !eventLogAlerts)
-	{
-		lastHud = newHud;
-		eventLogAlerts = nullptr;
-		if(drawWin_t * alertDef = newHud->FindChildByName(LOG_FEED_ALERT_WINDOW))
-		{
-			eventLogAlerts = static_cast<idFeedAlertWindow*>(alertDef->win);
-			assert(!eventLogAlerts->WasDisposed());
-		}
-	}
-
-	if( eventLogAlerts && !eventLogAlerts->WasDisposed())
+	if( eventLogAlerts && !eventLogAlerts->WasDisposed() )
 	{
 		if( idStr::Cmpn(text, STRTABLE_ID, STRTABLE_ID_LENGTH) == 0 )
 		{
@@ -6945,23 +7400,12 @@ void idGameLocal::DisplayEventLogAlert(const char *text, const char * icon, idVe
 		}
 		eventLogAlerts->DisplayAlert(text, icon, textColor, bgColor, iconColor, durationSeconds, allowDupes);
 	}
-	else
-	{
-		Warning("Missing LOG_FEED_ALERT_WINDOW: \"%s\" ", LOG_FEED_ALERT_WINDOW);
-	}
 }
 
 void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoFeed, int eventType)
 {
-	if (eventlogGuiList == NULL)
-		return;
-
 	if (gameLocal.GetLocalPlayer()->spectating)
 		return;
-
-	const char *timeStr = ParseTimeDetailedMS(gameLocal.time);
-	const char* entry = va("%s %s", timeStr, common->GetLanguageDict()->GetString(text));
-	eventlogGuiList->Push(entry);
 
 	//This is the list of events for the spectate mode.
 	eventlog_t newEvent;
@@ -6971,11 +7415,19 @@ void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoF
 	newEvent.eventType = eventType;
 	eventLogList.Append(newEvent);
 
+	if (eventlogGuiList == NULL)
+		return;
+
+	const char *timeStr = ParseTimeDetailedMS(gameLocal.time);
+	const char* entry = va("%s %s", timeStr, common->GetLanguageDict()->GetString(text));
+	eventlogGuiList->Push(entry);
+
 	if (showInfoFeed)
 	{
 		idStr iconName = "";
 		idVec4 bgColor = idVec4(0, 0, 0, 1);
 		idVec4 textColor = idVec4(1, 1, 1, 1);
+		bool showDupes = true; // SW 19th March 2025: cutting down on interestpoint spam by adding this arg to the DisplayEventLogAlert call
 
 		if (eventType == EL_INTERESTPOINT)
 		{
@@ -6983,6 +7435,7 @@ void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoF
 			bgColor = idVec4(1, 1, 1, 1); //white
 			textColor = idVec4(0, 0, 0, 1);
 			iconName = "guis/assets/interestpoint_iconsquare";
+			showDupes = false;
 		}
 		else if (eventType == EL_DEATH)
 		{
@@ -6990,6 +7443,13 @@ void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoF
 			bgColor = idVec4(.9, 0, 0, 1); //red
 			textColor = idVec4(1, 1, 1, 1);
 			iconName = "guis/assets/eventlog_skull";
+		}
+		else if (eventType == EL_DESTROYED)
+		{
+			//death event.
+			bgColor = idVec4(.9, 0, 0, 1); //red
+			textColor = idVec4(1, 1, 1, 1);
+			iconName = "guis/assets/eventlog_destroy";
 		}
 		else if (eventType == EL_DAMAGE)
 		{
@@ -7010,10 +7470,11 @@ void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoF
 			//interestpoint event.
 			bgColor = idVec4(1, .8, 0, 1); //yellow
 			textColor = idVec4(0, 0, 0, 1);
-			//iconName = "guis/assets/interestpoint_iconsquare";
+			iconName = "guis/assets/eventlog_alarm_wiggle";
 		}
 		
-		DisplayEventLogAlert(common->GetLanguageDict()->GetString(text), iconName.c_str(), &textColor, &bgColor, &textColor);
+		// SW 19th March 2025: cutting down on interestpoint spam by adding showDupes arg
+		DisplayEventLogAlert(common->GetLanguageDict()->GetString(text), iconName.c_str(), &textColor, &bgColor, &textColor, 0.0f, showDupes); 
 	}
 
 	if (g_eventLog_logToFile.GetBool())
@@ -7061,7 +7522,7 @@ void idGameLocal::AddEventlogDamage(idEntity *target, int damage, idEntity *infl
 		common->GetLanguageDict()->GetString(attackerName.c_str())), target->GetPhysics()->GetOrigin(), showEventLog, EL_DAMAGE);
 }
 
-void idGameLocal::AddEventlogDeath(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname)
+void idGameLocal::AddEventlogDeath(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname, int eventType)
 {
 	idStr attackerName = GetLogAttackerName(inflictor, attackerEnt, damageDefname);		
 
@@ -7073,14 +7534,14 @@ void idGameLocal::AddEventlogDeath(idEntity *target, int damage, idEntity *infli
 
 	if (attackerName == "???")
 	{
-		AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_destroyed"), myName.c_str()), target->GetPhysics()->GetOrigin(), true, EL_DEATH);
+		AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_destroyed"), myName.c_str()), target->GetPhysics()->GetOrigin(), true, eventType);
 		return;
 	}
 	else
 	{
 		
 		AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_destroyedby"), myName.c_str(), common->GetLanguageDict()->GetString(attackerName.c_str())),
-			target->GetPhysics()->GetOrigin(), true, EL_DEATH);
+			target->GetPhysics()->GetOrigin(), true, eventType);
 	}
 }
 
@@ -7130,10 +7591,11 @@ idStr idGameLocal::GetLogAttackerName(idEntity *inflictor, idEntity *attackerEnt
 				{
 					damageName = damageDisplayname;
 				}
-				else
-				{
-					damageName = damageDefname;
-				}
+				//BC 4-7-2025: do not fall back to the damage def name. We only want to display localized text.
+				//else
+				//{
+				//	damageName = damageDefname;
+				//}
 			}
 		}
 	}
@@ -7461,7 +7923,9 @@ void idGameLocal::DoVacuumSuctionActors(idVec3 suctionInteriorPosition, idVec3 s
 			continue;
 		}
 
-		if (entity->GetBindMaster() == NULL)
+		// SW 17th Feb 2025: Normal actors are bound to the mover, so this condition would prevent movers fighting over actors.
+		// However, the player *isn't* bound to the mover (to prevent clipping into walls) so we need to call the bespoke check here)
+		if (entity == gameLocal.GetLocalPlayer() ? !gameLocal.GetLocalPlayer()->GetBeingVacuumSplined() : entity->GetBindMaster() == NULL)
 		{
 			//TODO: the -32 height offset assumes the aperture is NOT on ceiling or floor. Detect suction direction and adjust this accordingly
 
@@ -7697,6 +8161,37 @@ int idGameLocal::GetSubtitleCount()
 //Call this when you want you want a subtitle to appear.
 void idGameLocal::AddSubtitle( idStr speakerName, idStr text, int durationMS)
 {
+	//BC 3-14-2025: if subtitle is empty, don't display it.
+	if (text.Length() <= 0)
+	{
+		if (speakerName.Length() <= 0)
+		{
+			gameLocal.Warning("Subtitle text is empty. Skipping.\n");
+		}
+		else
+		{
+			gameLocal.Warning("Subtitle text is empty. Speakername = '%s'\n", speakerName.c_str());
+		}
+
+		return;
+	}
+
+	// SW 26th Feb 2025:
+	// Sometimes we get a large number of identical subtitles doubling-up (e.g. when a large number of wallspeakers all announce the end of the combat alert at once)
+	// In situations like this, we check for a match and skip the subtitle if a match is found.
+	for (int i = 0; i < GetSubtitleCount(); i++)
+	{
+		idSubtitleItem existingSub = GetSubtitleSlot(i);
+		if (existingSub.displayText == text
+			&& existingSub.speakerName == speakerName
+			&& gameLocal.time - existingSub.startTime < 500)
+		{
+			// Subtitle has the same speaker and contents, and occurred at approximately the same time.
+			// We shouldn't try to add a duplicate.
+			return;
+		}
+	}
+
 	durationMS = Max(durationMS, SUBTITLE_MINTIME); //clamp the duration to a minimum value. So that we don't end up with weird situations where a subtitle blips onscreen for just several frames.
 
 	int fadeTimeMS = SEC2MS(gui_subtitleFadeTime.GetFloat());
@@ -8052,6 +8547,23 @@ void idGameLocal::DoSpewBurst(idEntity *ent, int spewType)
 	}
 }
 
+idStr idGameLocal::GetMapdisplaynameViaMapfile(idStr mapfilename)
+{
+	int num = declManager->GetNumDecls(DECL_MAPDEF);
+	for (int i = 0; i < num; i++)
+	{
+		const idDeclEntityDef* mapDef = static_cast<const idDeclEntityDef*>(declManager->DeclByIndex(DECL_MAPDEF, i));
+		if (mapDef && idStr::Icmp(mapDef->GetName(), mapfilename.c_str()) == 0)
+		{
+			//Found it.
+			idStr output = common->GetLanguageDict()->GetString(mapDef->dict.GetString("name"));
+			return output.c_str();
+		}
+	}
+
+	return mapfilename;
+}
+
 idStr idGameLocal::GetMapdisplaynameViaProgressIndex(int index)
 {
 	int num = declManager->GetNumDecls(DECL_MAPDEF);
@@ -8099,8 +8611,140 @@ void idGameLocal::BindStickyItemViaTrace(idEntity* stickyItem, trace_t tr)
 		stickyItem->BindToJoint(hitEnt, monsterJoint, true);
 		return;
 	}
+
+	//BC 2-21-2025: bind/affix to entities.
+	if (hitEnt->IsType(idMover::Type) || hitEnt->IsType(idMover_Binary::Type))
+	{
+		stickyItem->Bind(hitEnt, true);
+		return;
+	}
+
+	gameRenderWorld->DebugBounds(colorGreen, hitEnt->GetPhysics()->GetAbsBounds());
+	common->Printf("hit %s\n", hitEnt->GetName());
 }
 
+
+//bc going to do a game crime... just hard code these values
+idStr idGameLocal::GetCatViaModel(idStr modelname, int* voiceprint)
+{
+	*voiceprint = 1;
+	if (idStr::FindText(modelname.c_str(), "renfaire", false) >= 0)
+	{
+		*voiceprint = 0;
+		return "#str_emailname_renfaire";
+	}
+	else if (idStr::FindText(modelname.c_str(), "chef", false) >= 0)
+	{
+		return "#str_emailname_chef";
+	}
+	else if (idStr::FindText(modelname.c_str(), "beatpoet", false) >= 0)
+	{
+		return "#str_emailname_poet";
+	}
+	else if (idStr::FindText(modelname.c_str(), "occultrockmusic", false) >= 0)
+	{
+		return "#str_emailname_metal";
+	}
+	else if (idStr::FindText(modelname.c_str(), "lovingcaringmom", false) >= 0)
+	{
+		*voiceprint = 0;
+		return "#str_emailname_mom";
+	}
+	else if (idStr::FindText(modelname.c_str(), "skateboarder", false) >= 0)
+	{
+		*voiceprint = 0;
+		return "#str_emailname_skateboard";
+	}
+	else if (idStr::FindText(modelname.c_str(), "stagemagician", false) >= 0)
+	{
+		return "#str_emailname_magician";
+	}
+	else if (idStr::FindText(modelname.c_str(), "cowboy", false) >= 0)
+	{
+		return "#str_emailname_cowboy";
+	}
+	else if (idStr::FindText(modelname.c_str(), "scubadiving", false) >= 0)
+	{
+		return "#str_emailname_scuba";
+	}
+	else if (idStr::FindText(modelname.c_str(), "writingyanovel", false) >= 0)
+	{
+		*voiceprint = 0;
+		return "#str_emailname_yanovel";
+	}
+	else if (idStr::FindText(modelname.c_str(), "horrorfilmbuff", false) >= 0)
+	{
+		*voiceprint = 0;
+		return "#str_emailname_horror";
+	}
+	else if (idStr::FindText(modelname.c_str(), "farmer", false) >= 0)
+	{
+		*voiceprint = 0;
+		return "#str_emailname_farmer";
+	}
+
+	gameLocal.Warning("INVALID CAT MODEL? '%s'", modelname.c_str());
+	return "";
+}
+
+idStr idGameLocal::GetBindingnameViaBind(idStr bindname)
+{
+	if (idStr::Cmp(bindname, "_moveup") == 0)
+	{
+		return "#str_gui_mainmenu_100425"; //Jump/dash/climb
+	}
+	else if (idStr::Cmp(bindname, "_movedown") == 0)
+	{
+		return "#str_gui_sign_crouch_100193"; //crouch
+	}
+	else if (idStr::Cmp(bindname, "_frob") == 0)
+	{
+		return "#str_gui_mainmenu_100427"; //interact
+	}
+	else if (idStr::Cmp(bindname, "_bash") == 0)
+	{
+		return "#str_gui_hud_100359"; //bash
+	}
+	else if (idStr::Cmp(bindname, "_zoom") == 0)
+	{
+		return "#str_gui_cryo_zoom_100035"; //zoom lens
+	}
+	else if (idStr::Cmp(bindname, "_lean") == 0)
+	{
+		return "#str_gui_mainmenu_100426"; //lean
+	}
+	else if (idStr::Cmp(bindname, "_quickthrow") == 0)
+	{
+		return "#str_gui_hud_100361"; //throw
+	}
+	else if (idStr::Cmp(bindname, "_attack") == 0)
+	{
+		return "#str_gui_mainmenu_100428"; //attack/use item
+	}
+	else if (idStr::Cmp(bindname, "_impulse15") == 0)
+	{
+		return "#str_gui_sign_switchitem_100208"; //previous item
+	}
+	else if (idStr::Cmp(bindname, "_impulse14") == 0)
+	{
+		return "#str_gui_sign_switchitem_100209"; //next item
+	}
+	else if (idStr::Cmp(bindname, "_reload") == 0)
+	{
+		return "#str_gui_mainmenu_100429"; //reload weapon
+	}
+	else if (idStr::Cmp(bindname, "_rackslide") == 0)
+	{
+		return "#str_gui_mainmenu_100430"; //rack weapon
+	}
+	else if (idStr::Cmp(bindname, "_contextmenu") == 0)
+	{
+		return "#str_gui_mainmenu_100431"; //context menu
+	}
+
+	gameLocal.Warning("GetBindingnameViaBind: unknown bind '%s'\n", bindname.c_str());
+	return "";
+}
 
 
 // ------------- GAMEPAD FX / RUMBLE START -------------
@@ -8176,7 +8820,7 @@ void GamePadFXSystem::AddLight( idVec3 lightRGB, int timeInMs )
 
 void GamePadFXSystem::AddFX( gamePadFXEvent_t & inFX )
 {
-	if (gamepad_rumble_enable.GetBool() == false)
+	if (gamepad_rumble_enable.GetBool() == false || !usercmdGen->IsUsingJoystick()) //BC 3-2-2025: only do rumble if joystick is active.
 		return;
 
 	int replaceIdx = -1;
@@ -8293,7 +8937,7 @@ void GamePadFXSystem::Update(int frameTimeMs)
 		totalFX.ledLight = GAMEPADFX_LIGHT_MIN + (idVec3(1.0f,1.0f,1.0f)-GAMEPADFX_LIGHT_MIN) * shakeCombined * gamepad_screenshake_light.GetFloat();
 	}
 
-	bool active = gamepad_fx_background.GetBool() || Sys_IsWindowActive();
+	bool active = (gamepad_fx_background.GetBool() || Sys_IsWindowActive()) && usercmdGen->IsUsingJoystick(); //BC 3-2-2025: only do rumble if joystick is active.
 	if( active )
 	{
 		for(int idx = 0; idx < fxEventList.Num();)
@@ -8350,6 +8994,94 @@ void GamePadFXSystem::Update(int frameTimeMs)
 	}
 }
 
+
 //
 //------------- GAMEPAD FX / RUMBLE END -------------
+
+
+// ------------- TEST FUNC / PROFILING  -------------
+// blendo eric: this is just a helper area I use to test bits of code
+#define USE_TEST_FUNC 0
+#define USE_QUERYPERFORMANCECOUNTER 1
+
+#if USE_TEST_FUNC
+#if USE_QUERYPERFORMANCECOUNTER
+
+	#include "profileapi.h"
+	typedef int64 TESTFUNC_TIME;
+
+	LARGE_INTEGER TF_LI_START; 
+	LARGE_INTEGER TF_LI_END; 
+
+	#define StartTimer() { \
+			QueryPerformanceCounter(&TF_LI_START); \
+		}
+
+	#define StopTimer(timer) { \
+			QueryPerformanceCounter( &TF_LI_END );	\
+			timer += (TESTFUNC_TIME) (TF_LI_END.QuadPart - TF_LI_START.QuadPart); \
+		}
+
+#else
+
+	#include <ctime>
+	typedef std::clock_t TESTFUNC_TIME;
+	TESTFUNC_TIME TF_TIME_START = 0;
+	TESTFUNC_TIME TF_TIME_END = 0;
+	#define StartTimer( )			\
+		TF_TIME_START = clock();
+	#define StopTimer(timer)				\
+		TF_TIME_END = clock(); timer += TF_TIME_END-TF_TIME_START;
+
+#endif
+
+	void TestFuncPrint(const char* desc, TESTFUNC_TIME timer, TESTFUNC_TIME timer2 = (TESTFUNC_TIME)0)
+	{
+
+#if 0
+#if USE_QUERYPERFORMANCECOUNTER
+		LARGE_INTEGER freq;
+		QueryPerformanceFrequency(&freq);
+		timer = (1000 * timer) / freq.QuadPart; // convert to ms
+#endif
+#endif
+	if (timer2 != 0)
+	{
+		idLib::common->Printf("[test] %10s : %10d | %10d | %6d \n", desc, timer, timer2, (timer+timer2)/1000);
+	}
+	else
+	{
+		idLib::common->Printf("[test] %10s : %10d \n", desc, timer);
+	}
+}
+
+#define TESTUNROLL100X(uf) { \
+		uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; \
+		uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; \
+		uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; \
+		uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; \
+		uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; uf; \
+	} \
+
+void idGameLocal::TestTimedFunc_f(const idCmdArgs& args)
+{
+		gameLocal.TestTimedFunc(args);
+
+		cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "wait;wait;wait;wait;testfunc");
+
+}
+void idGameLocal::TestTimedFunc(const idCmdArgs& args)
+{
+	const int ExecTimes = 10;
+	static TESTFUNC_TIME timerSum[20] = {};
+	static int collectAll = 0;
+	int collect = 0; // make sure code isn't optimized out by "collecting" discarded results
+
+}
+#else
+void idGameLocal::TestTimedFunc_f(const idCmdArgs& args) {}
+#endif
+
+//
+//  ------------- TEST FUNC / PROFILING  -------------
 

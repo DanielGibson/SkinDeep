@@ -13,7 +13,7 @@ public:
                             idFoldingchair(void);
 	virtual					~idFoldingchair(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -29,9 +29,9 @@ private:
 	int						state;
 	int						stateTimer;
 
-	idEntity*				frobCube;
+	idEntity*				frobCube = nullptr;
 
-	idMover*				seatMover;
+	idMover*				seatMover = nullptr;
 	idVec3					seatPos_open;
 };
 //#pragma once

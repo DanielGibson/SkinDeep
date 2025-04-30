@@ -15,15 +15,6 @@ CLASS_DECLARATION(idAnimatedEntity, idSabotagePoint)
 	EVENT(EV_Activate,	idSabotagePoint::DoFrob)
 END_CLASS
 
-void idSabotagePoint::Save( idSaveGame *savefile ) const
-{
-	savefile->WriteInt(state);
-}
-
-void idSabotagePoint::Restore( idRestoreGame *savefile )
-{
-	savefile->ReadInt(state);
-}
 
 void idSabotagePoint::Spawn( void )
 {
@@ -38,6 +29,17 @@ void idSabotagePoint::Spawn( void )
 
 	StartSound("snd_ambient", SND_CHANNEL_AMBIENT);
 }
+
+void idSabotagePoint::Save( idSaveGame *savefile ) const
+{
+	savefile->WriteInt(state); // int state
+}
+
+void idSabotagePoint::Restore( idRestoreGame *savefile )
+{
+	savefile->ReadInt(state);  // int state
+}
+
 
 
 bool idSabotagePoint::DoFrob(int index, idEntity * frobber)
@@ -106,6 +108,25 @@ void idSabotagePoint_SparkHazard::Spawn(void)
 
 	idSabotagePoint::Spawn();
 }
+
+void idSabotagePoint_SparkHazard::Save( idSaveGame* savefile ) const
+{
+	savefile->WriteInt( triggerRadius ); //  int triggerRadius
+	savefile->WriteEntityDef( sparkJetDef ); // const  idDeclEntityDef*  sparkJetDef
+
+	savefile->WriteInt( lastRadiusCheck ); //  int lastRadiusCheck
+	savefile->WriteObject( armedFx ); //  idEntityFx*  armedFx
+}
+
+void idSabotagePoint_SparkHazard::Restore( idRestoreGame *savefile )
+{
+	savefile->ReadInt( triggerRadius ); //  int triggerRadius
+	savefile->ReadEntityDef( sparkJetDef ); // const idDeclEntityDef*  sparkJetDef
+
+	savefile->ReadInt( lastRadiusCheck ); //  int lastRadiusCheck
+	savefile->ReadObject( CastClassPtrRef( armedFx ) ); //  idEntityFx*  armedFx
+}
+
 
 bool idSabotagePoint_SparkHazard::DoFrob(int index, idEntity* frobber)
 {
@@ -180,6 +201,7 @@ void idSabotagePoint_SparkHazard::Think(void)
 					if (armedFx)
 					{
 						armedFx->PostEventMS(&EV_Remove, 0);
+						armedFx = nullptr;
 					}
 				}
 			}

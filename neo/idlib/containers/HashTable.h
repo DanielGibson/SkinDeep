@@ -344,6 +344,11 @@ ID_INLINE void idHashTable<Type>::Clear( void ) {
 	hashnode_s	*node;
 	hashnode_s	*next;
 
+	// SM: Early out if numentries is 0, there's nothing to delete
+	// this maybe fixes a crash though I can't understand why it would?
+	if (!numentries)
+		return;
+
 	for( i = 0; i < tablesize; i++ ) {
 		next = heads[ i ];
 		while( next != NULL ) {

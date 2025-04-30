@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "framework/CVarSystem.h"
 
-
+#include "d3xp/platformutilties.h"
 
 /*
 ==============================================================
@@ -164,7 +164,7 @@ public:
 	virtual void				ActivateTool( bool active ) = 0;
 
 								// Writes the user's configuration to a file
-	virtual void				WriteConfigToFile( const char *filename ) = 0;
+	virtual void				WriteConfigToFile(const char* filename, int excludeFlags = 0) = 0;
 
 								// Writes cvars with the given flags to a file.
 	virtual void				WriteFlaggedCVarsToFile( const char *filename, int flags, const char *setCmd ) = 0;
@@ -227,7 +227,7 @@ public:
 	virtual bool				IsConsoleActive() const = 0;
 
 
-
+	IPlatformUtilities* g_SteamUtilities;
 };
 
 extern idCommon *		common;

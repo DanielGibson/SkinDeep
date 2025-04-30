@@ -87,10 +87,24 @@ void idTeletext::Spawn(void)
 
 void idTeletext::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	SaveFileWriteArray( spotlights, 2, WriteObject ); // idLight* spotlights[2]
+	savefile->WriteObject( mover ); // idMover* mover
+
+	savefile->WriteObject( arrowProp ); // idEntity* arrowProp
 }
 
 void idTeletext::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	SaveFileReadArrayCast( spotlights, ReadObject, idClass*& ); // idLight* spotlights[2]
+	savefile->ReadObject( CastClassPtrRef(mover) ); // idMover* mover
+
+	savefile->ReadObject( arrowProp ); // idEntity* arrowProp
 }
 
 void idTeletext::Think(void)

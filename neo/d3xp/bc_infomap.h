@@ -13,7 +13,7 @@ public:
 							idInfoMap(void);
 	virtual					~idInfoMap(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -34,7 +34,7 @@ private:
 
 	//void					Event_Activate(idEntity *activator);
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 
 	idEntityPtr<idEntity>	FTLDrive_ptr;
 

@@ -85,6 +85,7 @@ public:
 	int					GetCursor(){ return cursor; }
 
 	void				AdjustCoords(float *x, float *y, float *w, float *h);
+	void				AdjustCursorCoords(float *x, float *y, float *w, float *h); // DG: added for "render menus as 4:3" hack
 	bool				ClippedCoords(float *x, float *y, float *w, float *h);
 	bool				ClippedCoords(float *x, float *y, float *w, float *h, float *s1, float *t1, float *s2, float *t2);
 
@@ -102,6 +103,12 @@ public:
 	bool				GetOverStrike() { return overStrikeMode; }
 
 	void				DrawEditCursor(float x, float y, float scale);
+
+	// DG: this is used for the "make sure menus are rendered as 4:3" hack
+	void				SetMenuScaleFix(bool enable);
+	bool				IsMenuScaleFixActive() const {
+		return fixOffsetForMenu.x != 0.0f || fixOffsetForMenu.y != 0.0f;
+	}
 
 	enum {
 		CURSOR_ARROW,
@@ -169,6 +176,10 @@ private:
 	bool				initialized;
 
 	bool				mbcs;
+
+	// DG: this is used for the "make sure menus are rendered as 4:3" hack
+	idVec2				fixScaleForMenu;
+	idVec2				fixOffsetForMenu;
 };
 
 #endif /* !__DEVICECONTEXT_H__ */

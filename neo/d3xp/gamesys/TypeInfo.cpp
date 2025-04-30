@@ -1350,26 +1350,18 @@ TestSaveGame_f
 ================
 */
 void TestSaveGame_f( const idCmdArgs &args ) {
-	idStr name;
+	idStr name = "test_save";
 
-	if ( args.Argc() <= 1 ) {
-		gameLocal.Printf( "testSaveGame <mapName>\n" );
-		return;
-	}
-
-	name = args.Argv( 1 );
+	// blendo eric: alter to check quicksave
 
 	try {
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "map %s", name.c_str() ) );
-		name.Replace( "\\", "_" );
-		name.Replace( "/", "_" );
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "saveGame test_%s", name.c_str() ) );
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "loadGame test_%s", name.c_str() ) );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "saveGame %s", name.c_str() ) );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "loadGame %s", name.c_str() ) );
 	}
-	catch( idException & ) {
-		// an ERR_DROP was thrown
+	catch( idException & ex ) {
+		common->Warning("return with exception %s", ex.error);
 	}
-	cmdSystem->BufferCommandText( CMD_EXEC_NOW, "quit" );
+	//cmdSystem->BufferCommandText( CMD_EXEC_NOW, "quit" );
 }
 
 /*

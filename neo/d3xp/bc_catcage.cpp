@@ -19,7 +19,7 @@ const int MEOW_OVERLAY_MAXTIME = 200;
 
 const int HELPME_VO_INTERVALTIME = 5000; //how often to play the cat help VO.
 const int HELPME_VO_RANDOMVARIATIONTIME = 1000; //random variation time for the help VO.
-const int HELPME_ACTIVATIONRADIUS = 256; //how close player has to be to activate the help VO.
+const idStr HELPME_ACTIVATIONRADIUS = "256"; //how close player has to be to activate the help VO.
 
 const int WORDBUBBLETIME = 4000;
 const int WORDBUBBLE_TRANSITIONTIME = 150;
@@ -31,10 +31,12 @@ const float WORDBUBBLE_JIGGLEAMOUNT = .2f;
 #define LIGHTRADIUS 12
 #define LIGHTINTENSITY .4f
 
+const int ARROW_DISPLAYTIME = 60000;
+
 const idEventDef EV_SetCallForHelp("setCallForHelp", "d");
 
 CLASS_DECLARATION(idEntity, idCatcage)
-	EVENT(EV_SetCallForHelp, Event_SetCallForHelp)
+	EVENT(EV_SetCallForHelp, idCatcage::Event_SetCallForHelp)
 END_CLASS
 
 
@@ -43,22 +45,55 @@ idCatcage::idCatcage(void)
 	catcageNode.SetOwner(this);
 	catcageNode.AddToEnd(gameLocal.catcageEntities);
 
+	state = 0;
+	timer = 0;
+
+	soundwaves = nullptr;
+
+	meowOverlay = nullptr;
+	overlayTimer = 0;
+
+	overlayState = 0;
+
+	helpme_VO_timer = 0;
+
+	awaitingPlayerResponse = false;
+	callForHelp = false;
+
+	wordbubble = nullptr;
+
 	wordbubbleState = WBS_OFF;
 	wordbubbleTimer = 0;
 	wordbubbleBasePosition = vec3_zero;
 	wordbubbleJiggleTimer = 0;
 
-	
+	catprisonerModel = nullptr;
+	catcage_animated = nullptr;
+
+	helpmeRadius = 0;
+
+	arrowProp = nullptr;
+	arrowTimer = 0;
+	arrowActive = false;
 
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
+
 }
 
 idCatcage::~idCatcage(void)
 {
 	catcageNode.Remove();
 
-	soundwaves->PostEventMS(&EV_Remove, 0);
+	if (soundwaves) {
+		soundwaves->PostEventMS(&EV_Remove, 0);
+	}
+	soundwaves = nullptr;
+
+	if (catprisonerModel) {
+		catprisonerModel->PostEventMS(&EV_Remove, 0);
+		catprisonerModel = nullptr;
+	}
 
 	if (headlightHandle != -1)
 		gameRenderWorld->FreeLightDef(headlightHandle);
@@ -193,23 +228,131 @@ void idCatcage::Spawn(void)
 	gameRenderWorld->UpdateLightDef(headlightHandle, &headlight);
 
 	
-	displayName = idStr::Format("Release %s", spawnArgs.GetString("name_cat", "???")).c_str();
+	//BC 3-20-2025: fixed bug with cat release text.
+	//BC 3-22-2025: cleaner fix for this with new string.
+	displayName = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_catcage_release"),
+		common->GetLanguageDict()->GetString(spawnArgs.GetString("name_cat", "???"))).c_str();
 
 
 	BecomeActive(TH_THINK);
+
+	helpmeRadius = spawnArgs.GetInt("helpmeradius", HELPME_ACTIVATIONRADIUS);
+
+
+	//BC 2-23-2025: failsafe arrow if key is in room with no location name.
+	args.Clear();
+	args.Set("classname", "func_static");
+	args.Set("model", spawnArgs.GetString("model_arrow"));
+	args.SetBool("spin", true);
+	args.SetBool("solid", false);
+	args.SetBool("hide", true);	
+	args.SetBool("drawGlobally", true);
+	gameLocal.SpawnEntityDef(args, &arrowProp);
+	if (arrowProp == nullptr)
+	{
+		gameLocal.Warning("catcage: failed to spawn arrow prop.\n");
+	}
 }
 
 void idCatcage::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( timer ); //  int timer
+
+	savefile->WriteObject( soundwaves ); //  idFuncEmitter * soundwaves
+
+	savefile->WriteObject( catPtr ); //  idEntityPtr<idEntity> catPtr
+
+	savefile->WriteObject( meowOverlay ); //  idEntity * meowOverlay
+	savefile->WriteInt( overlayTimer ); //  int overlayTimer
+
+	savefile->WriteInt( overlayState ); //  int overlayState
+
+	savefile->WriteInt( helpme_VO_timer ); //  int helpme_VO_timer
+
+	savefile->WriteBool( awaitingPlayerResponse ); //  bool awaitingPlayerResponse
+	savefile->WriteBool( callForHelp ); //  bool callForHelp
+
+	savefile->WriteObject( wordbubble ); //  idEntity* wordbubble
+
+	savefile->WriteInt( wordbubbleState ); //  int wordbubbleState
+	savefile->WriteInt( wordbubbleTimer ); //  int wordbubbleTimer
+
+	savefile->WriteVec3( wordbubbleBasePosition ); //  idVec3 wordbubbleBasePosition
+	savefile->WriteInt( wordbubbleJiggleTimer ); //  int wordbubbleJiggleTimer
+
+	savefile->WriteObject( catprisonerModel ); //  idAnimated* catprisonerModel
+	savefile->WriteObject( catcage_animated ); //  idAnimated* catcage_animated
+
+	savefile->WriteRenderLight( headlight ); //  renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); //  int headlightHandle
+
+	savefile->WriteInt( helpmeRadius ); //  int helpmeRadius
+
+	savefile->WriteObject( arrowProp ); //  idEntity* arrowProp
+	savefile->WriteInt( arrowTimer ); //  int arrowTimer
+	savefile->WriteBool( arrowActive ); //  bool arrowActive
 }
 
 void idCatcage::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( timer ); //  int timer
+
+	savefile->ReadObject( CastClassPtrRef(soundwaves) ); //  idFuncEmitter * soundwaves
+
+	savefile->ReadObject( catPtr ); //  idEntityPtr<idEntity> catPtr
+
+	savefile->ReadObject( meowOverlay ); //  idEntity * meowOverlay
+	savefile->ReadInt( overlayTimer ); //  int overlayTimer
+
+	savefile->ReadInt( overlayState ); //  int overlayState
+
+	savefile->ReadInt( helpme_VO_timer ); //  int helpme_VO_timer
+
+	savefile->ReadBool( awaitingPlayerResponse ); //  bool awaitingPlayerResponse
+	savefile->ReadBool( callForHelp ); //  bool callForHelp
+
+	savefile->ReadObject( wordbubble ); //  idEntity* wordbubble
+
+	savefile->ReadInt( wordbubbleState ); //  int wordbubbleState
+	savefile->ReadInt( wordbubbleTimer ); //  int wordbubbleTimer
+
+	savefile->ReadVec3( wordbubbleBasePosition ); //  idVec3 wordbubbleBasePosition
+	savefile->ReadInt( wordbubbleJiggleTimer ); //  int wordbubbleJiggleTimer
+
+	savefile->ReadObject( CastClassPtrRef(catprisonerModel) ); //  idAnimated* catprisonerModel
+	savefile->ReadObject( CastClassPtrRef(catcage_animated) ); //  idAnimated* catcage_animated
+
+	savefile->ReadRenderLight( headlight ); //  renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); //  int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadInt( helpmeRadius ); //  int helpmeRadius
+
+	savefile->ReadObject( arrowProp ); //  idEntity* arrowProp
+	savefile->ReadInt( arrowTimer ); //  int arrowTimer
+	savefile->ReadBool( arrowActive ); //  bool arrowActive
 }
 
 void idCatcage::Think(void)
 {
 	idEntity::Think();
+
+	//BC 2-23-2025: make the failsafe arrow hide itself after its display timer expires.
+	if (gameLocal.time > arrowTimer && arrowActive)
+	{
+		if (arrowProp != nullptr)
+		{
+			if (!arrowProp->IsHidden())
+			{
+				arrowProp->Hide();
+			}
+		}
+	}
+
 
 	if (state == CATCAGE_IDLE)
 	{
@@ -223,14 +366,14 @@ void idCatcage::Think(void)
 			bool playedHelpVO = false;
 			float distanceToPlayer = (gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin() - this->GetPhysics()->GetOrigin()).LengthFast();
 
-			if (distanceToPlayer < HELPME_ACTIVATIONRADIUS)
+			if (distanceToPlayer < helpmeRadius)
 			{
 				//do a traceline to see if player has LOS to the catcage.
 				trace_t eyeTr;
 				gameLocal.clip.TracePoint(eyeTr,  gameLocal.GetLocalPlayer()->firstPersonViewOrigin, GetPhysics()->GetOrigin(), MASK_SOLID, this);
 				if (eyeTr.fraction >= .98f)
 				{
-					StartSound("snd_helpme", SND_CHANNEL_ANY);
+					StartSound("snd_helpme", SND_CHANNEL_VOICE);
 					helpme_VO_timer = gameLocal.time + HELPME_VO_INTERVALTIME + gameLocal.random.RandomInt(HELPME_VO_RANDOMVARIATIONTIME);
 					playedHelpVO = true;
 					awaitingPlayerResponse = true;
@@ -345,7 +488,7 @@ void idCatcage::Think(void)
 					//All cat cages are now open.
 					if (gameLocal.world->spawnArgs.GetBool("objectives", "1"))
 					{
-						gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_summonpod"); //"Use a Signal Lamp to summon a Cat Evac pod"
+						gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_summonpod", true, "icon_obj_signallamp"); //"Use a Signal Lamp to summon a Cat Evac pod"
 					}
 
 
@@ -578,7 +721,22 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 	if (fallbackPosition != vec3_zero)
 	{
 		SetWordbubble("#str_def_gameplay_catcage_arrow");
-		gameRenderWorld->DebugArrow(colorWhite, this->GetPhysics()->GetOrigin(), fallbackPosition, 8, 90000);
+		//gameRenderWorld->DebugArrow(colorWhite, this->GetPhysics()->GetOrigin(), fallbackPosition, 8, 90000);
+
+		//BC 2-23-2025: replace debug arrow.
+		arrowTimer = gameLocal.time + ARROW_DISPLAYTIME;
+		arrowActive = true;
+		arrowProp->GetPhysics()->SetOrigin(fallbackPosition + idVec3(0,0,4));
+		arrowProp->Show();
+
+		return true;
+	}
+
+
+	idStr packageLocation = DoAskItemdefCheck();
+	if (packageLocation.Length() > 0)
+	{
+		SetWordbubble(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_catcage_keyatroom"), packageLocation.c_str()));
 		return true;
 	}
 
@@ -586,6 +744,41 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 	SetWordbubble("#str_def_gameplay_catcage_dontknow");
 	return true;
 }
+
+idStr idCatcage::DoAskItemdefCheck()
+{
+	//BC 2-18-2025: handle Ask for cat key inside a package.
+	//This checks for a def_item key that has the catkey as its value.
+	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+	{
+		if (!ent)
+			continue;
+
+		if (ent->IsHidden() || !ent->IsType(idMoveableItem::Type))
+			continue;
+
+		const idKeyValue* kv;
+		kv = ent->spawnArgs.MatchPrefix("def_item", NULL);
+		while (kv)
+		{
+			//validate definition.
+			idStr defname = kv->GetValue();
+			if (idStr::Cmp("item_cat_key", defname.c_str()) == 0)
+			{
+				idLocationEntity* locEntCatkey = gameLocal.LocationForEntity(ent);
+				if (locEntCatkey)
+				{
+					return common->GetLanguageDict()->GetString(locEntCatkey->GetLocation());
+				}
+			}
+
+			kv = ent->spawnArgs.MatchPrefix("def_item", kv);
+		}
+	}
+
+	return "";
+}
+
 
 bool idCatcage::DoFrob(int index, idEntity * frobber)
 {
@@ -622,6 +815,7 @@ void idCatcage::ReleaseCat()
 
 	catprisonerModel->Hide();
 	catprisonerModel->PostEventMS(&EV_Remove, 0);
+	catprisonerModel = nullptr;
 
 
 	Hide();
@@ -644,7 +838,13 @@ void idCatcage::ReleaseCat()
 	//Release the cat.
 	gameLocal.GetLocalPlayer()->SetImpactSlowmo(true);
 	StopSound(SND_CHANNEL_ANY);
-	StartSound("snd_rescue", SND_CHANNEL_BODY); //play the cat meow power-reverb
+
+
+	int catVoiceprint = 0;
+	gameLocal.GetCatViaModel(spawnArgs.GetString("model_cat"), &catVoiceprint);
+	StartSound((catVoiceprint <= 0) ? "snd_rescue_a" : "snd_rescue_b", SND_CHANNEL_VOICE); //play the cat meow power-reverb
+
+
 	state = CATCAGE_OPENING;
 
 	idVec3 forward;
@@ -693,6 +893,8 @@ void idCatcage::ReleaseCat()
 
 	//make skin change.
 	catcage_animated->SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_off")));
+
+	common->g_SteamUtilities->SetSteamTimelineEvent("steam_heart");
 }
 
 

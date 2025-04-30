@@ -12,7 +12,7 @@ class idFeedAlertWindow : public idWindow
 public:
 	idFeedAlertWindow(idUserInterfaceLocal *gui) : idWindow(gui){ CommonInit(); }
 	idFeedAlertWindow(idDeviceContext *d, idUserInterfaceLocal *gui) : idWindow(d, gui){ CommonInit(); }
-	virtual ~idFeedAlertWindow(){ disposedState = 0; idWindow::~idWindow(); }
+	virtual ~idFeedAlertWindow(){ disposedState = 0; }
 	virtual bool ParseInternalVar(const char* name, idParser* src);
 	virtual void PostParse();
 	virtual void Redraw(float x, float y){ Update(); idWindow::Redraw(x, y); }
@@ -25,6 +25,8 @@ public:
 
 	bool WasDisposed() { return disposedState != NotDisposedMagicNumber; } // double checking for bad data bug
 
+	virtual void WriteToSaveGame(idSaveGame* savefile) const override;
+	virtual void ReadFromSaveGame(idRestoreGame* savefile) override;
 private:
 	typedef struct alert_s
 	{
@@ -45,6 +47,9 @@ private:
 		float	heightScale; // alters the default rect, currently for double lines
 		idWindow*	window;	// draw window assigned when window begins transition
 	} alert_t;
+
+	// void WriteSaveGameAlert(const alert_t& alert, idSaveGame* savefile) const;
+	// void ReadSaveGameAlert(alert_t& alert, idRestoreGame* savefile);
 
 	void CommonInit();
 	void SetupWindow(alert_t& alertItem, idWindow* alertWindow);

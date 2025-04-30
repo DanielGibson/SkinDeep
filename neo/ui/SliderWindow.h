@@ -39,6 +39,9 @@ public:
 						idSliderWindow(idDeviceContext *d, idUserInterfaceLocal *gui);
 	virtual				~idSliderWindow();
 
+	virtual void		WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void		ReadFromSaveGame( idRestoreGame *savefile );
+
 	void				InitWithDefaults(const char *_name, const idRectangle &rect, const idVec4 &foreColor, const idVec4 &matColor, const char *_background, const char *_thumbShader,
 							bool _vertical, bool _scrollbar, bool _thumbAuto);
 
@@ -94,12 +97,12 @@ private:
 	float				stepSize;
 	float				lastValue;
 	idRectangle			thumbRect;
+	idStr				thumbShader;
 	const idMaterial *	thumbMat;
 	bool				vertical;
 	bool				verticalFlip;
 	bool				scrollbar;
 	idWindow *			buddyWin;
-	idStr				thumbShader;
 
 	idWinStr			cvarStr;
 	idCVar *			cvar;

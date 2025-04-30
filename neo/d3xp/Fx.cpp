@@ -62,20 +62,17 @@ idEntityFx::Save
 ================
 */
 void idEntityFx::Save( idSaveGame *savefile ) const {
-	int i;
+	savefile->WriteInt( started ); // int started
+	savefile->WriteInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->WriteFX( fxEffect ); // const idDeclFX * fxEffect
 
-	savefile->WriteInt( started );
-	savefile->WriteInt( nextTriggerTime );
-	savefile->WriteFX( fxEffect );
-	savefile->WriteString( systemName );
-
-	savefile->WriteInt( actions.Num() );
-
-	for ( i = 0; i < actions.Num(); i++ ) {
+	savefile->WriteInt( actions.Num() ); // idList<idFXLocalAction> actions
+	for ( int i = 0; i < actions.Num(); i++ ) {
 
 		if ( actions[i].lightDefHandle >= 0 ) {
 			savefile->WriteBool( true );
 			savefile->WriteRenderLight( actions[i].renderLight );
+			savefile->WriteInt( actions[i].lightDefHandle );
 		} else {
 			savefile->WriteBool( false );
 		}
@@ -83,6 +80,7 @@ void idEntityFx::Save( idSaveGame *savefile ) const {
 		if ( actions[i].modelDefHandle >= 0 ) {
 			savefile->WriteBool( true );
 			savefile->WriteRenderEntity( actions[i].renderEntity );
+			savefile->WriteInt( actions[i].modelDefHandle );
 		} else {
 			savefile->WriteBool( false );
 		}
@@ -94,6 +92,9 @@ void idEntityFx::Save( idSaveGame *savefile ) const {
 		savefile->WriteBool( actions[i].decalDropped );
 		savefile->WriteBool( actions[i].launched );
 	}
+
+	savefile->WriteString( systemName ); // idString systemName
+	savefile->WriteInt( forcefadeStartTime ); // int forcefadeStartTime
 }
 
 /*
@@ -102,24 +103,21 @@ idEntityFx::Restore
 ================
 */
 void idEntityFx::Restore( idRestoreGame *savefile ) {
-	int i;
+
+	savefile->ReadInt( started ); // int started
+	savefile->ReadInt( nextTriggerTime ); // int nextTriggerTime
+	savefile->ReadFX( fxEffect ); // const idDeclFX * fxEffect
+
 	int num;
-	bool hasObject;
-
-	savefile->ReadInt( started );
-	savefile->ReadInt( nextTriggerTime );
-	savefile->ReadFX( fxEffect );
-	savefile->ReadString( systemName );
-
 	savefile->ReadInt( num );
-
-	actions.SetNum( num );
-	for ( i = 0; i < num; i++ ) {
-
+	actions.SetNum( num ); // idList<idFXLocalAction> actions
+	for ( int i = 0; i < num; i++ ) {
+		bool hasObject;
 		savefile->ReadBool( hasObject );
 		if ( hasObject ) {
 			savefile->ReadRenderLight( actions[i].renderLight );
-			actions[i].lightDefHandle = gameRenderWorld->AddLightDef( &actions[i].renderLight );
+			savefile->ReadInt( actions[i].lightDefHandle );
+			gameRenderWorld->UpdateLightDef( actions[i].lightDefHandle, &actions[i].renderLight );
 		} else {
 			memset( &actions[i].renderLight, 0, sizeof( renderLight_t ) );
 			actions[i].lightDefHandle = -1;
@@ -128,7 +126,8 @@ void idEntityFx::Restore( idRestoreGame *savefile ) {
 		savefile->ReadBool( hasObject );
 		if ( hasObject ) {
 			savefile->ReadRenderEntity( actions[i].renderEntity );
-			actions[i].modelDefHandle = gameRenderWorld->AddEntityDef( &actions[i].renderEntity );
+			savefile->ReadInt( actions[i].modelDefHandle );
+			gameRenderWorld->UpdateEntityDef( actions[i].modelDefHandle, &actions[i].renderEntity );
 		} else {
 			memset( &actions[i].renderEntity, 0, sizeof( renderEntity_t ) );
 			actions[i].modelDefHandle = -1;
@@ -136,7 +135,7 @@ void idEntityFx::Restore( idRestoreGame *savefile ) {
 
 		savefile->ReadFloat( actions[i].delay );
 
-		// let the FX regenerate the particleSystem
+		// let the FX regenerate the particleSystem // eric blendo: TODO is this true?
 		actions[i].particleSystem = -1;
 
 		savefile->ReadInt( actions[i].start );
@@ -145,6 +144,9 @@ void idEntityFx::Restore( idRestoreGame *savefile ) {
 		savefile->ReadBool( actions[i].decalDropped );
 		savefile->ReadBool( actions[i].launched );
 	}
+
+	savefile->ReadString( systemName ); // idString systemName
+	savefile->ReadInt( forcefadeStartTime ); // int forcefadeStartTime
 }
 
 /*

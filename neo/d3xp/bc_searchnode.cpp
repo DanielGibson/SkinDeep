@@ -19,10 +19,16 @@ idSearchNode::~idSearchNode(void)
 
 void idSearchNode::Save(idSaveGame *savefile) const
 {
+    savefile->WriteInt( lastTimeUsed ); // int lastTimeUsed
+    savefile->WriteInt( lastNodeAnimTime ); // int lastNodeAnimTime
+    SaveFileWriteArray( nodeAnimList, nodeAnimList.Num(), WriteString ); // idList<idStr> nodeAnimList
 }
 
 void idSearchNode::Restore(idRestoreGame *savefile)
 {
+    savefile->ReadInt( lastTimeUsed ); // int lastTimeUsed
+    savefile->ReadInt( lastNodeAnimTime ); // int lastNodeAnimTime
+    SaveFileReadList( nodeAnimList, ReadString ); // idList<idStr> nodeAnimList
 }
 
 void idSearchNode::Spawn(void)

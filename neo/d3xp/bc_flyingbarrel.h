@@ -13,7 +13,10 @@ class idFlyingBarrel : public idMoveableItem
 public:
 	CLASS_PROTOTYPE(idFlyingBarrel);
 
-	void					Save( idSaveGame *savefile ) const;
+							idFlyingBarrel( void );
+	virtual					~idFlyingBarrel( void );
+
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 	virtual void			Think( void );
@@ -45,11 +48,11 @@ private:
 	int						fireSpewTimer;
 	idVec3					fireSpewDirection;
 
-	idEntity *				jetNode;
+	idEntity *				jetNode = nullptr;
 
 	void					Event_PreDeath();
 
-	idLight *				barrelLight;
+	idLight *				barrelLight = nullptr;
 
 	void					Explode(idEntity *attacker);
 };

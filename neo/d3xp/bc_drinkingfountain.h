@@ -10,7 +10,7 @@ public:
 							idDrinkingFountain(void);
 	virtual					~idDrinkingFountain(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -23,7 +23,7 @@ public:
 
 private:
 		
-	idFuncEmitter			*faucetEmitter;	
+	idFuncEmitter			*faucetEmitter = nullptr;
 	idVec3					GetFaucetPos();
 	idVec3					GetDrinkPos();
 
@@ -33,7 +33,7 @@ private:
 	int						slurpTimer;
 	bool					isSlurping;
 
-	idFuncEmitter*			drinkEmitter;
+	idFuncEmitter*			drinkEmitter = nullptr;
 
 };
 //#pragma once

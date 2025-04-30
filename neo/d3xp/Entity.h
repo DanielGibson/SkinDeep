@@ -69,6 +69,7 @@ extern const idEventDef EV_SetSkin;
 extern const idEventDef EV_StartSoundShader;
 extern const idEventDef EV_StopSound;
 extern const idEventDef EV_CacheSoundShader;
+extern const idEventDef EV_PostSaveRestore;
 
 // SM
 extern const idEventDef EV_PostPhysicsRest;
@@ -82,6 +83,7 @@ enum {
 	TH_UPDATEVISUALS		= 8,		// update renderEntity
 	TH_UPDATEPARTICLES		= 16,
 	TH_PHYSICSFROMBIND		= 32,		// blendo eric: physics were activated from a bind event
+	TH_DISABLED				= 64,		// blendo eric: disable on destruction
 };
 
 //
@@ -201,7 +203,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	const char *			GetEntityDefName( void ) const;
@@ -477,6 +479,7 @@ public:
 	float					itemDamageVelocityMin;
 
 	bool					DoesPlayerHaveLOStoMe();
+	bool					DoesPlayerHaveLOStoMe_Simple();
 
 	virtual void			DoHack(); //for the hackgrenade.
 
@@ -497,15 +500,21 @@ public:
 
 	idVec2					infomapPositionOffset;
 
+	virtual void			Event_PostSaveRestore() {} // blendo eric: allow ents to setup after game save load/restore
+
+	virtual bool			RequiresPresentOnRestore() const { return modelDefHandle != -1; }
+
 	//BC PUBLIC END ENTITY
 	
 
 
 protected:
 	renderEntity_t			renderEntity;						// used to present a model to the renderer
-	int						modelDefHandle;						// handle to static renderer model
+	qhandle_t				modelDefHandle;						// handle to static renderer model
 	refSound_t				refSound;							// used to present sound to the audio engine
-	idList<trackedInteraction_t>*	trackedInteractions;		// List of light interactions that occurred on the last frame (if we're tracking them -- see spawnarg 'trackInteractions')
+
+	// unused?
+	//idList<trackedInteraction_t>	trackedInteractions;		// List of light interactions that occurred on the last frame (if we're tracking them -- see spawnarg 'trackInteractions')
 
 	// SM BEGIN
 	bool					isFrobHoldable;
@@ -663,15 +672,19 @@ private:
 
 	void					Event_RepairEntity();
 
-	void					Event_EntityTeleport(idVec3 origin, idVec3 angles);
+	void					Event_EntityTeleport(const idVec3 &origin, const idVec3 &angles);
 
 	void					Event_SetSystemicVoEnabled(int value);
 
 	void					SetGui(int guiNum, const char* guiName, bool unique); // SW: intermediary for Event_SetGui and Event_SetGuiUnique
 
-	void					HandleSubtitle(const char* soundName, int length);
+	void					HandleSubtitle(const char* soundName, int length, idStr& sampleName, s_channelType channel);
 
 	void					Event_IsPlayingSound(int channel);
+
+	// SW 3rd March 2025
+	// Introducing a tuning factor for idEntity::CanDamage. It's not really 'radius' but I don't know what else to call it.
+	float					directDamageRadius;
 
 	//BC PRIVATE END
 };
@@ -698,8 +711,8 @@ typedef struct damageEffect_s {
 	idVec3					localOrigin;
 	idVec3					localNormal;
 	int						time;
-	const idDeclParticle*	type;
-	struct damageEffect_s *	next;
+	const idDeclParticle*	type = nullptr;
+	struct damageEffect_s *	next = nullptr;
 } damageEffect_t;
 
 class idAnimatedEntity : public idEntity {
@@ -709,7 +722,7 @@ public:
 							idAnimatedEntity();
 							~idAnimatedEntity();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			ClientPredictionThink( void );
@@ -773,12 +786,12 @@ public:
 
 ID_INLINE SetTimeState::SetTimeState() {
 	activated = false;
+	fast = false;
 	previousFast = false;
 }
 
 ID_INLINE SetTimeState::SetTimeState( int timeGroup ) {
-	activated = false;
-	previousFast = false;
+	SetTimeState();
 	PushState( timeGroup );
 }
 

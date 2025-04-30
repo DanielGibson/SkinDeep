@@ -203,26 +203,30 @@ idMoveable::Save
 */
 void idMoveable::Save( idSaveGame *savefile ) const {
 
-	savefile->WriteString( brokenModel );
-	savefile->WriteString( damage );
-#ifdef _D3XP
-	savefile->WriteString( monsterDamage );
-	savefile->WriteObject( attacker );
-#endif
-	savefile->WriteString( fxCollide );
-	savefile->WriteInt( nextCollideFxTime );
-	savefile->WriteFloat( minDamageVelocity );
-	savefile->WriteFloat( maxDamageVelocity );
-	savefile->WriteBool( explode );
-	savefile->WriteBool( unbindOnDeath );
-	savefile->WriteBool( allowStep );
-	savefile->WriteBool( canDamage );
-	savefile->WriteInt( nextDamageTime );
-	savefile->WriteInt( nextSoundTime );
-	savefile->WriteInt( initialSpline != NULL ? initialSpline->GetTime( 0 ) : -1 );
-	savefile->WriteVec3( initialSplineDir );
+	savefile->WriteStaticObject( idMoveable::physicsObj ); //  idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
 
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteString( brokenModel ); //  idString brokenModel
+	savefile->WriteString( damage ); //  idString damage
+
+	savefile->WriteString( monsterDamage ); //  idString monsterDamage
+	savefile->WriteObject( attacker ); //  idEntity *attacker
+
+	savefile->WriteString( fxCollide ); //  idString fxCollide
+	savefile->WriteInt( nextCollideFxTime ); //  int nextCollideFxTime
+	savefile->WriteFloat( minDamageVelocity ); //  float minDamageVelocity
+	savefile->WriteFloat( maxDamageVelocity ); //  float maxDamageVelocity
+
+	savefile->WriteInt( initialSpline != NULL ? initialSpline->GetTime( 0 ) : -1 ); // idCurve_Spline<idVec3> *initialSpline;
+	savefile->WriteVec3( initialSplineDir ); //  idVec3 initialSplineDir
+
+	savefile->WriteBool( explode ); //  bool explode
+	savefile->WriteBool( unbindOnDeath ); //  bool unbindOnDeath
+	savefile->WriteBool( allowStep ); //  bool allowStep
+	savefile->WriteBool( canDamage ); //  bool canDamage
+	savefile->WriteInt( nextDamageTime ); //  int nextDamageTime
+	savefile->WriteInt( nextSoundTime ); //  int nextSoundTime
 }
 
 /*
@@ -233,24 +237,27 @@ idMoveable::Restore
 void idMoveable::Restore( idRestoreGame *savefile ) {
 	int initialSplineTime;
 
-	savefile->ReadString( brokenModel );
-	savefile->ReadString( damage );
-#ifdef _D3XP
-	savefile->ReadString( monsterDamage );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( attacker ) );
-#endif
-	savefile->ReadString( fxCollide );
-	savefile->ReadInt( nextCollideFxTime );
-	savefile->ReadFloat( minDamageVelocity );
-	savefile->ReadFloat( maxDamageVelocity );
-	savefile->ReadBool( explode );
-	savefile->ReadBool( unbindOnDeath );
-	savefile->ReadBool( allowStep );
-	savefile->ReadBool( canDamage );
-	savefile->ReadInt( nextDamageTime );
-	savefile->ReadInt( nextSoundTime );
-	savefile->ReadInt( initialSplineTime );
-	savefile->ReadVec3( initialSplineDir );
+	savefile->ReadStaticObject( physicsObj ); //  idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+
+	savefile->ReadString( brokenModel ); //  idString brokenModel
+	savefile->ReadString( damage ); //  idString damage
+
+	savefile->ReadString( monsterDamage ); //  idString monsterDamage
+	savefile->ReadObject( reinterpret_cast<idClass *&>( attacker ) );  //  idEntity *attacker
+
+	savefile->ReadString( fxCollide ); //  idString fxCollide
+	savefile->ReadInt( nextCollideFxTime ); //  int nextCollideFxTime
+	savefile->ReadFloat( minDamageVelocity ); //  float minDamageVelocity
+	savefile->ReadFloat( maxDamageVelocity ); //  float maxDamageVelocity
+
+	savefile->ReadInt( initialSplineTime );  // idCurve_Spline<idVec3> *initialSpline;
+	savefile->ReadVec3( initialSplineDir ); //  idVec3 initialSplineDir
 
 	if ( initialSplineTime != -1 ) {
 		InitInitialSpline( initialSplineTime );
@@ -258,8 +265,12 @@ void idMoveable::Restore( idRestoreGame *savefile ) {
 		initialSpline = NULL;
 	}
 
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
+	savefile->ReadBool( explode );  //  bool explode
+	savefile->ReadBool( unbindOnDeath ); //  bool unbindOnDeath
+	savefile->ReadBool( allowStep ); //  bool allowStep
+	savefile->ReadBool( canDamage ); //  bool canDamage
+	savefile->ReadInt( nextDamageTime ); //  int nextDamageTime
+	savefile->ReadInt( nextSoundTime ); //  int nextSoundTime
 }
 
 /*
@@ -659,12 +670,12 @@ idBarrel::Save
 ================
 */
 void idBarrel::Save( idSaveGame *savefile ) const {
-	savefile->WriteFloat( radius );
-	savefile->WriteInt( barrelAxis );
-	savefile->WriteVec3( lastOrigin );
-	savefile->WriteMat3( lastAxis );
-	savefile->WriteFloat( additionalRotation );
-	savefile->WriteMat3( additionalAxis );
+	savefile->WriteFloat( radius ); // float radius
+	savefile->WriteInt( barrelAxis ); // int barrelAxis
+	savefile->WriteVec3( lastOrigin ); // idVec3 lastOrigin
+	savefile->WriteMat3( lastAxis ); // idMat3 lastAxis
+	savefile->WriteFloat( additionalRotation ); // float additionalRotation
+	savefile->WriteMat3( additionalAxis ); // idMat3 additionalAxis
 }
 
 /*
@@ -673,12 +684,12 @@ idBarrel::Restore
 ================
 */
 void idBarrel::Restore( idRestoreGame *savefile ) {
-	savefile->ReadFloat( radius );
-	savefile->ReadInt( barrelAxis );
-	savefile->ReadVec3( lastOrigin );
-	savefile->ReadMat3( lastAxis );
-	savefile->ReadFloat( additionalRotation );
-	savefile->ReadMat3( additionalAxis );
+	savefile->ReadFloat( radius ); // float radius
+	savefile->ReadInt( barrelAxis ); // int barrelAxis
+	savefile->ReadVec3( lastOrigin ); // idVec3 lastOrigin
+	savefile->ReadMat3( lastAxis ); // idMat3 lastAxis
+	savefile->ReadFloat( additionalRotation ); // float additionalRotation
+	savefile->ReadMat3( additionalAxis ); // idMat3 additionalAxis
 }
 
 /*
@@ -872,23 +883,19 @@ idExplodingBarrel::Save
 ================
 */
 void idExplodingBarrel::Save( idSaveGame *savefile ) const {
-	savefile->WriteVec3( spawnOrigin );
-	savefile->WriteMat3( spawnAxis );
+	savefile->WriteInt( state ); // explode_state_t state
 
-	savefile->WriteInt( state );
-	savefile->WriteInt( particleModelDefHandle );
-	savefile->WriteInt( lightDefHandle );
+	savefile->WriteVec3( spawnOrigin ); // idVec3 spawnOrigin
+	savefile->WriteMat3( spawnAxis ); // idMat3 spawnAxis
+	savefile->WriteInt( particleModelDefHandle ); // int particleModelDefHandle
+	savefile->WriteInt( lightDefHandle ); // int lightDefHandle
+	savefile->WriteRenderEntity( particleRenderEntity ); // renderEntity_t particleRenderEntity
+	savefile->WriteRenderLight( light ); // renderLight_t light
+	savefile->WriteInt( particleTime ); // int particleTime
+	savefile->WriteInt( lightTime ); // int lightTime
+	savefile->WriteFloat( time ); // float time
 
-	savefile->WriteRenderEntity( particleRenderEntity );
-	savefile->WriteRenderLight( light );
-
-	savefile->WriteInt( particleTime );
-	savefile->WriteInt( lightTime );
-	savefile->WriteFloat( time );
-
-#ifdef _D3XP
-	savefile->WriteBool( isStable );
-#endif
+	savefile->WriteBool( isStable ); // bool isStable
 }
 
 /*
@@ -897,30 +904,28 @@ idExplodingBarrel::Restore
 ================
 */
 void idExplodingBarrel::Restore( idRestoreGame *savefile ) {
-	savefile->ReadVec3( spawnOrigin );
-	savefile->ReadMat3( spawnAxis );
+	savefile->ReadInt( (int&)state ); // explode_state_t state
 
-	savefile->ReadInt( (int &)state );
-	savefile->ReadInt( (int &)particleModelDefHandle );
-	savefile->ReadInt( (int &)lightDefHandle );
+	savefile->ReadVec3( spawnOrigin ); // idVec3 spawnOrigin
+	savefile->ReadMat3( spawnAxis ); // idMat3 spawnAxis
+	savefile->ReadInt( particleModelDefHandle ); // int particleModelDefHandle
 
-	savefile->ReadRenderEntity( particleRenderEntity );
-	savefile->ReadRenderLight( light );
-
-	savefile->ReadInt( particleTime );
-	savefile->ReadInt( lightTime );
-	savefile->ReadFloat( time );
-
-#ifdef _D3XP
-	savefile->ReadBool( isStable );
-
-	if ( lightDefHandle != -1 ) {
-		lightDefHandle = gameRenderWorld->AddLightDef( &light );
-	}
+	savefile->ReadInt( lightDefHandle ); // int lightDefHandle
+	savefile->ReadRenderEntity( particleRenderEntity ); // renderEntity_t particleRenderEntity
 	if ( particleModelDefHandle != -1 ) {
-		particleModelDefHandle = gameRenderWorld->AddEntityDef( &particleRenderEntity );
+		gameRenderWorld->UpdateEntityDef( particleModelDefHandle, &particleRenderEntity );
 	}
-#endif
+
+	savefile->ReadRenderLight( light ); // renderLight_t light
+	if ( lightDefHandle != -1 ) {
+		gameRenderWorld->UpdateLightDef( lightDefHandle, &light );
+	}
+
+	savefile->ReadInt( particleTime ); // int particleTime
+	savefile->ReadInt( lightTime ); // int lightTime
+	savefile->ReadFloat( time ); // float time
+
+	savefile->ReadBool( isStable ); // bool isStable
 }
 
 /*
@@ -1050,6 +1055,7 @@ void idExplodingBarrel::AddParticles( const char *name, bool burn ) {
 #endif
 		if ( particleModelDefHandle >= 0 ){
 			gameRenderWorld->FreeEntityDef( particleModelDefHandle );
+			particleModelDefHandle = -1;
 		}
 		memset( &particleRenderEntity, 0, sizeof ( particleRenderEntity ) );
 		const idDeclModelDef *modelDef = static_cast<const idDeclModelDef *>( declManager->FindType( DECL_MODELDEF, name ) );

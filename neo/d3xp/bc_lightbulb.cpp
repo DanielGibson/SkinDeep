@@ -22,10 +22,12 @@ END_CLASS
 
 void idLightbulb::Save(idSaveGame *savefile) const
 {
+	// savegame no data
 }
 
 void idLightbulb::Restore(idRestoreGame *savefile)
 {
+	// savegame no data
 }
 
 

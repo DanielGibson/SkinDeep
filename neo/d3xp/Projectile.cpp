@@ -150,36 +150,46 @@ idProjectile::Save
 ================
 */
 void idProjectile::Save( idSaveGame *savefile ) const {
+	savefile->WriteBool( neutralized ); // bool neutralized
 
-	owner.Save( savefile );
+	savefile->WriteObject( owner ); // idEntityPtr<idEntity> owner
 
-	projectileFlags_s flags = projectileFlags;
+	projectileFlags_s flags = projectileFlags; // projectileFlags_s projectileFlags;
 	LittleBitField( &flags, sizeof( flags ) );
 	savefile->Write( &flags, sizeof( flags ) );
 
-	savefile->WriteFloat( thrust );
-	savefile->WriteInt( thrust_end );
+	savefile->WriteFloat( thrust ); // float thrust
+	savefile->WriteInt( thrust_end ); // int thrust_end
+	savefile->WriteFloat( damagePower ); // float damagePower
 
-	savefile->WriteRenderLight( renderLight );
-	savefile->WriteInt( (int)lightDefHandle );
-	savefile->WriteVec3( lightOffset );
-	savefile->WriteInt( lightStartTime );
-	savefile->WriteInt( lightEndTime );
-	savefile->WriteVec3( lightColor );
+	savefile->WriteRenderLight( renderLight ); // renderLight_t renderLight
+	savefile->WriteInt( lightDefHandle ); // int lightDefHandle
+	savefile->WriteVec3( lightOffset ); // idVec3 lightOffset
+	savefile->WriteInt( lightStartTime ); // int lightStartTime
+	savefile->WriteInt( lightEndTime ); // int lightEndTime
+	savefile->WriteVec3( lightColor ); // idVec3 lightColor
 
-	savefile->WriteParticle( smokeFly );
-	savefile->WriteInt( smokeFlyTime );
+	thruster.Save( savefile ); // idForce_Constant thruster
+	savefile->WriteStaticObject( idProjectile::physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
 
-#ifdef _D3XP
-	savefile->WriteInt( originalTimeGroup );
-#endif
+	savefile->WriteParticle( smokeFly ); // const idDeclParticle * smokeFly
+	savefile->WriteInt( smokeFlyTime ); // int smokeFlyTime
 
-	savefile->WriteInt( (int)state );
 
-	savefile->WriteFloat( damagePower );
+	savefile->WriteInt( originalTimeGroup ); // int originalTimeGroup
 
-	savefile->WriteStaticObject( physicsObj );
-	savefile->WriteStaticObject( thruster );
+	savefile->WriteInt( state ); // projectileState_t state
+
+
+	savefile->WriteBool( netSyncPhysics ); // bool netSyncPhysics
+
+
+	savefile->WriteInt( displayDelaytime ); // int displayDelaytime
+	savefile->WriteObject( originalOwner ); // idEntityPtr<idEntity> originalOwner
+
+	savefile->WriteBool( doPenetration ); // bool doPenetration
 }
 
 /*
@@ -188,38 +198,57 @@ idProjectile::Restore
 ================
 */
 void idProjectile::Restore( idRestoreGame *savefile ) {
+	savefile->ReadBool( neutralized ); // bool neutralized
 
-	owner.Restore( savefile );
+	savefile->ReadObject( owner ); // idEntityPtr<idEntity> owner
 
-	savefile->Read( &projectileFlags, sizeof( projectileFlags ) );
-	LittleBitField( &projectileFlags, sizeof( projectileFlags ) );
+	projectileFlags_s flags = projectileFlags; // projectileFlags_s projectileFlags;
+	LittleBitField( &flags, sizeof( flags ) );
+	savefile->Read( &flags, sizeof( flags ) );
 
-	savefile->ReadFloat( thrust );
-	savefile->ReadInt( thrust_end );
+	savefile->ReadFloat( thrust ); // float thrust
+	savefile->ReadInt( thrust_end ); // int thrust_end
+	savefile->ReadFloat( damagePower ); // float damagePower
 
-	savefile->ReadRenderLight( renderLight );
-	savefile->ReadInt( (int &)lightDefHandle );
-	savefile->ReadVec3( lightOffset );
-	savefile->ReadInt( lightStartTime );
-	savefile->ReadInt( lightEndTime );
-	savefile->ReadVec3( lightColor );
+	savefile->ReadRenderLight( renderLight ); // renderLight_t renderLight
+	savefile->ReadInt( lightDefHandle ); // int lightDefHandle
+	if ( lightDefHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( lightDefHandle, &renderLight );
+	}
 
-	savefile->ReadParticle( smokeFly );
-	savefile->ReadInt( smokeFlyTime );
+	savefile->ReadVec3( lightOffset ); // idVec3 lightOffset
+	savefile->ReadInt( lightStartTime ); // int lightStartTime
+	savefile->ReadInt( lightEndTime ); // int lightEndTime
+	savefile->ReadVec3( lightColor ); // idVec3 lightColor
 
-#ifdef _D3XP
-	savefile->ReadInt( originalTimeGroup );
-#endif
+	thruster.Restore( savefile ); // idForce_Constant thruster
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
 
-	savefile->ReadInt( (int &)state );
+	savefile->ReadParticle( smokeFly ); // const idDeclParticle * smokeFly
+	savefile->ReadInt( smokeFlyTime ); // int smokeFlyTime
 
-	savefile->ReadFloat( damagePower );
 
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
+	savefile->ReadInt( originalTimeGroup ); // int originalTimeGroup
 
-	savefile->ReadStaticObject( thruster );
-	thruster.SetPhysics( &physicsObj );
+	savefile->ReadInt( (int&)state ); // projectileState_t state
+
+
+	savefile->ReadBool( netSyncPhysics ); // bool netSyncPhysics
+
+
+	savefile->ReadInt( displayDelaytime ); // int displayDelaytime
+	savefile->ReadObject( originalOwner ); // idEntityPtr<idEntity> originalOwner
+
+	savefile->ReadBool( doPenetration ); // bool doPenetration
+
+	//savefile->ReadStaticObject( thruster );
+	//thruster.SetPhysics( &physicsObj );
 
 	if ( smokeFly != NULL ) {
 		idVec3 dir;
@@ -483,6 +512,10 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 
 	smokeFlyTime = 0;
 	const char *smokeName = spawnArgs.GetString( "smoke_fly" );
+	if (!g_bloodEffects.GetBool() && spawnArgs.FindKey("smoke_fly_noblood"))
+	{
+		smokeName = spawnArgs.GetString("smoke_fly_noblood");
+	}
 	if ( *smokeName != '\0' ) {
 		smokeFly = static_cast<const idDeclParticle *>( declManager->FindType( DECL_PARTICLE, smokeName ) );
 		smokeFlyTime = gameLocal.time;
@@ -696,7 +729,7 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity ) {
 	surfaceType = collision.c.material != NULL ? collision.c.material->GetSurfaceType() : SURFTYPE_NONE;
 	
 	//Create a 'spark' object. This is used to ignite gas clouds.
-	if (gameLocal.IsCollisionSparkable(collision) && gameLocal.InPlayerConnectedArea(this))
+	if (gameLocal.IsCollisionSparkable(collision) && gameLocal.InPlayerConnectedArea(this) && spawnArgs.GetBool("projectilespark", "1")) //BC 3-19-2025: projectiles can now be flagged to not create sparks.
 	{
 		gameLocal.CreateSparkObject(GetPhysics()->GetOrigin(), collision.c.normal);
 	}
@@ -729,7 +762,7 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity ) {
 		else
 			physicsObj.SetLinearVelocity(reflectionAngle * currentSpeed * .7f);
 
-		displayName = idStr::Format("%s (ricocheted)", displayName.c_str()); //When a bullet gets ricocheted, add a descriptor to its displayname.
+		//displayName = idStr::Format("%s (ricocheted)", displayName.c_str()); //When a bullet gets ricocheted, add a descriptor to its displayname.
 
 
 		// align z-axis of model with the direction
@@ -2013,18 +2046,19 @@ idGuidedProjectile::Save
 ================
 */
 void idGuidedProjectile::Save( idSaveGame *savefile ) const {
-	enemy.Save( savefile );
-	savefile->WriteFloat( speed );
-	savefile->WriteAngles( rndScale );
-	savefile->WriteAngles( rndAng );
-	savefile->WriteInt( rndUpdateTime );
-	savefile->WriteFloat( turn_max );
-	savefile->WriteFloat( clamp_dist );
-	savefile->WriteAngles( angles );
-	savefile->WriteBool( burstMode );
-	savefile->WriteBool( unGuided );
-	savefile->WriteFloat( burstDist );
-	savefile->WriteFloat( burstVelocity );
+	savefile->WriteFloat( speed ); // float speed
+	savefile->WriteObject( enemy ); // idEntityPtr<idEntity> enemy
+
+	savefile->WriteAngles( rndScale ); // idAngles rndScale
+	savefile->WriteAngles( rndAng ); // idAngles rndAng
+	savefile->WriteAngles( angles ); // idAngles angles
+	savefile->WriteInt( rndUpdateTime ); // int rndUpdateTime
+	savefile->WriteFloat( turn_max ); // float turn_max
+	savefile->WriteFloat( clamp_dist ); // float clamp_dist
+	savefile->WriteBool( burstMode ); // bool burstMode
+	savefile->WriteBool( unGuided ); // bool unGuided
+	savefile->WriteFloat( burstDist ); // float burstDist
+	savefile->WriteFloat( burstVelocity ); // float burstVelocity
 }
 
 /*
@@ -2033,18 +2067,19 @@ idGuidedProjectile::Restore
 ================
 */
 void idGuidedProjectile::Restore( idRestoreGame *savefile ) {
-	enemy.Restore( savefile );
-	savefile->ReadFloat( speed );
-	savefile->ReadAngles( rndScale );
-	savefile->ReadAngles( rndAng );
-	savefile->ReadInt( rndUpdateTime );
-	savefile->ReadFloat( turn_max );
-	savefile->ReadFloat( clamp_dist );
-	savefile->ReadAngles( angles );
-	savefile->ReadBool( burstMode );
-	savefile->ReadBool( unGuided );
-	savefile->ReadFloat( burstDist );
-	savefile->ReadFloat( burstVelocity );
+	savefile->ReadFloat( speed ); // float speed
+	savefile->ReadObject( enemy ); // idEntityPtr<idEntity> enemy
+
+	savefile->ReadAngles( rndScale ); // idAngles rndScale
+	savefile->ReadAngles( rndAng ); // idAngles rndAng
+	savefile->ReadAngles( angles ); // idAngles angles
+	savefile->ReadInt( rndUpdateTime ); // int rndUpdateTime
+	savefile->ReadFloat( turn_max ); // float turn_max
+	savefile->ReadFloat( clamp_dist ); // float clamp_dist
+	savefile->ReadBool( burstMode ); // bool burstMode
+	savefile->ReadBool( unGuided ); // bool unGuided
+	savefile->ReadFloat( burstDist ); // float burstDist
+	savefile->ReadFloat( burstVelocity ); // float burstVelocity
 }
 
 
@@ -2321,17 +2356,17 @@ idSoulCubeMissile::Save
 ================
 */
 void idSoulCubeMissile::Save( idSaveGame *savefile ) const {
-	savefile->WriteVec3( startingVelocity );
-	savefile->WriteVec3( endingVelocity );
-	savefile->WriteFloat( accelTime );
-	savefile->WriteInt( launchTime );
-	savefile->WriteBool( killPhase );
-	savefile->WriteBool( returnPhase );
-	savefile->WriteVec3( destOrg);
-	savefile->WriteInt( orbitTime );
-	savefile->WriteVec3( orbitOrg );
-	savefile->WriteInt( smokeKillTime );
-	savefile->WriteParticle( smokeKill );
+	savefile->WriteVec3( startingVelocity ); // idVec3 startingVelocity
+	savefile->WriteVec3( endingVelocity ); // idVec3 endingVelocity
+	savefile->WriteFloat( accelTime ); // float accelTime
+	savefile->WriteInt( launchTime ); // int launchTime
+	savefile->WriteBool( killPhase ); // bool killPhase
+	savefile->WriteBool( returnPhase ); // bool returnPhase
+	savefile->WriteVec3( destOrg ); // idVec3 destOrg
+	savefile->WriteVec3( orbitOrg ); // idVec3 orbitOrg
+	savefile->WriteInt( orbitTime ); // int orbitTime
+	savefile->WriteInt( smokeKillTime ); // int smokeKillTime
+	savefile->WriteParticle( smokeKill ); // const idDeclParticle * smokeKill
 }
 
 /*
@@ -2340,17 +2375,17 @@ idSoulCubeMissile::Restore
 ================
 */
 void idSoulCubeMissile::Restore( idRestoreGame *savefile ) {
-	savefile->ReadVec3( startingVelocity );
-	savefile->ReadVec3( endingVelocity );
-	savefile->ReadFloat( accelTime );
-	savefile->ReadInt( launchTime );
-	savefile->ReadBool( killPhase );
-	savefile->ReadBool( returnPhase );
-	savefile->ReadVec3( destOrg);
-	savefile->ReadInt( orbitTime );
-	savefile->ReadVec3( orbitOrg );
-	savefile->ReadInt( smokeKillTime );
-	savefile->ReadParticle( smokeKill );
+	savefile->ReadVec3( startingVelocity ); // idVec3 startingVelocity
+	savefile->ReadVec3( endingVelocity ); // idVec3 endingVelocity
+	savefile->ReadFloat( accelTime ); // float accelTime
+	savefile->ReadInt( launchTime ); // int launchTime
+	savefile->ReadBool( killPhase ); // bool killPhase
+	savefile->ReadBool( returnPhase ); // bool returnPhase
+	savefile->ReadVec3( destOrg ); // idVec3 destOrg
+	savefile->ReadVec3( orbitOrg ); // idVec3 orbitOrg
+	savefile->ReadInt( orbitTime ); // int orbitTime
+	savefile->ReadInt( smokeKillTime ); // int smokeKillTime
+	savefile->ReadParticle( smokeKill ); // const idDeclParticle * smokeKill
 }
 
 /*
@@ -2571,17 +2606,17 @@ idBFGProjectile::Save
 void idBFGProjectile::Save( idSaveGame *savefile ) const {
 	int i;
 
-	savefile->WriteInt( beamTargets.Num() );
+	savefile->WriteInt( beamTargets.Num() ); // idList<beamTarget_t> beamTargets
 	for ( i = 0; i < beamTargets.Num(); i++ ) {
 		beamTargets[i].target.Save( savefile );
 		savefile->WriteRenderEntity( beamTargets[i].renderEntity );
 		savefile->WriteInt( beamTargets[i].modelDefHandle );
 	}
 
-	savefile->WriteRenderEntity( secondModel );
-	savefile->WriteInt( secondModelDefHandle );
-	savefile->WriteInt( nextDamageTime );
-	savefile->WriteString( damageFreq );
+	savefile->WriteRenderEntity( secondModel ); // renderEntity_t secondModel
+	savefile->WriteInt( secondModelDefHandle ); // int secondModelDefHandle
+	savefile->WriteInt( nextDamageTime ); // int nextDamageTime
+	savefile->WriteString( damageFreq ); // idString damageFreq
 }
 
 /*
@@ -2593,25 +2628,26 @@ void idBFGProjectile::Restore( idRestoreGame *savefile ) {
 	int i, num;
 
 	savefile->ReadInt( num );
-	beamTargets.SetNum( num );
+	beamTargets.SetNum( num ); // idList<beamTarget_t> beamTargets
 	for ( i = 0; i < num; i++ ) {
 		beamTargets[i].target.Restore( savefile );
 		savefile->ReadRenderEntity( beamTargets[i].renderEntity );
 		savefile->ReadInt( beamTargets[i].modelDefHandle );
 
 		if ( beamTargets[i].modelDefHandle >= 0 ) {
-			beamTargets[i].modelDefHandle = gameRenderWorld->AddEntityDef( &beamTargets[i].renderEntity );
+			gameRenderWorld->UpdateEntityDef( beamTargets[i].modelDefHandle, &beamTargets[i].renderEntity );
 		}
 	}
 
-	savefile->ReadRenderEntity( secondModel );
-	savefile->ReadInt( secondModelDefHandle );
-	savefile->ReadInt( nextDamageTime );
-	savefile->ReadString( damageFreq );
-
+	savefile->ReadRenderEntity( secondModel ); // renderEntity_t secondModel
+	savefile->ReadInt( secondModelDefHandle ); // int secondModelDefHandle
 	if ( secondModelDefHandle >= 0 ) {
-		secondModelDefHandle = gameRenderWorld->AddEntityDef( &secondModel );
+		gameRenderWorld->UpdateEntityDef( secondModelDefHandle, &secondModel );
 	}
+
+	savefile->ReadInt( nextDamageTime ); // int nextDamageTime
+	savefile->ReadString( damageFreq ); // idString damageFreq
+
 }
 
 /*
@@ -3006,7 +3042,7 @@ void idDebris::Create( idEntity *owner, const idVec3 &start, const idMat3 &axis 
 #endif
 	UpdateVisuals();
 
-	splat = NULL;
+	splat = idStr();
 }
 
 /*
@@ -3021,7 +3057,6 @@ idDebris::idDebris( void ) {
 	sndBounce = NULL;
 
 	//bc
-	splat = NULL;
 	suspiciousNoiseTimer = 0;
 }
 
@@ -3039,13 +3074,19 @@ idDebris::Save
 =================
 */
 void idDebris::Save( idSaveGame *savefile ) const {
-	owner.Save( savefile );
+	savefile->WriteObject( owner ); // idEntityPtr<idEntity> owner
+	savefile->WriteStaticObject( idDebris::physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+	savefile->WriteParticle( smokeFly ); // const idDeclParticle * smokeFly
+	savefile->WriteInt( smokeFlyTime ); // int smokeFlyTime
+	savefile->WriteSoundShader( sndBounce ); // const idSoundShader * sndBounce
 
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteString( splat ); // const char * splat
+	savefile->WriteInt( suspiciousNoiseTimer ); // int suspiciousNoiseTimer
 
-	savefile->WriteParticle( smokeFly );
-	savefile->WriteInt( smokeFlyTime );
-	savefile->WriteSoundShader( sndBounce );
+	savefile->WriteInt( nextBounceFX ); // int nextBounceFX
+	savefile->WriteInt( nextBounceSnd ); // int nextBounceSnd
 }
 
 /*
@@ -3054,14 +3095,24 @@ idDebris::Restore
 =================
 */
 void idDebris::Restore( idRestoreGame *savefile ) {
-	owner.Restore( savefile );
 
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
+	savefile->ReadObject( owner ); // idEntityPtr<idEntity> owner
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
+	savefile->ReadParticle( smokeFly ); // const idDeclParticle * smokeFly
+	savefile->ReadInt( smokeFlyTime ); // int smokeFlyTime
+	savefile->ReadSoundShader( sndBounce ); // const idSoundShader * sndBounce
 
-	savefile->ReadParticle( smokeFly );
-	savefile->ReadInt( smokeFlyTime );
-	savefile->ReadSoundShader( sndBounce );
+	savefile->ReadString( splat ); // const char * splat
+	savefile->ReadInt( suspiciousNoiseTimer ); // int suspiciousNoiseTimer
+
+	savefile->ReadInt( nextBounceFX ); // int nextBounceFX
+	savefile->ReadInt( nextBounceSnd ); // int nextBounceSnd
 }
 
 /*
@@ -3175,6 +3226,10 @@ void idDebris::Launch( void ) {
 	smokeFly = NULL;
 	smokeFlyTime = 0;
 	const char *smokeName = spawnArgs.GetString( "smoke_fly" );
+	if (!g_bloodEffects.GetBool() && spawnArgs.FindKey("smoke_fly_noblood"))
+	{
+		smokeName = spawnArgs.GetString("smoke_fly_noblood");
+	}
 	if ( *smokeName != '\0' ) {
 		smokeFly = static_cast<const idDeclParticle *>( declManager->FindType( DECL_PARTICLE, smokeName ) );
 		smokeFlyTime = gameLocal.time;
@@ -3190,6 +3245,10 @@ void idDebris::Launch( void ) {
 
 	//bc
 	splat = spawnArgs.GetString("mtr_splat");
+	if (!g_bloodEffects.GetBool() && spawnArgs.FindKey("mtr_splat_noblood"))
+	{
+		splat = spawnArgs.GetString("mtr_splat_noblood");
+	}
 	nextBounceFX = 0;
 	nextBounceSnd = 0;
 }
@@ -3247,7 +3306,7 @@ bool idDebris::Collide( const trace_t &collision, const idVec3 &velocity ) {
 
 
 	//BC make a little splat decal on ground, but only trigger it once.
-	if (splat != NULL)
+	if (splat.Length() > 0)
 	{
 		if (*splat != '\0')
 		{
@@ -3260,6 +3319,10 @@ bool idDebris::Collide( const trace_t &collision, const idVec3 &velocity ) {
 	{
 		const char *fxBounce;
 		fxBounce = spawnArgs.GetString("fx_bounce");
+		if (!g_bloodEffects.GetBool() && spawnArgs.FindKey("fx_bounce_noblood"))
+		{
+			fxBounce = spawnArgs.GetString("fx_bounce_noblood");
+		}
 		if (*fxBounce != '\0')
 		{
 			idEntityFx::StartFx(fxBounce, &this->GetPhysics()->GetOrigin(), &mat3_identity, NULL, false);

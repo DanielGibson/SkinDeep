@@ -93,6 +93,8 @@ static void SetSDLIcon()
 	SDL_FreeSurface(icon);
 }
 
+extern idStrList displayVidModes;
+
 /*
 ===================
 GLimp_Init
@@ -222,6 +224,29 @@ bool GLimp_Init(glimpParms_t parms) {
 			SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(window), &displayMode);
 			glConfig.displayWidth = displayMode.w;
 			glConfig.displayHeight = displayMode.h;
+		}
+
+		// SM: Build list of available video modes (for full screen)
+		const float ASPECT_RATIO_DIFF = 0.2f; // Used to decide how much different aspect ratio is allowed
+		const int MIN_WIDTH = 1024; // minimum width required
+		const int MIN_HEIGHT = 720; // minimum height required
+		const float ASPECT_RATIO_WIDESCREEN = 1.5f;
+		float aspectRatio = glConfig.displayWidth / static_cast<float>(glConfig.displayHeight);
+		displayVidModes.Clear();
+
+		int displayIndex = SDL_GetWindowDisplayIndex(window);
+		int numDisplayModes = SDL_GetNumDisplayModes(displayIndex);
+		for (int i = 0; i < numDisplayModes; i++)
+		{
+			SDL_DisplayMode mode;
+			SDL_GetDisplayMode(displayIndex, i, &mode);
+			float modeRatio = mode.w / static_cast<float>(mode.h);
+			if (mode.w >= MIN_WIDTH && mode.h >= MIN_HEIGHT && 
+				(fabs(aspectRatio - modeRatio) < ASPECT_RATIO_DIFF || modeRatio >= ASPECT_RATIO_WIDESCREEN))
+			{
+				idStr resString = idStr::Format("%dx%d", mode.w, mode.h);
+				displayVidModes.AddUnique(resString);
+			}
 		}
 
 		SDL_GetWindowSize(window, &glConfig.vidWidth, &glConfig.vidHeight);

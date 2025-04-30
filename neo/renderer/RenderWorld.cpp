@@ -259,7 +259,12 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 
 	idRenderEntityLocal	*def = entityDefs[entityHandle];
 	if ( def ) {
-
+		#if defined(_DEBUG) || defined(_RELWITHDEBINFO)
+			#if 0
+				if (def->parmsDebug != re) DebugBreak();
+			#endif
+			def->parmsDebug = re;
+		#endif
 		if ( !re->forceUpdate ) {
 
 			// check for exact match (OPTIMIZE: check through pointers more)
@@ -305,8 +310,11 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 
 		def->world = this;
 		def->index = entityHandle;
-	}
 
+		#if defined(_DEBUG) || defined(_RELWITHDEBINFO)
+			def->parmsDebug = re;
+		#endif
+	}
 
 	assert(def->parms.customSkin != (const idDeclSkin*)0xcdcdcdcdcdcdcdcd); 
 	assert(re->customSkin != (const idDeclSkin*)0xcdcdcdcdcdcdcdcd); 
@@ -362,6 +370,10 @@ void idRenderWorldLocal::FreeEntityDef( qhandle_t entityHandle ) {
 	// in R_FreeEntityDefDerivedData(), otherwise the gui
 	// object still exists in the game
 
+#if defined(_DEBUG) || defined(_RELWITHDEBINFO)
+	def->parmsDebug = NULL;
+#endif
+
 	def->parms.gui[ 0 ] = NULL;
 	def->parms.gui[ 1 ] = NULL;
 	def->parms.gui[ 2 ] = NULL;
@@ -401,7 +413,7 @@ idRenderWorldLocal::AddGlobalRenderEnt
 */
 void idRenderWorldLocal::AddGlobalRenderEnt(qhandle_t handle)
 {
-	globalRenderEnts.Append(handle);
+	globalRenderEnts.AddUnique(handle);
 }
 
 /*
@@ -1985,7 +1997,7 @@ void idRenderWorldLocal::DebugSphere( const idVec4 &color, const idSphere &spher
 idRenderWorldLocal::DebugBounds
 ====================
 */
-void idRenderWorldLocal::DebugBounds( const idVec4 &color, const idBounds &bounds, const idVec3 &org, const int lifetime ) {
+void idRenderWorldLocal::DebugBounds( const idVec4 &color, const idBounds &bounds, const idVec3 &org, const int lifetime, const idMat3 * axis ) {
 	int i;
 	idVec3 v[8];
 
@@ -1993,11 +2005,25 @@ void idRenderWorldLocal::DebugBounds( const idVec4 &color, const idBounds &bound
 		return;
 	}
 
-	for ( i = 0; i < 8; i++ ) {
-		v[i][0] = org[0] + bounds[(i^(i>>1))&1][0];
-		v[i][1] = org[1] + bounds[(i>>1)&1][1];
-		v[i][2] = org[2] + bounds[(i>>2)&1][2];
+	if(axis)
+	{
+		for ( i = 0; i < 8; i++ ) {
+			v[i][0] = bounds[(i^(i>>1))&1][0];
+			v[i][1] = bounds[(i>>1)&1][1];
+			v[i][2] = bounds[(i>>2)&1][2];
+
+			v[i] = (*axis)*v[i] + org;
+		}
 	}
+	else
+	{
+		for ( i = 0; i < 8; i++ ) {
+			v[i][0] = org[0] + bounds[(i^(i>>1))&1][0];
+			v[i][1] = org[1] + bounds[(i>>1)&1][1];
+			v[i][2] = org[2] + bounds[(i>>2)&1][2];
+		}
+	}
+
 	for ( i = 0; i < 4; i++ ) {
 		DebugLine( color, v[i], v[(i+1)&3], lifetime );
 		DebugLine( color, v[4+i], v[4+((i+1)&3)], lifetime );

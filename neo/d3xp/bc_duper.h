@@ -9,7 +9,7 @@ class idDuper : public idMoveableItem
 public:
 	CLASS_PROTOTYPE(idDuper);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -27,13 +27,16 @@ private:
 	void					DoDupe();
 	idVec3					FindClearSpawnSpot();
 
+	void					AddConditionalSpawnArgs(idDict* args, idEntity* aimedEnt);
+
 	int						chargesRemaining;
 	int						misfireCooldownTimer;
 	bool					lastAimState;
 	idEntityPtr<idEntity>	aimedEnt;
 	int						spawnTime;
 
-
+	bool					IsValidDupeItemTr(trace_t tr);
+	bool					IsValidDupeItemEnt(idEntity *ent);
 	
 
 };

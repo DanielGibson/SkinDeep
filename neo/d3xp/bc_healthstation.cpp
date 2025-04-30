@@ -51,6 +51,9 @@ idHealthstation::idHealthstation(void)
 	proximityAnnouncer.checkHealth = true;
 
 	proximityannouncerActive = true;
+
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idHealthstation::~idHealthstation(void)
@@ -75,20 +78,14 @@ void idHealthstation::Spawn(void)
 	GetPhysics()->SetClipMask(MASK_SOLID | CONTENTS_MOVEABLECLIP);
 
 
-	//Find a suitable space to spawn the idleTask.
-	idVec3 forward, forwardPos;
-	this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, NULL);
-	trace_t downTr;
-	forwardPos = this->GetPhysics()->GetOrigin() + forward * 32;
-	gameLocal.clip.TracePoint(downTr, forwardPos, forwardPos + idVec3(0, 0, -72), MASK_SOLID, NULL);
-	if (downTr.fraction >= 1.0f)
-		return; //Wasn't able to find a piece of floor..... this should never happen.
 	
-	static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->SpawnIdleTask(this, downTr.endpos, "idletask_healthstation"); //spawn the idletask.
 
 	//renderlight.
 	if (1)
 	{
+		idVec3 forward;
+		this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, NULL);
+
 		// Light source.
 		headlight.shader = declManager->FindMaterial("lights/defaultPointLight", false);
 		headlight.pointLight = true;
@@ -115,20 +112,82 @@ void idHealthstation::Spawn(void)
 	//repair system.
 	needsRepair = false;
 	repairrequestTimestamp = 0;
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 	proximityAnnouncer.Start();
 
+	team = TEAM_NEUTRAL;
+
 	BecomeActive(TH_THINK);
+
+	PostEventMS(&EV_PostSpawn, 100);
 }
+
+//BC 2-26-2025: moved this to post spawn, so that we can guarantee idmeta exists in world at this point.
+void idHealthstation::Event_PostSpawn(void)
+{
+	//Find a suitable space to spawn the idleTask.
+	idVec3 forward, forwardPos;
+	this->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, NULL);
+	trace_t downTr;
+	forwardPos = this->GetPhysics()->GetOrigin() + forward * 32;
+	gameLocal.clip.TracePoint(downTr, forwardPos, forwardPos + idVec3(0, 0, -72), MASK_SOLID, NULL);
+	if (downTr.fraction >= 1.0f)
+	{
+		common->Warning("healthstation %s: failed to find place for idletask.\n", GetName());
+		return; //Wasn't able to find a piece of floor..... this should never happen.
+	}
+
+	idMeta* meta = static_cast<idMeta*>(gameLocal.metaEnt.GetEntity());
+	if (meta != NULL)
+	{
+		meta->SpawnIdleTask(this, downTr.endpos, "idletask_healthstation"); //spawn the idletask.
+	}
+	else
+	{
+		common->Warning("healthstation %s: metaEnt is NULL.\n", GetName());
+	}
+}
+
 
 void idHealthstation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteBool( doBloodDispense ); // bool doBloodDispense
+	savefile->WriteBool( playerWasLastFrobber ); // bool playerWasLastFrobber
+	savefile->WriteInt( bloodDispenseTimer ); // int bloodDispenseTimer
+	savefile->WriteInt( bloodDispenseTickInterval ); // int bloodDispenseTickInterval
+
+	proximityAnnouncer.Save(savefile); // idProximityAnnouncer proximityAnnouncer
+
+	savefile->WriteBool( proximityannouncerActive ); // bool proximityannouncerActive
 }
 
 void idHealthstation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadBool( doBloodDispense ); // bool doBloodDispense
+	savefile->ReadBool( playerWasLastFrobber ); // bool playerWasLastFrobber
+	savefile->ReadInt( bloodDispenseTimer ); // int bloodDispenseTimer
+	savefile->ReadInt( bloodDispenseTickInterval ); // int bloodDispenseTickInterval
+
+	proximityAnnouncer.Restore(savefile); // idProximityAnnouncer proximityAnnouncer
+
+	savefile->ReadBool( proximityannouncerActive ); // bool proximityannouncerActive
 }
 
 void idHealthstation::Think(void)
@@ -150,36 +209,25 @@ void idHealthstation::Think(void)
 				//gameLocal.GetLocalPlayer()->health = 110; //refill bleedout bar. Give it a little extra as a bonus.
 
 				//Bloodstream particles from nozzle.
-				DoNozzleParticle("heal_bloodnozzle.prt", true);
+				if (g_bloodEffects.GetBool())
+				{
+					DoNozzleParticle("heal_bloodnozzle.prt", true);
+				}
+				else
+				{
+					// SW 18th Feb 2025: We don't want blood, 
+					// but we do want the player to be able to see that the health station is dispensing something,
+					// so we use a special bloodless particle
+					DoNozzleParticle("heal_bloodnozzle_noblood.prt", true);
+				}
+				
 
 				bloodDispenseTimer = gameLocal.time + BLOODDISPENSE_TIME;
 				bloodDispenseTickInterval = 0;
 			}
 			else
 			{
-				StartSound("snd_aerosol", SND_CHANNEL_BODY);
-
-				//Spawn heal cloud.
-				idVec3 forward, up;
-				GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, &up);
-				idDict args;
-				idTrigger_Multi* healTrigger;
-				int radius = spawnArgs.GetInt("spewRadius", HEALCLOUD_RADIUS);
-				args.Clear();
-				args.SetVector("mins", idVec3(-radius, -radius, -radius));
-				args.SetVector("maxs", idVec3(radius, radius, radius));
-				args.SetVector("origin", GetPhysics()->GetOrigin() + forward * HEALCLOUD_FORWARDDISTANCE);
-				args.Set("spewParticle", spawnArgs.GetString("spewParticle", "healcloud01.prt"));
-				args.SetInt("spewLifetime", spawnArgs.GetInt("spewLifetime", HEALCLOUD_LIFETIME));
-				healTrigger = (idTrigger_healcloud *)gameLocal.SpawnEntityType(idTrigger_healcloud::Type, &args);
-
-				//Particle jet from nozzle.
-				DoNozzleParticle("heal_jet.prt", false);
-
-				if (gameLocal.GetLocalPlayer()->health >= gameLocal.GetLocalPlayer()->maxHealth && playerWasLastFrobber)
-				{
-					gameLocal.GetLocalPlayer()->ForceShowHealthbar(2000);
-				}
+				DispenseHealcloud();
 			}
 		}
 	}
@@ -253,6 +301,33 @@ void idHealthstation::Think(void)
 	}
 
 	idAnimated::Think();
+}
+
+void idHealthstation::DispenseHealcloud()
+{
+	StartSound("snd_aerosol", SND_CHANNEL_BODY);
+
+	//Spawn heal cloud.
+	idVec3 forward, up;
+	GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, &up);
+	idDict args;
+	idTrigger_Multi* healTrigger;
+	int radius = spawnArgs.GetInt("spewRadius", HEALCLOUD_RADIUS);
+	args.Clear();
+	args.SetVector("mins", idVec3(-radius, -radius, -radius));
+	args.SetVector("maxs", idVec3(radius, radius, radius));
+	args.SetVector("origin", GetPhysics()->GetOrigin() + forward * HEALCLOUD_FORWARDDISTANCE);
+	args.Set("spewParticle", spawnArgs.GetString("spewParticle", "healcloud01.prt"));
+	args.SetInt("spewLifetime", spawnArgs.GetInt("spewLifetime", HEALCLOUD_LIFETIME));
+	healTrigger = (idTrigger_healcloud*)gameLocal.SpawnEntityType(idTrigger_healcloud::Type, &args);
+
+	//Particle jet from nozzle.
+	DoNozzleParticle("heal_jet.prt", false);
+
+	if (gameLocal.GetLocalPlayer()->health >= gameLocal.GetLocalPlayer()->maxHealth && playerWasLastFrobber)
+	{
+		gameLocal.GetLocalPlayer()->ForceShowHealthbar(2000);
+	}
 }
 
 bool idHealthstation::DoFrob(int index, idEntity * frobber)
@@ -405,11 +480,13 @@ void idHealthstation::Damage(idEntity *inflictor, idEntity *attacker, const idVe
 
 	if (health <= 0)
 	{
+		gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
+
 		state = HEALTHSTATION_DAMAGED;
 		//Event_PlayAnim("leverhide", 1);
 		SetColor(idVec4(0, 0, 0, 0));
 		needsRepair = true;
-		SetSkin(declManager->FindSkin("skins/objects/healthstation/broken"));
+		SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_broken")));
 		this->Event_SetGuiInt("broken", 1);
 		gameLocal.DoParticle("explosion_gascylinder.prt", GetPhysics()->GetOrigin());
 		isFrobbable = true;
@@ -458,6 +535,29 @@ void idProximityAnnouncer::Start()
 	static int announcerCount = 0;
 	proximityCheckTimer = gameLocal.time + 1000 + announcerCount*100 + rand2.RandomInt(50);
 	if(checkPeriod == 0) checkPeriod = 1;
+}
+
+void idProximityAnnouncer::Save(idSaveGame* savefile) const
+{
+	savefile->WriteObject( sensor ); // idEntity* sensor
+	savefile->WriteInt( proximityCheckTimer ); // int proximityCheckTimer
+	savefile->WriteBool( canProximityAnnounce ); // bool canProximityAnnounce
+	savefile->WriteInt( coolDownTimer ); // int coolDownTimer
+	savefile->WriteBool( checkHealth ); // bool checkHealth
+	savefile->WriteInt( activationRadius ); // int activationRadius
+	savefile->WriteInt( checkPeriod ); // int checkPeriod
+	savefile->WriteInt( coolDownPeriod ); // int coolDownPeriod
+}
+void idProximityAnnouncer::Restore(idRestoreGame *savefile)
+{
+	savefile->ReadObject( sensor ); // idEntity* sensor
+	savefile->ReadInt( proximityCheckTimer ); // int proximityCheckTimer
+	savefile->ReadBool( canProximityAnnounce ); // bool canProximityAnnounce
+	savefile->ReadInt( coolDownTimer ); // int coolDownTimer
+	savefile->ReadBool( checkHealth ); // bool checkHealth
+	savefile->ReadInt( activationRadius ); // int activationRadius
+	savefile->ReadInt( checkPeriod ); // int checkPeriod
+	savefile->ReadInt( coolDownPeriod ); // int coolDownPeriod
 }
 
 bool idProximityAnnouncer::Ready()
@@ -565,4 +665,11 @@ void idProximityAnnouncer::DoSoundwaves()
 void idHealthstation::Event_SetHealthstationAnnouncer(int _value)
 {
 	proximityannouncerActive = _value > 0 ? true : false;
+}
+
+void idHealthstation::DoHack()
+{
+	DispenseHealcloud();
+
+	SetCombatLockdown(false);
 }

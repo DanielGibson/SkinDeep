@@ -125,37 +125,115 @@ idTurret::~idTurret(void)
 
 void idTurret::Save( idSaveGame *savefile ) const
 {
-	savefile->WriteInt(state);
-	savefile->WriteInt(volleyCount);
-	savefile->WriteInt(nextIdleSound);
-	savefile->WriteMat3(bodyAxis);
-	savefile->WriteMat3(turretAxis);
+	savefile->WriteInt( state ); // int state
 
-	savefile->WriteObject(beamStart);
-	savefile->WriteObject(beamEnd);
-	savefile->WriteObject(laserdot);
+	savefile->WriteInt( nextStateTime ); // int nextStateTime
+	savefile->WriteInt( volleyCount ); // int volleyCount
+	savefile->WriteInt( nextIdleSound ); // int nextIdleSound
 
-	//BC 7-29-2016	
-	savefile->WriteInt(nextStateTime);
-	targetEnt.Save(savefile);
+	savefile->WriteMat3( bodyAxis ); // idMat3 bodyAxis
+	savefile->WriteMat3( turretAxis ); // idMat3 turretAxis
+	savefile->WriteVec3( turretSpawnDir ); // idVec3 turretSpawnDir
+
+	savefile->WriteObject( beamStart ); // idBeam* beamStart
+	savefile->WriteObject( beamEnd ); // idBeam* beamEnd
+
+	savefile->WriteObject( laserdot ); // idEntity* laserdot
+
+	savefile->WriteVec3( laserAimPos ); // idVec3 laserAimPos
+	savefile->WriteInt( laserAimtimer ); // int laserAimtimer
+	savefile->WriteInt( laserAimMaxtime ); // int laserAimMaxtime
+	savefile->WriteVec3( laserAimPosStart ); // idVec3 laserAimPosStart
+	savefile->WriteVec3( laserAimPosEnd ); // idVec3 laserAimPosEnd
+	savefile->WriteBool( laserAimIsMoving ); // bool laserAimIsMoving
+
+	savefile->WriteObject( targetEnt ); // idEntityPtr<idEntity> targetEnt
+	savefile->WriteInt( lastTargetNum ); // int lastTargetNum
+
+	savefile->WriteInt( nextFindTime ); // int nextFindTime
+
+	savefile->WriteVec3( lastTargetPos ); // idVec3 lastTargetPos
+
+	savefile->WriteDict( &brassDict ); // idDict brassDict
+
+	savefile->WriteFloat( targetYaw ); // float targetYaw
+	savefile->WriteFloat( bodyYaw ); // float bodyYaw
+
+	savefile->WriteInt( idleSwayTimer ); // int idleSwayTimer
+
+	savefile->WriteInt( lastTeam ); // int lastTeam
+
+	savefile->WriteInt( idleVOTimer ); // int idleVOTimer
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteBool( electricalActive ); // bool electricalActive
+
+	savefile->WriteObject( spotlight ); // idLight * spotlight
+
+	savefile->WriteBool( playingRotationSound ); // bool playingRotationSound
+
+	savefile->WriteObject( inflictorEnt ); // idEntityPtr<idEntity> inflictorEnt
+	savefile->WriteObject( searchEnt ); // idEntityPtr<idEntity> searchEnt
 }
 
 void idTurret::Restore( idRestoreGame *savefile )
 {
-	savefile->ReadInt(state);
-	savefile->ReadInt(volleyCount);
-	savefile->ReadInt(nextIdleSound);
-	savefile->ReadMat3(bodyAxis);
-	savefile->ReadMat3(turretAxis);
+	savefile->ReadInt( state ); // int state
 
-	savefile->ReadObject(reinterpret_cast<idClass *&>(beamStart));
-	savefile->ReadObject(reinterpret_cast<idClass *&>(beamEnd));
-	savefile->ReadObject(reinterpret_cast<idClass *&>(laserdot));
+	savefile->ReadInt( nextStateTime ); // int nextStateTime
+	savefile->ReadInt( volleyCount ); // int volleyCount
+	savefile->ReadInt( nextIdleSound ); // int nextIdleSound
 
-	//BC 7-29-2016	
-	savefile->ReadInt(nextStateTime);
-	targetEnt.Restore(savefile);
-	
+	savefile->ReadMat3( bodyAxis ); // idMat3 bodyAxis
+	savefile->ReadMat3( turretAxis ); // idMat3 turretAxis
+	savefile->ReadVec3( turretSpawnDir ); // idVec3 turretSpawnDir
+
+	savefile->ReadObject( CastClassPtrRef(beamStart) ); // idBeam* beamStart
+	savefile->ReadObject( CastClassPtrRef(beamEnd) ); // idBeam* beamEnd
+
+	savefile->ReadObject( laserdot ); // idEntity* laserdot
+
+	savefile->ReadVec3( laserAimPos ); // idVec3 laserAimPos
+	savefile->ReadInt( laserAimtimer ); // int laserAimtimer
+	savefile->ReadInt( laserAimMaxtime ); // int laserAimMaxtime
+	savefile->ReadVec3( laserAimPosStart ); // idVec3 laserAimPosStart
+	savefile->ReadVec3( laserAimPosEnd ); // idVec3 laserAimPosEnd
+	savefile->ReadBool( laserAimIsMoving ); // bool laserAimIsMoving
+
+	savefile->ReadObject( targetEnt ); // idEntityPtr<idEntity> targetEnt
+	savefile->ReadInt( lastTargetNum ); // int lastTargetNum
+
+	savefile->ReadInt( nextFindTime ); // int nextFindTime
+
+	savefile->ReadVec3( lastTargetPos ); // idVec3 lastTargetPos
+
+	savefile->ReadDict( &brassDict ); // idDict brassDict
+
+	savefile->ReadFloat( targetYaw ); // float targetYaw
+	savefile->ReadFloat( bodyYaw ); // float bodyYaw
+
+	savefile->ReadInt( idleSwayTimer ); // int idleSwayTimer
+
+	savefile->ReadInt( lastTeam ); // int lastTeam
+
+	savefile->ReadInt( idleVOTimer ); // int idleVOTimer
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadBool( electricalActive ); // bool electricalActive
+
+	savefile->ReadObject( CastClassPtrRef(spotlight) ); // idLight * spotlight
+
+	savefile->ReadBool( playingRotationSound ); // bool playingRotationSound
+
+	savefile->ReadObject( inflictorEnt ); // idEntityPtr<idEntity> inflictorEnt
+	savefile->ReadObject( searchEnt ); // idEntityPtr<idEntity> searchEnt
 }
 
 
@@ -263,7 +341,7 @@ void idTurret::Spawn(void)
 	else
 	{
 		//visual visioncone starts off.
-		renderEntity.shaderParms[7] = 0;
+		renderEntity.shaderParms[SHADERPARM_VISIONCONE] = 0;
 		UpdateVisuals();
 	}
 
@@ -342,7 +420,7 @@ void idTurret::ActivateLights()
 
 	SetLight(true);
 
-	renderEntity.shaderParms[7] = 1;
+	renderEntity.shaderParms[SHADERPARM_VISIONCONE] = 1;
 	UpdateVisuals();
 }
 
@@ -392,6 +470,9 @@ void idTurret::SetLight(bool active)
 		headlightHandle = gameRenderWorld->AddLightDef(&headlight);
 
 		spotlight->On();
+
+		// SW 18th Feb 2025: enable vision cone
+		renderEntity.shaderParms[SHADERPARM_VISIONCONE] = 1;
 	}
 	else
 	{
@@ -402,7 +483,12 @@ void idTurret::SetLight(bool active)
 		}
 
 		spotlight->Off();
+
+		// SW 18th Feb 2025: disable vision cone
+		renderEntity.shaderParms[SHADERPARM_VISIONCONE] = 0;
 	}
+
+	UpdateVisuals();
 }
 
 
@@ -441,6 +527,9 @@ void idTurret::Event_activate(int value)
 
 		fl.takedamage = true;
 		GetPhysics()->SetClipModel(new idClipModel(spawnArgs.GetString("clipmodel_open")), 1.0f);
+
+		//BC 2-21-2025: make the turret uninspectable when the doors are open.
+		SetInspectable(false);
 	}
 	else
 	{
@@ -469,8 +558,11 @@ void idTurret::Event_activate(int value)
 		SetLight(false);
 
 		//Turn off visioncone visualization.
-		renderEntity.shaderParms[7] = 0;
+		renderEntity.shaderParms[SHADERPARM_VISIONCONE] = 0;
 		UpdateVisuals();
+
+		//BC 2-21-2025: make the turret uninspectable when the doors are open.
+		SetInspectable(true);
 	}
 }
 
@@ -1490,13 +1582,12 @@ void idTurret::Killed(idEntity *inflictor, idEntity *attacker, int damage, const
 
 	gameLocal.SpawnInterestPoint(this, GetPhysics()->GetOrigin(), spawnArgs.GetString("def_deathinterest"));
 
-	gameLocal.AddEventlogDeath(this, damage, inflictor, attacker, "");
+	gameLocal.AddEventlogDeath(this, damage, inflictor, attacker, "", EL_DESTROYED);
 
 	state = TURRET_DEAD;
 	BecomeInactive(TH_THINK);
 
 	this->SetSkin(declManager->FindSkin( spawnArgs.GetString("skin_death") ));
-	Present(); //HAVE TO call Present() here in order for skin update to appear.
 
 	StopSound(SND_CHANNEL_ANY, false);
 	const char *fx = spawnArgs.GetString("fx_destroyed");
@@ -1517,6 +1608,9 @@ void idTurret::Killed(idEntity *inflictor, idEntity *attacker, int damage, const
 
 	idMoveableItem::DropItemsBurst(this, "ammo", idVec3(0, 0, -8), 16);
 
+	// SW 18th Feb 2025: moving Present() call to after the SetLight() call so that the vision cone correctly hides
+	Present(); //HAVE TO call Present() here in order for skin update to appear.
+
 }
 
 // SW 12th Feb 2025: adding support for turrets to be repaired
@@ -1531,7 +1625,7 @@ void idTurret::DoRepairTick(int amount)
 		state = TURRET_OFF;
 		SetSkin(declManager->FindSkin("skins/turret/skin"));
 		fl.takedamage = false;
-		renderEntity.shaderParms[7] = 0;
+		renderEntity.shaderParms[SHADERPARM_VISIONCONE] = 0;
 		GetPhysics()->SetContents(CONTENTS_SOLID);
 		BecomeActive(TH_THINK);
 
@@ -1546,6 +1640,9 @@ void idTurret::DoRepairTick(int amount)
 		{
 			// go to idle closed
 			Event_PlayAnim("closed", 4, true);
+
+			//BC 2-21-2025: make the turret uninspectable when the doors are open.
+			SetInspectable(true);
 		}
 	}
 }
@@ -1622,4 +1719,10 @@ void idTurret::DoHack()
 	{
 		gameLocal.RunMapScript(hackScript);
 	}
+}
+
+//BC 2-21-2025: make the turret uninspectable when the doors are open.
+void idTurret::SetInspectable(bool value)
+{
+	spawnArgs.SetBool("zoominspect", value);
 }

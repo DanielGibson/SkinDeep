@@ -43,10 +43,14 @@ void idPepperBag::Spawn(void)
 
 void idPepperBag::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( nextFallingDamageTime ); // int nextFallingDamageTime
+	savefile->WriteInt( spewType ); // int spewType
 }
 
 void idPepperBag::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( nextFallingDamageTime ); // int nextFallingDamageTime
+	savefile->ReadInt( spewType ); // int spewType
 }
 
 bool idPepperBag::Collide(const trace_t &collision, const idVec3 &velocity)

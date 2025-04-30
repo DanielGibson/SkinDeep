@@ -56,6 +56,34 @@ idFieldWindow::~idFieldWindow() {
 
 }
 
+void idFieldWindow::WriteToSaveGame( idSaveGame *savefile ) const
+{
+	idWindow::WriteToSaveGame( savefile );
+
+	savefile->WriteInt( cursorPos ); // int cursorPos
+	savefile->WriteInt( lastTextLength ); // int lastTextLength
+	savefile->WriteInt( lastCursorPos ); // int lastCursorPos
+	savefile->WriteInt( paintOffset ); // int paintOffset
+	savefile->WriteBool( showCursor ); // bool showCursor
+	savefile->WriteString( cursorVar ); // idString cursorVar
+
+	savefile->WriteCheckSizeMarker();
+}
+
+void idFieldWindow::ReadFromSaveGame( idRestoreGame *savefile )
+{
+	idWindow::ReadFromSaveGame( savefile );
+
+	savefile->ReadInt( cursorPos ); // int cursorPos
+	savefile->ReadInt( lastTextLength ); // int lastTextLength
+	savefile->ReadInt( lastCursorPos ); // int lastCursorPos
+	savefile->ReadInt( paintOffset ); // int paintOffset
+	savefile->ReadBool( showCursor ); // bool showCursor
+	savefile->ReadString( cursorVar ); // idString cursorVar
+
+	savefile->ReadCheckSizeMarker();
+}
+
 bool idFieldWindow::ParseInternalVar(const char *_name, idParser *src) {
 	if (idStr::Icmp(_name, "cursorvar") == 0) {
 		ParseString(src, cursorVar);

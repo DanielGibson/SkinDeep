@@ -41,10 +41,30 @@ idCatpod::~idCatpod(void)
 
 void idCatpod::Save( idSaveGame *savefile ) const
 {
+	savefile->WriteInt( catpodState ); // int catpodState
+	savefile->WriteInt( catpodTimer ); // int catpodTimer
+
+	savefile->WriteInt( guiUpdateTimer ); // int guiUpdateTimer
+
+	savefile->WriteBool( doFinalCatSequence ); // bool doFinalCatSequence
+	savefile->WriteInt( finalCatSequenceTimer ); // int finalCatSequenceTimer
+	savefile->WriteBool( finalCatSequenceActivated ); // bool finalCatSequenceActivated
+	savefile->WriteBool( awaitingScriptCall ); // bool awaitingScriptCall
+	savefile->WriteInt( scriptCallTimer ); // int scriptCallTimer
 }
 
 void idCatpod::Restore( idRestoreGame *savefile )
 {
+	savefile->ReadInt( catpodState ); // int catpodState
+	savefile->ReadInt( catpodTimer ); // int catpodTimer
+
+	savefile->ReadInt( guiUpdateTimer ); // int guiUpdateTimer
+
+	savefile->ReadBool( doFinalCatSequence ); // bool doFinalCatSequence
+	savefile->ReadInt( finalCatSequenceTimer ); // int finalCatSequenceTimer
+	savefile->ReadBool( finalCatSequenceActivated ); // bool finalCatSequenceActivated
+	savefile->ReadBool( awaitingScriptCall ); // bool awaitingScriptCall
+	savefile->ReadInt( scriptCallTimer ); // int scriptCallTimer
 }
 
 void idCatpod::Spawn(void)
@@ -270,31 +290,38 @@ void idCatpod::OnLanded()
 	if (!gameLocal.world->spawnArgs.GetBool("objectives", "1"))
 		return;
 
-	if (GetCatsAwaitingRescue() > 0)
-		return;
-
 	int catsAwaitingDeposit = GetCatsAwaitingDeposit();
 	if (catsAwaitingDeposit > 0)
 	{
 		//There are cats available to place in the pod.
-		gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_placecatsinpod", false); //"Deposit crew into the Cat Evac Pod"
-	}
-	else
-	{
-		gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_interactwithpod", false); //"Interact with the Cat Evac Pod"
+		gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_placecatsinpod", false, "icon_obj_catpod"); //"Deposit crew into the Cat Evac Pod"
 	}
 }
 
-//void idCatpod::OnTakeoff()
-//{
-//	//if (!gameLocal.world->spawnArgs.GetBool("objectives", "1"))
-//	//	return;
-//	//
-//	//if (GetCatsAwaitingDeposit() > 0 || GetCatsAwaitingRescue() > 0)
-//	//{
-//	//	gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_summonpod"); //"Use a Signal Lamp to summon a Cat Evac pod"
-//	//}
-//}
+// SW 24th March 2025: restoring this function for the purposes of objective control
+// I think ideally I'd like all objective updating to be refactored and routed through one master function that decides what the objective should be
+// but we know that's not happening at this stage, don't we?
+void idCatpod::OnTakeoff()
+{
+	if (gameLocal.world->spawnArgs.GetBool("objectives", "1"))
+	{
+		if (GetCatsAwaitingRescue() > 0)
+		{
+			// There are still cats left to rescue (this can happen if the player summons the pod prematurely and only deposits some subset of the cats)
+			static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->UpdateCagecageObjectiveText();
+		}
+		else if (GetCatsAwaitingDeposit() > 0)
+		{
+			// All cats have been rescued from the cages, but not all of them have been deposited in the pod
+			gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_summonpod", false, "icon_obj_signallamp"); //"Use a Signal Lamp to summon a Cat Evac pod"
+		}
+		else
+		{
+			// There are no cats left to rescue or deposit, meaning we are now in pirate reinforcements phase
+			gameLocal.GetLocalPlayer()->SetObjectiveText("#str_obj_boardingship", false, "icon_obj_pirates");
+		}
+	}
+}
 
 void idCatpod::Think_Landed()
 {

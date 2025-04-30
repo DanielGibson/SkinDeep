@@ -30,8 +30,10 @@ idBananaPeel::idBananaPeel(void)
 
 idBananaPeel::~idBananaPeel(void)
 {
-	if (particleEmitter != NULL)
+	if (particleEmitter != NULL) {
 		particleEmitter->PostEventMS(&EV_Remove, 0);
+		particleEmitter = nullptr;
+	}
 }
 
 void idBananaPeel::Spawn(void)
@@ -64,10 +66,22 @@ void idBananaPeel::Spawn(void)
 
 void idBananaPeel::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( thinkTimer ); //  int thinkTimer
+	savefile->WriteBool( flipuprightCheckDone ); //  bool flipuprightCheckDone
+
+	savefile->WriteObject( particleEmitter ); //  idFuncEmitter * particleEmitter
+
+	savefile->WriteInt( actorBounceTimer ); //  int actorBounceTimer
 }
 
 void idBananaPeel::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( thinkTimer ); //  int thinkTimer
+	savefile->ReadBool( flipuprightCheckDone ); //  bool flipuprightCheckDone
+
+	savefile->ReadObject(CastClassPtrRef(particleEmitter)); //  idFuncEmitter * particleEmitter
+
+	savefile->ReadInt( actorBounceTimer ); //  int actorBounceTimer
 }
 
 void idBananaPeel::Think(void)

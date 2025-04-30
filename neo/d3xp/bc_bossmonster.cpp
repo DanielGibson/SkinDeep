@@ -23,6 +23,20 @@ void idBossMonster::Spawn(void)
 	bossStateTimer = 0;
 }
 
+
+void idBossMonster::Save(idSaveGame* savefile) const
+{
+	savefile->WriteInt( bossState ); //  int bossState
+	savefile->WriteInt( bossStateTimer ); //  int bossStateTimer
+	savefile->WriteVec3( bossSpawnPos ); //  idVec3 bossSpawnPos
+}
+void idBossMonster::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadInt( bossState ); //  int bossState
+	savefile->ReadInt( bossStateTimer ); //  int bossStateTimer
+	savefile->ReadVec3( bossSpawnPos ); //  idVec3 bossSpawnPos
+}
+
 void idBossMonster::Think(void)
 {
 	idAI::Think();

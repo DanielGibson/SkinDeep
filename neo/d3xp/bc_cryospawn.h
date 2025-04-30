@@ -12,7 +12,7 @@ public:
 							idCryospawn(void);
 	virtual					~idCryospawn(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -25,6 +25,8 @@ private:
 	int						state;
 	enum					{ OPEN, CLOSEDELAY, SMOKEDELAY, CLOSED  };
 
+	//BC 3-24-2025: locbox.
+	idEntity* locbox = nullptr;
 	
 };
 //#pragma once

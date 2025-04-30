@@ -23,6 +23,8 @@ END_CLASS
 
 idRefinery::idRefinery(void)
 {
+	bafflerNode.SetOwner(this);
+	bafflerNode.AddToEnd(gameLocal.bafflerEntities);
 }
 
 idRefinery::~idRefinery(void)
@@ -35,9 +37,6 @@ void idRefinery::Spawn(void)
 	int i;
 	idVec3 forwardDir, rightDir;
 	idDict algaeArgs, lightArgs;
-
-	bafflerNode.SetOwner(this);
-	bafflerNode.AddToEnd(gameLocal.bafflerEntities);
 
 	fl.takedamage = true;
 	refineryState = REFINERY_IDLE;
@@ -141,10 +140,44 @@ void idRefinery::Event_Activate(idEntity* activator)
 
 void idRefinery::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( refineryState ); // int refineryState
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteBool( initialized ); // bool initialized
+	savefile->WriteObject( pathEnt ); // idEntityPtr<idEntity> pathEnt
+	savefile->WriteInt( rotationCounter ); // int rotationCounter
+
+	SaveFileWriteArray( smokeEmitters, 4, WriteObject ); // idFuncEmitter *smokeEmitters[4]
+	SaveFileWriteArray( skins, 2, WriteSkin ); // const idDeclSkin *skins[2]
+
+	savefile->WriteObject( algaeEmitter ); // idFuncEmitter * algaeEmitter
+	savefile->WriteObject( splashEmitter ); // idFuncEmitter * splashEmitter
+
+	savefile->WriteObject( sirenLight ); // idLight * sirenLight
+
+	savefile->WriteInt( splashTimer ); // int splashTimer
 }
 
 void idRefinery::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( refineryState ); // int refineryState
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadBool( initialized ); // bool initialized
+	savefile->ReadObject( pathEnt ); // idEntityPtr<idEntity> pathEnt
+	savefile->ReadInt( rotationCounter ); // int rotationCounter
+
+	SaveFileReadArrayCast( smokeEmitters, ReadObject, idClass*& ); // idFuncEmitter *smokeEmitters[4]
+	SaveFileReadArray( skins, ReadSkin ); // const idDeclSkin *skins[2]
+
+	savefile->ReadObject( CastClassPtrRef(algaeEmitter) ); // idFuncEmitter * algaeEmitter
+	savefile->ReadObject( CastClassPtrRef(splashEmitter) ); // idFuncEmitter * splashEmitter
+
+	savefile->ReadObject( CastClassPtrRef(sirenLight) ); // idLight * sirenLight
+
+	savefile->ReadInt( splashTimer ); // int splashTimer
 }
 
 void idRefinery::Think(void)

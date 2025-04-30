@@ -23,10 +23,14 @@ END_CLASS
 
 void idRandPackage::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( spawnTime ); // int spawnTime
+	savefile->WriteBool( hasBeenOpened ); // bool hasBeenOpened
 }
 
 void idRandPackage::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( spawnTime ); // int spawnTime
+	savefile->ReadBool( hasBeenOpened ); // bool hasBeenOpened
 }
 
 void idRandPackage::Spawn(void)
@@ -52,6 +56,55 @@ void idRandPackage::Spawn(void)
 	}
 }
 
+void idRandPackage::OpenPackage(void)
+{
+	hasBeenOpened = true;
+
+	idStr itemSpawnDef = GetRandomSpawnDef();
+	if (itemSpawnDef.Length() > 0)
+	{
+		const idDeclEntityDef* itemDef;
+		itemDef = gameLocal.FindEntityDef(itemSpawnDef, false);
+		if (itemDef)
+		{
+			//found definition for the item to spawn.
+			//Spawn item.
+			idEntity* itemEnt;
+			idDict args;
+			args.Set("classname", itemSpawnDef);
+			args.SetVector("origin", GetPhysics()->GetOrigin());
+			
+			// SW 3rd March 2025:
+			// Inherit some of the box's velocity so we don't just drop to the ground awkwardly
+			if (gameLocal.SpawnEntityDef(args, &itemEnt) && this->GetPhysics() && itemEnt->GetPhysics())
+			{
+				itemEnt->GetPhysics()->SetLinearVelocity(this->GetPhysics()->GetLinearVelocity() * 0.5);
+				itemEnt->GetPhysics()->SetAngularVelocity(this->GetPhysics()->GetAngularVelocity());
+			}
+
+		}
+	}
+
+	//Destroy self.
+	StartSound("snd_break", SND_CHANNEL_ANY);
+	gameLocal.DoParticle(spawnArgs.GetString("model_open"), GetPhysics()->GetOrigin()); //Particle effect for package bursting open.
+	Hide();
+	physicsObj.SetContents(0);
+	PostEventMS(&EV_Remove, 0);
+}
+
+// SW 3rd March 2025:
+// Package should behave the same if killed to if it was thrown at a wall (i.e. release its contents)
+void idRandPackage::Killed(idEntity* inflictor, idEntity* attacker, int damage, const idVec3& dir, int location)
+{
+	idMoveableItem::Killed(inflictor, attacker, damage, dir, location);
+
+	if (!hasBeenOpened)
+	{
+		OpenPackage();
+	}
+}
+
 bool idRandPackage::Collide(const trace_t& collision, const idVec3& velocity)
 {
 	//Don't do checks if being held by player
@@ -70,32 +123,7 @@ bool idRandPackage::Collide(const trace_t& collision, const idVec3& velocity)
 	v = -(velocity * collision.c.normal);	
 	if (v > COLLISION_VELOCITY_THRESHOLD && !hasBeenOpened && gameLocal.time > spawnTime + 2000) //don't open it right at game start.
 	{
-		//turn into banana peel.
-		hasBeenOpened = true;
-
-		idStr itemSpawnDef = GetRandomSpawnDef();
-		if (itemSpawnDef.Length() > 0)
-		{			
-			const idDeclEntityDef* itemDef;
-			itemDef = gameLocal.FindEntityDef(itemSpawnDef, false);
-			if (itemDef)
-			{
-				//found definition for the item to spawn.
-				//Spawn item.
-				idEntity* itemEnt;
-				idDict args;
-				args.Set("classname", itemSpawnDef);
-				args.SetVector("origin", GetPhysics()->GetOrigin());
-				gameLocal.SpawnEntityDef(args, &itemEnt);
-
-			}
-		}
-
-		//Destroy self.
-		gameLocal.DoParticle(spawnArgs.GetString("model_open"), GetPhysics()->GetOrigin()); //Particle effect for package bursting open.
-		Hide();
-		physicsObj.SetContents(0);
-		PostEventMS(&EV_Remove, 0);
+		OpenPackage();
 		return false;
 	}
 

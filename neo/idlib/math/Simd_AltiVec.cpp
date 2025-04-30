@@ -26,6 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include <math.h>
 #include <float.h>
 
@@ -11236,3 +11238,5 @@ void VPCALL idSIMD_AltiVec::MixedSoundToSamples( short *samples, const float *mi
 #endif /* ENABLE_SOUND_ROUTINES */
 
 #endif /* MACOS_X */
+
+#endif

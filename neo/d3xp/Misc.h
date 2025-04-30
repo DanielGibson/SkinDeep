@@ -79,7 +79,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	virtual bool		ClientReceiveEvent( int event, int time, const idBitMsg &msg );
@@ -110,7 +110,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	virtual void		Think( void );
@@ -135,6 +135,9 @@ public:
 
 						idPathCorner();
 						~idPathCorner();
+
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+    void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
 
@@ -167,7 +170,7 @@ public:
 
 						idDamagable( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
@@ -218,6 +221,10 @@ private:
 class idSpring : public idEntity {
 public:
 	CLASS_PROTOTYPE( idSpring );
+						idSpring();
+
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
 
@@ -248,7 +255,7 @@ class idForceField : public idEntity {
 public:
 	CLASS_PROTOTYPE( idForceField );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
@@ -281,7 +288,7 @@ public:
 							idAnimated();
 							~idAnimated();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -289,7 +296,7 @@ public:
 	bool					StartRagdoll( void );
 	virtual bool			GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis );
 
-	void					Event_TurnJointToward(const char* jointName, idVec3 lookPoint); //BC
+	void					Event_TurnJointToward(const char* jointName, const idVec3 &lookPoint); //BC
 
 private:
 	int						num_anims;
@@ -337,7 +344,7 @@ public:
 
 						idStaticEntity( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
@@ -381,7 +388,7 @@ public:
 
 						idFuncEmitter( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
@@ -418,7 +425,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -467,7 +474,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const;  // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	virtual void		Think( void );
@@ -518,7 +525,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const;  // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Event_Activate( idEntity *activator );
@@ -556,7 +563,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const;   // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	virtual void		Think( void );
@@ -596,7 +603,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const;     // blendo eric TODO: relook at this
 	void				Restore( idRestoreGame *savefile );
 
 private:
@@ -623,7 +630,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 private:
@@ -651,7 +658,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	virtual void		Think( void );
@@ -686,7 +693,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 private:
@@ -712,7 +719,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 private:
@@ -738,7 +745,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const;  // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 private:
@@ -765,7 +772,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 private:
@@ -791,7 +798,7 @@ public:
 
 	void				Spawn( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	virtual void		Think( void );
@@ -831,7 +838,7 @@ public:
 	void				Spawn( void );
 	void				Think( void );
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 private:
@@ -868,6 +875,10 @@ public:
 	~idFuncMountedObject();
 
 	void				Spawn( void );
+
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				Restore( idRestoreGame *savefile );
+
 	void				Think( void );
 
 	void				GetAngleRestrictions( int &yaw_min, int &yaw_max, int &pitch );
@@ -894,6 +905,10 @@ public:
 	~idFuncMountedWeapon();
 
 	void				Spawn( void );
+
+	void				Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				Restore( idRestoreGame *savefile );
+
 	void				Think( void );
 
 private:

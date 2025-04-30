@@ -74,9 +74,10 @@ idFont::RemapFont
 idFont * idFont::RemapFont( const char * baseName ) {
 	idStr cleanName = baseName;
 
-	if ( cleanName == DEFAULT_FONT ) {
-		return NULL;
-	}
+	// SM: For some langauges, we actually need to remap the default font
+	//if ( cleanName == DEFAULT_FONT ) {
+	//	return NULL;
+	//}
 
 	// SM: If the font name has a slash in it, assume this is already the remapped name
 	if (cleanName.Find( '/' ) != -1) {

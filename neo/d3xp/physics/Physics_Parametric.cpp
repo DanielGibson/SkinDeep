@@ -271,18 +271,18 @@ idPhysics_Parametric::Save
 */
 void idPhysics_Parametric::Save( idSaveGame *savefile ) const {
 
-	idPhysics_Parametric_SavePState( savefile, current );
-	idPhysics_Parametric_SavePState( savefile, saved );
+	idPhysics_Parametric_SavePState( savefile, current ); // parametricPState_t current
+	idPhysics_Parametric_SavePState( savefile, saved ); // parametricPState_t saved
 
-	savefile->WriteBool( isPusher );
-	savefile->WriteClipModel( clipModel );
-	savefile->WriteInt( pushFlags );
+	savefile->WriteBool( isPusher ); // bool isPusher
+	savefile->WriteClipModel( clipModel ); // idClipModel * clipModel
+	savefile->WriteInt( pushFlags ); // int pushFlags
 
-	savefile->WriteTrace( pushResults );
-	savefile->WriteBool( isBlocked );
+	savefile->WriteTrace( pushResults ); // trace_t pushResults
+	savefile->WriteBool( isBlocked ); // bool isBlocked
 
-	savefile->WriteBool( hasMaster );
-	savefile->WriteBool( isOrientated );
+	savefile->WriteBool( hasMaster ); // bool hasMaster
+	savefile->WriteBool( isOrientated ); // bool isOrientated
 }
 
 /*
@@ -292,18 +292,18 @@ idPhysics_Parametric::Restore
 */
 void idPhysics_Parametric::Restore( idRestoreGame *savefile ) {
 
-	idPhysics_Parametric_RestorePState( savefile, current );
-	idPhysics_Parametric_RestorePState( savefile, saved );
+	idPhysics_Parametric_RestorePState( savefile, current ); // parametricPState_t current
+	idPhysics_Parametric_RestorePState( savefile, saved ); // parametricPState_t saved
 
-	savefile->ReadBool( isPusher );
-	savefile->ReadClipModel( clipModel );
-	savefile->ReadInt( pushFlags );
+	savefile->ReadBool( isPusher ); // bool isPusher
+	savefile->ReadClipModel( clipModel ); // idClipModel * clipModel
+	savefile->ReadInt( pushFlags ); // int pushFlags
 
-	savefile->ReadTrace( pushResults );
-	savefile->ReadBool( isBlocked );
+	savefile->ReadTrace( pushResults ); // trace_t pushResults
+	savefile->ReadBool( isBlocked ); // bool isBlocked
 
-	savefile->ReadBool( hasMaster );
-	savefile->ReadBool( isOrientated );
+	savefile->ReadBool( hasMaster ); // bool hasMaster
+	savefile->ReadBool( isOrientated ); // bool isOrientated
 }
 
 /*

@@ -26,6 +26,8 @@ const int DESPAWNTIME = 20000; //After idle for XX time, attempt to move to hatc
 const float DESPAWN_THRESHOLDDISTANCE = 128; //during despawn, has to be XX distance to hatch to despawn.
 const int DESPAWN_PROXIMITY_TIMER = 300;
 
+const int DONE_VO_DELAYTIME = 1500;
+
 CLASS_DECLARATION(idAI, idAI_Repairbot)	
 	EVENT(EV_Touch, idAI_Repairbot::Event_Touch)
 END_CLASS
@@ -126,6 +128,62 @@ void idAI_Repairbot::Spawn(void)
 	if (gameLocal.time > 0)
 	{
 		gameLocal.AddEventLog("#str_def_gameplay_repairbot_deployed", GetPhysics()->GetOrigin());
+	}
+}
+
+void idAI_Repairbot::Save(idSaveGame* savefile) const
+{
+	savefile->WriteObject( repairEnt ); // idEntityPtr<idEntity> repairEnt
+
+	savefile->WriteObject( queuedRepairEnt ); // idEntityPtr<idEntity> queuedRepairEnt
+
+	savefile->WriteVec3( repairPosition ); // idVec3 repairPosition
+	savefile->WriteInt( updateTimer ); // int updateTimer
+
+	savefile->WriteObject( headLight ); // idLight * headLight
+	savefile->WriteObject( repairParticles ); // idFuncEmitter * repairParticles
+
+	savefile->WriteInt( patrolCooldownTimer ); // int patrolCooldownTimer
+
+	savefile->WriteInt( blockVoTimer ); // int blockVoTimer
+
+	savefile->WriteBool( isMovingToDespawn ); // bool isMovingToDespawn
+	savefile->WriteInt( despawnTimer ); // int despawnTimer
+	savefile->WriteObject( despawnHatch ); // idEntityPtr<idEntity> despawnHatch
+	savefile->WriteInt( despawnProximityTimer ); // int despawnProximityTimer
+
+	savefile->WriteObject( talkParticles ); // idFuncEmitter * talkParticles
+
+	savefile->WriteRenderLight( selfglowLight ); // renderLight_t selfglowLight
+	savefile->WriteInt( selfglowlightHandle ); // int selfglowlightHandle
+}
+void idAI_Repairbot::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadObject( repairEnt ); // idEntityPtr<idEntity> repairEnt
+
+	savefile->ReadObject( queuedRepairEnt ); // idEntityPtr<idEntity> queuedRepairEnt
+
+	savefile->ReadVec3( repairPosition ); // idVec3 repairPosition
+	savefile->ReadInt( updateTimer ); // int updateTimer
+
+	savefile->ReadObject( CastClassPtrRef(headLight) ); // idLight * headLight
+	savefile->ReadObject( CastClassPtrRef(repairParticles) ); // idFuncEmitter * repairParticles
+
+	savefile->ReadInt( patrolCooldownTimer ); // int patrolCooldownTimer
+
+	savefile->ReadInt( blockVoTimer ); // int blockVoTimer
+
+	savefile->ReadBool( isMovingToDespawn ); // bool isMovingToDespawn
+	savefile->ReadInt( despawnTimer ); // int despawnTimer
+	savefile->ReadObject( despawnHatch ); // idEntityPtr<idEntity> despawnHatch
+	savefile->ReadInt( despawnProximityTimer ); // int despawnProximityTimer
+
+	savefile->ReadObject( CastClassPtrRef(talkParticles) ); // idFuncEmitter * talkParticles
+
+	savefile->ReadRenderLight( selfglowLight ); // renderLight_t selfglowLight
+	savefile->ReadInt( selfglowlightHandle ); // int selfglowlightHandle
+	if ( selfglowlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( selfglowlightHandle, &selfglowLight );
 	}
 }
 
@@ -246,6 +304,9 @@ void idAI_Repairbot::Think(void)
 			StartSound("snd_vo_done", SND_CHANNEL_VOICE, 0, false, NULL);
 
 			
+			//BC 3-4-2025: add a delay before seeking next repair object, so that the "done" vo has time to play.
+			updateTimer = gameLocal.time + DONE_VO_DELAYTIME;
+
 
 			return;
 		}

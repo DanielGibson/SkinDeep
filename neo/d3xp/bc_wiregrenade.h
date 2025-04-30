@@ -21,7 +21,7 @@ public:
 	CLASS_PROTOTYPE(idWiregrenade);
 
 							~idWiregrenade(void);
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -48,12 +48,12 @@ private:
 	int						grenadeTimer;
 	int						grenadeState;
 
-	idAnimated*				animatedEnt;
+	idAnimated*				animatedEnt = nullptr;
 
-	idBeam*					wireOrigin[MAXWIRES];
-	idBeam*					wireTarget[MAXWIRES];
+	idBeam*					wireOrigin[MAXWIRES] = {};
+	idBeam*					wireTarget[MAXWIRES] = {};
 
-	idStaticEntity*			wireHooks[MAXWIRES];
+	idStaticEntity*			wireHooks[MAXWIRES] = {};
 
 	int						checkTimer;
 

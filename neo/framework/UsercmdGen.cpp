@@ -251,6 +251,9 @@ public:
 	virtual bool	IsUsingJoystick() const { return isUsingJoystick; }
 	float			JoystickAxisState(int axis) const { return joystickAxis[axis]; }
 
+	int*			ButtonStates() { return buttonState; }
+	int*			PrevButtonStates() { return prevButtonState; }
+
 private:
 	void			MakeCurrent( void );
 	void			InitCurrent( void );
@@ -307,47 +310,32 @@ private:
 	float			lastLookValueYaw;
 	bool			isUsingJoystick;
 
-
-	static idCVar	in_yawSpeed;
-	static idCVar	in_pitchSpeed;
-	static idCVar	in_angleSpeedKey;
-	static idCVar	in_freeLook;
-	static idCVar	in_alwaysRun;
-	static idCVar	in_toggleRun;
-	static idCVar	in_toggleZoom;
-	static idCVar	sensitivity;
-	static idCVar	m_pitch;
-	static idCVar	m_yaw;
-	static idCVar	m_strafeScale;
-	static idCVar	m_smooth;
-	static idCVar	m_strafeSmooth;
-	static idCVar	m_showMouseRate;
 };
 
-idCVar idUsercmdGenLocal::in_yawSpeed( "in_yawspeed", "140", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "yaw change speed when holding down _left or _right button" );
-idCVar idUsercmdGenLocal::in_pitchSpeed( "in_pitchspeed", "140", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "pitch change speed when holding down look _lookUp or _lookDown button" );
-idCVar idUsercmdGenLocal::in_angleSpeedKey( "in_anglespeedkey", "1.5", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "angle change scale when holding down _speed button" );
-idCVar idUsercmdGenLocal::in_freeLook( "in_freeLook", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "look around with mouse" );
-idCVar idUsercmdGenLocal::in_alwaysRun( "in_alwaysRun", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "always run (reverse _speed button) - only in MP" );
-idCVar idUsercmdGenLocal::in_toggleRun( "in_toggleRun", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "pressing _speed button toggles run on/off - only in MP" );
-idCVar idUsercmdGenLocal::in_toggleZoom( "in_toggleZoom", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "pressing _zoom button toggles zoom on/off" );
-idCVar idUsercmdGenLocal::sensitivity( "sensitivity", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse view sensitivity" );
-idCVar idUsercmdGenLocal::m_pitch( "m_pitch", "0.022", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse pitch scale" );
-idCVar idUsercmdGenLocal::m_yaw( "m_yaw", "0.022", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse yaw scale" );
-idCVar idUsercmdGenLocal::m_strafeScale( "m_strafeScale", "6.25", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse strafe movement scale" );
-idCVar idUsercmdGenLocal::m_smooth( "m_smooth", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "number of samples blended for mouse viewing", 1, 8, idCmdSystem::ArgCompletion_Integer<1,8> );
-idCVar idUsercmdGenLocal::m_strafeSmooth( "m_strafeSmooth", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "number of samples blended for mouse moving", 1, 8, idCmdSystem::ArgCompletion_Integer<1,8> );
-idCVar idUsercmdGenLocal::m_showMouseRate( "m_showMouseRate", "0", CVAR_SYSTEM | CVAR_BOOL, "shows mouse movement" );
+idCVar in_yawSpeed( "in_yawspeed", "140", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "yaw change speed when holding down _left or _right button" );
+idCVar in_pitchSpeed( "in_pitchspeed", "140", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "pitch change speed when holding down look _lookUp or _lookDown button" );
+idCVar in_angleSpeedKey( "in_anglespeedkey", "1.5", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "angle change scale when holding down _speed button" );
+idCVar in_freeLook( "in_freeLook", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "look around with mouse" );
+idCVar in_alwaysRun( "in_alwaysRun", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "always run (reverse _speed button) - only in MP" );
+idCVar in_toggleRun( "in_toggleRun", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "pressing _speed button toggles run on/off - only in MP" );
+idCVar in_toggleZoom( "in_toggleZoom", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "pressing _zoom button toggles zoom on/off" );
+idCVar m_sensitivity( "sensitivity", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse view sensitivity" );
+idCVar m_pitch( "m_pitch", "0.022", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse pitch scale" );
+idCVar m_yaw( "m_yaw", "0.022", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse yaw scale" );
+idCVar m_strafeScale( "m_strafeScale", "6.25", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "mouse strafe movement scale" );
+idCVar m_smooth( "m_smooth", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "number of samples blended for mouse viewing", 1, 8, idCmdSystem::ArgCompletion_Integer<1,8> );
+idCVar m_strafeSmooth( "m_strafeSmooth", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "number of samples blended for mouse moving", 1, 8, idCmdSystem::ArgCompletion_Integer<1,8> );
+idCVar m_showMouseRate( "m_showMouseRate", "0", CVAR_SYSTEM | CVAR_BOOL, "shows mouse movement" );
 
 //QC
 idCVar joy_triggerThreshold("joy_triggerThreshold", "0.05", CVAR_FLOAT | CVAR_ARCHIVE, "how far the joystick triggers have to be pressed before they register as down");
 idCVar joy_deadZone("joy_deadZone", "0.25", CVAR_FLOAT | CVAR_ARCHIVE, "specifies how large the dead-zone is on the joystick");
-idCVar joy_gammaLook("joy_gammaLook", "1", CVAR_INTEGER | CVAR_ARCHIVE, "use a log curve instead of a power curve for movement");
-idCVar joy_powerScale("joy_powerScale", "2", CVAR_FLOAT | CVAR_ARCHIVE, "Raise joystick values to this power");
+idCVar joy_gammaLook("joy_gammaLook", "1", CVAR_INTEGER | CVAR_ARCHIVE, "Look: use log curve instead of a power curve for looking.");
+idCVar joy_powerScale("joy_powerScale", "2", CVAR_FLOAT | CVAR_ARCHIVE, "Look: raise joystick values to this power.");
 idCVar joy_pitchSpeed("joy_pitchSpeed", "30", CVAR_ARCHIVE | CVAR_FLOAT, "pitch speed when pressing up or down on the joystick", 1, 600);
 idCVar joy_yawSpeed("joy_yawSpeed", "40", CVAR_ARCHIVE | CVAR_FLOAT, "pitch speed when pressing left or right on the joystick", 1, 600);
-idCVar joy_dampenLook("joy_dampenLook", "1", CVAR_BOOL | CVAR_ARCHIVE, "Do not allow full acceleration on look");
-idCVar joy_deltaPerMSLook("joy_deltaPerMSLook", "0.003", CVAR_FLOAT | CVAR_ARCHIVE, "Max amount to be added on look per MS");
+idCVar joy_dampenLook("joy_dampenLook", "1", CVAR_BOOL | CVAR_ARCHIVE, "Look: dampen full acceleration on look.");
+idCVar joy_deltaPerMSLook("joy_deltaPerMSLook", "0.0005", CVAR_FLOAT | CVAR_ARCHIVE, "Look: acceleration to be added on look.");
 idCVar joy_invertPitch("joy_invertPitch", "0", CVAR_BOOL | CVAR_ARCHIVE, "If true, invert joystick pitch");
 idCVar in_useJoystick("in_useJoystick", "1", CVAR_ARCHIVE | CVAR_BOOL, "enables/disables the gamepad for PC use");
 idCVar in_forceButtonPrompts("in_forceButtonPrompts", "-1", CVAR_ARCHIVE | CVAR_INTEGER, "force button prompts to a specific type (or -1 for automatic)", -1, CT_NUM + 1);
@@ -524,6 +512,32 @@ void idUsercmdGenLocal::MouseMove( void ) {
 	static int	historyCounter;
 	int			i;
 
+
+	// blendo eric: modify exceeding large mouse movement input check to use unsmoothed mouse accel instead of delta
+	// with frame time, sensitivity, and stutter taken into account
+	float pollTimeDelta = pollTime - lastPollTime;
+
+	static float lastUnsmoothX = 0;
+	static float lastUnsmoothY = 0;
+	float unsmoothMx = mouseDx * m_sensitivity.GetFloat();
+	float unsmoothMy = mouseDy * m_sensitivity.GetFloat();
+
+	float accelAbsX = idMath::Fabs(unsmoothMx - lastUnsmoothX) / pollTimeDelta; // accel dots per second
+	float accelAbsY = idMath::Fabs(unsmoothMy - lastUnsmoothY) / pollTimeDelta;
+
+	//Sys_DebugPrintf("accel %.2f, %.2f \n", accelAbsX, accelAbsY);
+
+	lastUnsmoothX = unsmoothMx;
+	lastUnsmoothY = unsmoothMy;
+
+	const float MOUSE_ACCEL_PER_MS_MAX = 1000.0f / (1000 / 30); // prev max input speed divided by 30fps frametime (1000px / (1000ms/30ms)) = ~30
+	bool deltaOutOfRange = pollTimeDelta > 500; // there was probably a hiccup / stutter if the frame time was large
+
+	if (deltaOutOfRange || accelAbsX > MOUSE_ACCEL_PER_MS_MAX || accelAbsY > MOUSE_ACCEL_PER_MS_MAX) {
+		Sys_DebugPrintf("idUsercmdGenLocal::MouseMove: Ignoring ridiculous mouse accel delta %.2f,%.2f\n", accelAbsX, accelAbsY);
+		mouseDx = mouseDy = 0;
+	}
+
 	history[historyCounter&7][0] = mouseDx;
 	history[historyCounter&7][1] = mouseDy;
 
@@ -563,13 +577,8 @@ void idUsercmdGenLocal::MouseMove( void ) {
 
 	historyCounter++;
 
-	if ( idMath::Fabs( mx ) > 1000 || idMath::Fabs( my ) > 1000 ) {
-		Sys_DebugPrintf( "idUsercmdGenLocal::MouseMove: Ignoring ridiculous mouse delta.\n" );
-		mx = my = 0;
-	}
-
-	mx *= sensitivity.GetFloat();
-	my *= sensitivity.GetFloat();
+	mx *= m_sensitivity.GetFloat();
+	my *= m_sensitivity.GetFloat();
 
 	if ( m_showMouseRate.GetBool() ) {
 		Sys_DebugPrintf( "[%3i %3i  = %5.1f %5.1f = %5.1f %5.1f] ", mouseDx, mouseDy, mx, my, strafeMx, strafeMy );
@@ -816,8 +825,8 @@ void idUsercmdGenLocal::HandleJoystickAxis(int keyNum, float unclampedValue, flo
 			lastLookValuePitch = lookValue;
 		}
 
-		//float invertPitch = in_invertLook.GetBool() ? -1.0f : 1.0f;
-		float invertPitch = 1.0f;
+		//BC 2-25-2025: fixed gamepad invert.
+		float invertPitch = joy_invertPitch.GetBool() ? -1.0f : 1.0f;
 		viewangles[PITCH] -= MS2SEC(pollTime - lastPollTime) * lookValue * joy_pitchSpeed.GetFloat() * invertPitch;
 		break;
 	}
@@ -827,8 +836,8 @@ void idUsercmdGenLocal::HandleJoystickAxis(int keyNum, float unclampedValue, flo
 			lastLookValuePitch = lookValue;
 		}
 
-		//float invertPitch = in_invertLook.GetBool() ? -1.0f : 1.0f;
-		float invertPitch = 1.0f;
+		//BC 2-25-2025: fixed gamepad invert.
+		float invertPitch = joy_invertPitch.GetBool() ? -1.0f : 1.0f;
 		viewangles[PITCH] += MS2SEC(pollTime - lastPollTime) * lookValue * joy_pitchSpeed.GetFloat() * invertPitch;
 		break;
 	}
@@ -941,8 +950,11 @@ void idUsercmdGenLocal::InitCurrent( void ) {
 
 	// SM: Setup button states
 	memcpy( prevButtonState, buttonState, sizeof( buttonState ) );
-	cmd.prevButtonState = prevButtonState;
-	cmd.buttonState = buttonState;
+
+	// eric blendo: altered for idlist, set buttonstate list in makecurrent
+	for (int idx = 0; idx < UB_MAX_BUTTONS; ++idx) {
+		cmd.prevButtonState[idx] = prevButtonState[idx];
+	}
 }
 
 /*
@@ -1007,6 +1019,9 @@ void idUsercmdGenLocal::MakeCurrent( void ) {
 	flags = cmd.flags;
 	impulse = cmd.impulse;
 
+	for (int idx = 0; idx < UB_MAX_BUTTONS; ++idx) {
+		cmd.buttonState[idx] = buttonState[idx];
+	}
 }
 
 //=====================================================================
@@ -1083,6 +1098,12 @@ void idUsercmdGenLocal::Clear( void ) {
 	mouseButton = 0;
 	mouseDown = false;
 	isUsingJoystick = false;
+
+	// SM: Default to "true" on steam deck/big picture mode
+	if (common->g_SteamUtilities && common->g_SteamUtilities->ShouldDefaultToController())
+	{
+		isUsingJoystick = true;
+	}
 }
 
 /*

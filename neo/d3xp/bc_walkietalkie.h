@@ -12,7 +12,7 @@ public:
 							idWalkietalkie(void);
 	virtual					~idWalkietalkie(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -25,6 +25,8 @@ public:
 
 	virtual void			Hide(void);
 	virtual void			Show(void);
+
+	int						GetBatteryAmount();	// SW 24th Feb 2025
 
 
 
@@ -56,7 +58,7 @@ private:
 	int						buttonDisplayState;
 	enum					{WB_UNITIALIZED, WB_GREYED, WB_ENABLED};
 
-	idAnimatedEntity*		flagModel;
+	idAnimatedEntity*		flagModel = nullptr;
 
 	int						batteryAmount;
 	bool					DoBatteryLogic();

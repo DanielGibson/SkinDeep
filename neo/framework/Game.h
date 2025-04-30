@@ -199,6 +199,7 @@ public:
 
 	// SW: Lifting up this interface so we can call these methods from session
 	virtual void				InitEventLog(void) = 0;
+	virtual void				ShutdownEventLog() = 0;
 	virtual void				InitEventLogFile(bool startOfSession) = 0;
 	virtual void				CloseEventLogFile(void) = 0;
 

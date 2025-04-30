@@ -123,6 +123,8 @@ public:
 	static void					Init( void );
 	static void					Shutdown( void );
 
+
+	// blendo eric: savegame pass 1
 	// save games
 	static void					Save( idSaveGame *savefile );					// archives object for save game file
 	static void					Restore( idRestoreGame *savefile );				// unarchives object from save game file

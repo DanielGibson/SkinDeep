@@ -205,9 +205,9 @@ typedef struct particleEmitter_s {
 
 #ifdef _D3XP
 typedef struct funcEmitter_s {
-	char				name[64];
-	idFuncEmitter*		particle;
-	jointHandle_t		joint;
+	char				name[64] = {};
+	idFuncEmitter*		particle = 0;
+	jointHandle_t		joint = {};
 } funcEmitter_t;
 #endif
 
@@ -215,12 +215,12 @@ class idMoveState {
 public:
 							idMoveState();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
-	moveType_t				moveType;
-	moveCommand_t			moveCommand;
-	moveStatus_t			moveStatus;
+	moveType_t				moveType = {};
+	moveCommand_t			moveCommand = {};
+	moveStatus_t			moveStatus = {};
 	idVec3					moveDest;
 	idVec3					moveDir;			// used for wandering and slide moves
 	idEntityPtr<idEntity>	goalEntity;
@@ -329,7 +329,7 @@ public:
 							idAI();
 							~idAI();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -423,7 +423,7 @@ public:
 
 protected:
 	// navigation
-	idAAS *					aas;
+	idAAS *					aas = 0;
 	int						travelFlags;
 
 	idMoveState				move;
@@ -450,7 +450,7 @@ protected:
 	idPhysics_Monster		physicsObj;
 
 	// flying
-	jointHandle_t			flyTiltJoint;
+	jointHandle_t			flyTiltJoint = {};
 	float					fly_speed;
 	float					fly_bob_strength;
 	float					fly_bob_vert;
@@ -477,7 +477,7 @@ protected:
 	float					projectile_height_to_distance_ratio;	// calculates the maximum height a projectile can be thrown
 	idList<idVec3>			missileLaunchOffset;
 
-	const idDict *			projectileDef;
+	const idDict *			projectileDef = 0;
 	mutable idClipModel		*projectileClipModel;
 	float					projectileRadius;
 	float					projectileSpeed;
@@ -487,11 +487,11 @@ protected:
 	idStr					attack;
 
 	// chatter/talking
-	const idSoundShader		*chat_snd;
+	const idSoundShader		*chat_snd = 0;
 	int						chat_min;
 	int						chat_max;
 	int						chat_time;
-	talkState_t				talk_state;
+	talkState_t				talk_state = {};
 	idEntityPtr<idActor>	talkTarget;
 
 	// cinematics
@@ -525,17 +525,17 @@ protected:
 	bool					useBoneAxis;				// use the bone vs the model axis
 	idList<particleEmitter_t> particles;				// particle data
 
-	renderLight_t			worldMuzzleFlash;			// positioned on world weapon bone
+	renderLight_t			worldMuzzleFlash = {};			// positioned on world weapon bone
 	int						worldMuzzleFlashHandle;
-	jointHandle_t			flashJointWorld;
+	jointHandle_t			flashJointWorld = {};
 	int						muzzleFlashEnd;
 	int						flashTime;
 
 	// joint controllers
 	idAngles				eyeMin;
 	idAngles				eyeMax;
-	jointHandle_t			focusJoint;
-	jointHandle_t			orientationJoint;
+	jointHandle_t			focusJoint = {};
+	jointHandle_t			orientationJoint = {};
 
 	// enemy variables
 	idEntityPtr<idActor>	enemy;
@@ -847,7 +847,7 @@ protected:
 #endif
 
 	//BC PROTECTED. Put all private vars/funcs here.
-	void					Event_LookAtPoint(idVec3 _point, float duration);
+	void					Event_LookAtPoint(const idVec3 &_point, float duration);
 	void					LookAtPointMS(idVec3 _point, int durationMS);
 	void					Event_GetCoverNode(void);
 	void					Event_GetLastEnemyPosition(void);
@@ -855,10 +855,10 @@ protected:
 	void					Event_HeardSuspiciousPriority();
 	void					Event_GetThrowableObject(const idVec3 &mins, const idVec3 &maxs, float speed, float minDist, float offset);
 	void					Event_ThrowObjectAtEnemy(idEntity *ent, float speed);
-	bool					Event_ThrowObjectAtPosition(idEntity *ent, idVec3 targetPos);
+	bool					Event_ThrowObjectAtPosition(idEntity *ent, const idVec3 &targetPos);
 	void					Event_GetSearchNode();
 	idEntity *				GetSearchNode();
-	void					Event_SetLaserLock(idVec3 laserPos);
+	void					Event_SetLaserLock(const idVec3 &laserPos);
 	void					Event_SetLaserSkin(const char* laserSkinName);
 	void					Event_GetEnemyCenter();
 	void					Event_SetFlyBobStrength(int value);
@@ -872,23 +872,23 @@ protected:
 	void					Event_DoDamage(const char *damageDefName);
 	void					Event_ResetLookPoint();
 	void					LaunchProjectileAtPos(const char *jointname, idVec3 fireTarget);
-	void					Event_CanHitFromAnim(const char *animname, idVec3 targetPos);
+	void					Event_CanHitFromAnim(const char *animname, const idVec3 &targetPos);
 	bool					CanHitFromAnim(const char *animname, idVec3 targetPos);
 	void					Event_SetLaserActive(int active);
-	void					Event_CheckSearchLook(idVec3 lookPoint, int useFacing);
+	void					Event_CheckSearchLook(const idVec3 &lookPoint, int useFacing);
 	bool					CheckSearchLook(idVec3 lookPoint, int useFacing, bool doProximityCheck);
-	void					Event_SetLastVisiblePos(idVec3 pos);
-	void					Event_CheckForwardDot(idVec3 lookPoint);
-	void					Event_SetLaserEndLock(idVec3 pos);
+	void					Event_SetLastVisiblePos(const idVec3 &pos);
+	void					Event_CheckForwardDot(const idVec3 &lookPoint);
+	void					Event_SetLaserEndLock(const idVec3 &pos);
 	void					Event_StartStunState(const char* damageDefName);
 	void					Event_IsBleedingOut(void);
 	void					Event_GetSkullsaver(void);
 	virtual void			Event_SetPathEntity(idEntity *pathEnt);
 
 
-	idBeam*					lasersightbeam;
-	idBeam*					lasersightbeamTarget;
-	idEntity*				laserdot;
+	idBeam*					lasersightbeam = 0;
+	idBeam*					lasersightbeamTarget = 0;
+	idEntity*				laserdot = 0;
 	idVec3					laserLockPosition;
 	idVec3					laserEndLockPosition;
 
@@ -905,7 +905,7 @@ protected:
 	void					UpdateIcon();
 
 	void					EjectBrass();
-	jointHandle_t			brassJoint;
+	jointHandle_t			brassJoint = {};
 	idDict					brassDict;
 
 	void					SpawnEmitters(const char *keyName);
@@ -913,19 +913,19 @@ protected:
 	int						lastPlayerSightTimer;
 	int						playersightCounter;
 
-	idEntity*				dragButtons[AI_LIMBCOUNT]; //This is how player drags bodies around.
+	idEntity*				dragButtons[AI_LIMBCOUNT] = {}; //This is how player drags bodies around.
 	void					SpawnDragButton(int index, const char * jointName, const char * displayString);
 
 
-	const idDeclSkin		*currentskin;
-	const idDeclSkin*		damageFlashSkin;
+	const idDeclSkin*		currentskin = 0;
+	const idDeclSkin*		damageFlashSkin = 0;
 	int						damageflashTimer;
 	bool					damageFlashActive;
 
 	int						lastBrassTime;
 
 	//bleed out ui
-	idEntity*				bleedoutTube;	
+	idEntityPtr<idEntity>	bleedoutTube;	
 	int						bleedoutTime;
 	int						bleedoutState;
 	int						bleedoutDamageTimer;
@@ -943,12 +943,12 @@ protected:
 
 
 	virtual void			OnShieldHit();
-	void					Event_GetObservationViaNodes(idVec3 pointToObserve);
+	void					Event_GetObservationViaNodes(const idVec3 &pointToObserve);
 	idVec3					GetObservationViaNodes(idVec3 pointToObserve);
 	void					SetCombatState(int value, bool restartCombatTimer = false);
 
 	void					SpawnSkullsaver();
-	idEntity*				skullEnt; // refers to skullsaver if it exists, otherwise NULL
+	idEntity*				skullEnt = 0; // refers to skullsaver if it exists, otherwise NULL
 
 	idEntityPtr<idLocationEntity> skullSpawnOrigLoc; // blendo eric: where the ai originally spawns
 
@@ -983,6 +983,11 @@ protected:
 	enum					{AILS_DEFEATED, AILS_ALIVE, AILS_BLEEDINGOUT, AILS_INSKULLSAVER};
 	void					Event_GetLifeState();
 
+	// SW 25th Feb 2025
+	void					UpdateSpacePush();
+	int						outerspaceUpdateTimer;
+
+	idEntityPtr<idEntity>	helmetPtr;
 	//BC PROTECTED end.
 
 
@@ -994,7 +999,7 @@ public:
 
 						idCombatNode();
 
-	void				Save( idSaveGame *savefile ) const;
+	void				Save( idSaveGame *savefile ) const;	// blendo eric: savegame pass 1
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );

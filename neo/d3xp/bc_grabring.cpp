@@ -54,10 +54,17 @@ void idGrabRing::Spawn(void)
 
 void idGrabRing::Save(idSaveGame *savefile) const
 {
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
 }
 
 void idGrabRing::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
 }
 
 void idGrabRing::Think(void)
@@ -75,6 +82,16 @@ const int GRAB_BUFFERSPACE = 4; //when doing tracebound check, increase bounding
 bool idGrabRing::DoFrob(int index, idEntity * frobber)
 {
 	//Player wants to grab this grab ring.
+
+
+	//BC 4-21-2025: only allow if player directly frobs me (ignore if player throws object at me)
+	if (frobber == nullptr)
+		return false;
+
+	if (frobber != gameLocal.GetLocalPlayer())
+		return false;
+
+
 
 	//Try to find safe clearance for the player.
 	idVec3 destinationPos = vec3_zero;

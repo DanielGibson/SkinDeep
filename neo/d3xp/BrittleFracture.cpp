@@ -124,56 +124,47 @@ idBrittleFracture::Save
 ================
 */
 void idBrittleFracture::Save( idSaveGame *savefile ) const {
-	int i, j;
+	savefile->WriteObject( assignedRoom ); // idEntityPtr<idEntity> assignedRoom
 
-	savefile->WriteInt( health );
-	entityFlags_s flags = fl;
-	LittleBitField( &flags, sizeof( flags ) );
-	savefile->Write( &flags, sizeof( flags ) );
+	savefile->WriteMaterial( material ); // const idMaterial * material
+	savefile->WriteMaterial( decalMaterial ); // const idMaterial * decalMaterial
+	savefile->WriteMaterial( crackedMaterial ); // const idMaterial * crackedMaterial
+	savefile->WriteFloat( decalSize ); // float decalSize
+	savefile->WriteFloat( maxShardArea ); // float maxShardArea
+	savefile->WriteFloat( maxShatterRadius ); // float maxShatterRadius
+	savefile->WriteFloat( minShatterRadius ); // float minShatterRadius
+	savefile->WriteFloat( linearVelocityScale ); // float linearVelocityScale
+	savefile->WriteFloat( angularVelocityScale ); // float angularVelocityScale
+	savefile->WriteFloat( shardMass ); // float shardMass
+	savefile->WriteFloat( density ); // float density
+	savefile->WriteFloat( friction ); // float friction
+	savefile->WriteFloat( bouncyness ); // float bouncyness
+	savefile->WriteString( fxFracture ); // idString fxFracture
 
-	// setttings
-	savefile->WriteMaterial( material );
-	savefile->WriteMaterial( decalMaterial );
-	savefile->WriteMaterial( crackedMaterial );
-	savefile->WriteFloat( decalSize );
-	savefile->WriteFloat( maxShardArea );
-	savefile->WriteFloat( maxShatterRadius );
-	savefile->WriteFloat( minShatterRadius );
-	savefile->WriteFloat( linearVelocityScale );
-	savefile->WriteFloat( angularVelocityScale );
-	savefile->WriteFloat( shardMass );
-	savefile->WriteFloat( density );
-	savefile->WriteFloat( friction );
-	savefile->WriteFloat( bouncyness );
-	savefile->WriteString( fxFracture );
+	savefile->WriteBool( isXraySurface ); // bool isXraySurface
 
-	// state
-	savefile->WriteBounds( bounds );
-	savefile->WriteBool( disableFracture );
+	savefile->WriteStaticObject( idBrittleFracture::physicsObj ); // idPhysics_StaticMulti physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
 
-	savefile->WriteInt( lastRenderEntityUpdate );
-	savefile->WriteBool( changed );
-
-	savefile->WriteStaticObject( physicsObj );
-
-	savefile->WriteInt( shards.Num() );
-	for ( i = 0; i < shards.Num(); i++ ) {
+	savefile->WriteInt( shards.Num() ); // idList<shard_t *> shards
+	for (int i = 0; i < shards.Num(); i++ ) {
 		savefile->WriteWinding( shards[i]->winding );
 
 		savefile->WriteInt( shards[i]->decals.Num() );
-		for ( j = 0; j < shards[i]->decals.Num(); j++ ) {
+		for (int j = 0; j < shards[i]->decals.Num(); j++ ) {
 			savefile->WriteWinding( *shards[i]->decals[j] );
 		}
 
 		savefile->WriteInt( shards[i]->neighbours.Num() );
-		for ( j = 0; j < shards[i]->neighbours.Num(); j++ ) {
+		for (int j = 0; j < shards[i]->neighbours.Num(); j++ ) {
 			int index = shards.FindIndex(shards[i]->neighbours[j]);
 			assert(index != -1);
 			savefile->WriteInt( index );
 		}
 
 		savefile->WriteInt( shards[i]->edgeHasNeighbour.Num() );
-		for ( j = 0; j < shards[i]->edgeHasNeighbour.Num(); j++ ) {
+		for (int j = 0; j < shards[i]->edgeHasNeighbour.Num(); j++ ) {
 			savefile->WriteBool( shards[i]->edgeHasNeighbour[j] );
 		}
 
@@ -183,9 +174,16 @@ void idBrittleFracture::Save( idSaveGame *savefile ) const {
 		savefile->WriteStaticObject( shards[i]->physicsObj );
 	}
 
-#ifdef _D3XP
-	savefile->WriteBool( isXraySurface );
-#endif
+	savefile->WriteBounds( bounds ); // idBounds bounds
+	savefile->WriteBool( disableFracture ); // bool disableFracture
+	savefile->WriteInt( lastRenderEntityUpdate ); // mutable int lastRenderEntityUpdate
+	savefile->WriteBool( changed ); // mutable bool changed
+
+	savefile->WriteBool( hasActivatedTargets ); // bool hasActivatedTargets
+	savefile->WriteDict( &glasspieceDict ); // idDict glasspieceDict
+
+	savefile->WriteInt( portal ); // int portal
+	savefile->WriteInt( portalFadeState ); // int portalFadeState
 }
 
 /*
@@ -194,8 +192,6 @@ idBrittleFracture::Restore
 ================
 */
 void idBrittleFracture::Restore( idRestoreGame *savefile ) {
-	int i, j , num;
-
 	renderEntity.hModel = renderModelManager->AllocModel();
 	renderEntity.hModel->InitEmpty( brittleFracture_SnapshotName );
 	renderEntity.callback = idBrittleFracture::ModelCallback;
@@ -203,64 +199,61 @@ void idBrittleFracture::Restore( idRestoreGame *savefile ) {
 	renderEntity.noSelfShadow = true;
 	renderEntity.noDynamicInteractions = false;
 
-	savefile->ReadInt( health );
-	savefile->Read( &fl, sizeof( fl ) );
-	LittleBitField( &fl, sizeof( fl ) );
+	savefile->ReadObject( assignedRoom ); // idEntityPtr<idEntity> assignedRoom
 
-	// setttings
-	savefile->ReadMaterial( material );
-	savefile->ReadMaterial( decalMaterial );
-	savefile->ReadMaterial( crackedMaterial );
-	savefile->ReadFloat( decalSize );
-	savefile->ReadFloat( maxShardArea );
-	savefile->ReadFloat( maxShatterRadius );
-	savefile->ReadFloat( minShatterRadius );
-	savefile->ReadFloat( linearVelocityScale );
-	savefile->ReadFloat( angularVelocityScale );
-	savefile->ReadFloat( shardMass );
-	savefile->ReadFloat( density );
-	savefile->ReadFloat( friction );
-	savefile->ReadFloat( bouncyness );
-	savefile->ReadString( fxFracture );
+	savefile->ReadMaterial( material ); // const idMaterial * material
+	savefile->ReadMaterial( decalMaterial ); // const idMaterial * decalMaterial
+	savefile->ReadMaterial( crackedMaterial ); // const idMaterial * crackedMaterial
+	savefile->ReadFloat( decalSize ); // float decalSize
+	savefile->ReadFloat( maxShardArea ); // float maxShardArea
+	savefile->ReadFloat( maxShatterRadius ); // float maxShatterRadius
+	savefile->ReadFloat( minShatterRadius ); // float minShatterRadius
+	savefile->ReadFloat( linearVelocityScale ); // float linearVelocityScale
+	savefile->ReadFloat( angularVelocityScale ); // float angularVelocityScale
+	savefile->ReadFloat( shardMass ); // float shardMass
+	savefile->ReadFloat( density ); // float density
+	savefile->ReadFloat( friction ); // float friction
+	savefile->ReadFloat( bouncyness ); // float bouncyness
+	savefile->ReadString( fxFracture ); // idString fxFracture
 
-	// state
-	savefile->ReadBounds(bounds);
-	savefile->ReadBool( disableFracture );
+	savefile->ReadBool( isXraySurface ); // bool isXraySurface
 
-	savefile->ReadInt( lastRenderEntityUpdate );
-	savefile->ReadBool( changed );
-
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
-
-	savefile->ReadInt( num );
-	shards.SetNum( num );
-	for ( i = 0; i < num; i++ ) {
-		shards[i] = new shard_t;
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_StaticMulti physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys) {
+		RestorePhysics( &physicsObj );
 	}
 
-	for ( i = 0; i < num; i++ ) {
+	int num;
+	savefile->ReadInt( num ); // idList<shard_t *> shards
+	shards.SetNum( num );
+	for (int i = 0; i < shards.Num(); i++ ) {
+		shards[i] = new shard_t;
+	}
+	for (int i = 0; i < shards.Num(); i++ ) {
 		savefile->ReadWinding( shards[i]->winding );
 
-		savefile->ReadInt( j );
-		shards[i]->decals.SetNum( j );
-		for ( j = 0; j < shards[i]->decals.Num(); j++ ) {
+		savefile->ReadInt( num );
+		shards[i]->decals.SetNum( num );
+		int j = 0;
+		for (int j = 0; j < shards[i]->decals.Num(); j++ ) {
 			shards[i]->decals[j] = new idFixedWinding;
 			savefile->ReadWinding( *shards[i]->decals[j] );
 		}
 
-		savefile->ReadInt( j );
-		shards[i]->neighbours.SetNum( j );
-		for ( j = 0; j < shards[i]->neighbours.Num(); j++ ) {
+		savefile->ReadInt( num );
+		shards[i]->neighbours.SetNum( num );
+		for (int j = 0; j < shards[i]->neighbours.Num(); j++ ) {
 			int index;
 			savefile->ReadInt( index );
 			assert(index != -1);
 			shards[i]->neighbours[j] = shards[index];
 		}
 
-		savefile->ReadInt( j );
-		shards[i]->edgeHasNeighbour.SetNum( j );
-		for ( j = 0; j < shards[i]->edgeHasNeighbour.Num(); j++ ) {
+		savefile->ReadInt( num );
+		shards[i]->edgeHasNeighbour.SetNum( num );
+		for (j = 0; j < shards[i]->edgeHasNeighbour.Num(); j++ ) {
 			savefile->ReadBool( shards[i]->edgeHasNeighbour[j] );
 		}
 
@@ -275,9 +268,16 @@ void idBrittleFracture::Restore( idRestoreGame *savefile ) {
 		}
 	}
 
-#ifdef _D3XP
-	savefile->ReadBool( isXraySurface );
-#endif
+	savefile->ReadBounds( bounds ); // idBounds bounds
+	savefile->ReadBool( disableFracture ); // bool disableFracture
+	savefile->ReadInt( lastRenderEntityUpdate ); // mutable int lastRenderEntityUpdate
+	savefile->ReadBool( changed ); // mutable bool changed
+
+	savefile->ReadBool( hasActivatedTargets ); // bool hasActivatedTargets
+	savefile->ReadDict( &glasspieceDict ); // idDict glasspieceDict
+
+	savefile->ReadInt( portal ); // int portal
+	savefile->ReadInt( portalFadeState ); // int portalFadeState
 }
 
 /*
@@ -862,6 +862,8 @@ void idBrittleFracture::UpdatePortalVisibility()
 		// Fallback for windows without portals: never fade
 		this->GetRenderEntity()->shaderParms[SHADERPARM_ALPHA] = 0;
 	}
+
+	Present();
 }
 
 /*
@@ -1825,4 +1827,11 @@ void idBrittleFracture::PrintEventMessage(idEntity *inflictor)
 
 	idStr inflictorName = (inflictor->displayName.Length() > 0) ? inflictor->displayName : idStr(inflictor->GetName());
 	gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_window_break"), inflictorName.c_str()), GetPhysics()->GetOrigin());
+}
+
+//BC 2-26-2025: make windows update during spectate, so they do the proper fade in / fade out.
+void idBrittleFracture::SpectateUpdate()
+{
+	UpdatePortalVisibility();
+	Present();
 }

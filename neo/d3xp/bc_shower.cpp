@@ -22,8 +22,10 @@ idShower::~idShower(void)
 {
 	StopSound(SND_CHANNEL_BODY3);
 
-	if (waterParticle != NULL)
+	if (waterParticle != NULL) {
 		waterParticle->PostEventMS(&EV_Remove, 0);
+		waterParticle = nullptr;
+	}
 }
 
 void idShower::Spawn(void)
@@ -65,10 +67,18 @@ idVec3 idShower::GetJointPosition(idStr jointname)
 
 void idShower::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteObject( waterParticle ); // idFuncEmitter * waterParticle
+	savefile->WriteInt( cleanseTimer ); // int cleanseTimer
+	savefile->WriteInt( interestTimer ); // int interestTimer
 }
 
 void idShower::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadObject( CastClassPtrRef(waterParticle) ); // idFuncEmitter * waterParticle
+	savefile->ReadInt( cleanseTimer ); // int cleanseTimer
+	savefile->ReadInt( interestTimer ); // int interestTimer
 }
 
 void idShower::Think(void)

@@ -120,10 +120,30 @@ void idTrashcuber::Spawn(void)
 
 void idTrashcuber::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( interiorLight ); // idLight * interiorLight
+	SaveFileWriteArray( exteriorLights, 4, WriteObject ); // idLight * exteriorLights[4]
+	savefile->WriteObject( spotlight ); // idLight * spotlight
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( cuberState ); // int cuberState
+
+	savefile->WriteInt( lastZPosition ); // int lastZPosition
+
+	savefile->WriteString( targetAirlock ); // const char * targetAirlock
 }
 
 void idTrashcuber::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( CastClassPtrRef(interiorLight) ); // idLight * interiorLight
+	SaveFileReadArrayCast( exteriorLights, ReadObject, idClass*& ); // idLight * exteriorLights[4]
+	savefile->ReadObject( CastClassPtrRef(spotlight) ); // idLight * spotlight
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( cuberState ); // int cuberState
+
+	savefile->ReadInt( lastZPosition ); // int lastZPosition
+
+	savefile->ReadString( targetAirlock ); // const char * targetAirlock
 }
 
 //We constantly resize the spotlight so that it remains the same consistent size, regardless of how high or low the trashcuber is from the ground.

@@ -10,7 +10,7 @@ class idElevatorcable : public idAnimated
 public:
 	CLASS_PROTOTYPE(idElevatorcable);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -27,8 +27,8 @@ private:
 
 	void					Initialize();
 
-	idEntity *				topEnt;
-	idEntity *				bottomEnt;
+	idEntity *				topEnt = nullptr;
+	idEntity *				bottomEnt = nullptr;
 
 	int						animTimer;
 	int						animState;

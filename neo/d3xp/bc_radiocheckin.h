@@ -13,6 +13,8 @@ public:
 							idRadioCheckin();
 							~idRadioCheckin();
 	void					Spawn();
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
 
 	virtual void			Think(void);
 	void					StartCheckin(idVec3 _pos);

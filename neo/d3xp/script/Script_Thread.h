@@ -140,15 +140,15 @@ private:
 	void						Event_SetSpawnArg( const char *key, const char *value );
 	void						Event_SpawnString( const char *key, const char *defaultvalue );
 	void						Event_SpawnFloat( const char *key, float defaultvalue );
-	void						Event_SpawnVector( const char *key, idVec3 &defaultvalue );
+	void						Event_SpawnVector( const char *key, const idVec3 &defaultvalue );
 	void						Event_ClearPersistantArgs( void );
 	void						Event_SetPersistantArg( const char *key, const char *value );
 	void						Event_GetPersistantString( const char *key );
 	void						Event_GetPersistantFloat( const char *key );
 	void						Event_GetPersistantVector( const char *key );
-	void						Event_AngToForward( idAngles &ang );
-	void						Event_AngToRight( idAngles &ang );
-	void						Event_AngToUp( idAngles &ang );
+	void						Event_AngToForward( const idAngles &ang );
+	void						Event_AngToRight( const idAngles &ang );
+	void						Event_AngToUp( const idAngles &ang );
 	void						Event_GetSine( float angle );
 	void						Event_GetCosine( float angle );
 #ifdef _D3XP
@@ -157,11 +157,11 @@ private:
 	void						Event_GetArcTan(float a);
 #endif
 	void						Event_GetSquareRoot( float theSquare );
-	void						Event_VecNormalize( idVec3 &vec );
-	void						Event_VecLength( idVec3 &vec );
-	void						Event_VecDotProduct( idVec3 &vec1, idVec3 &vec2 );
-	void						Event_VecCrossProduct( idVec3 &vec1, idVec3 &vec2 );
-	void						Event_VecToAngles( idVec3 &vec );
+	void						Event_VecNormalize( const idVec3 &vec );
+	void						Event_VecLength( const idVec3 &vec );
+	void						Event_VecDotProduct( const idVec3 &vec1, const idVec3 &vec2 );
+	void						Event_VecCrossProduct( const idVec3 &vec1, const idVec3 &vec2 );
+	void						Event_VecToAngles( const idVec3 &vec );
 #ifdef _D3XP
 	void						Event_VecToOrthoBasisAngles( idVec3 &vec );
 	void						Event_RotateVector( idVec3 &vec, idVec3 &ang );
@@ -178,9 +178,9 @@ private:
 	void						Event_GetTraceEntity( void );
 	void						Event_GetTraceJoint( void );
 	void						Event_GetTraceBody( void );
-	void						Event_FadeIn( idVec3 &color, float time );
-	void						Event_FadeOut( idVec3 &color, float time );
-	void						Event_FadeTo( idVec3 &color, float alpha, float time );
+	void						Event_FadeIn( const idVec3 &color, float time );
+	void						Event_FadeOut( const idVec3 &color, float time );
+	void						Event_FadeTo( const idVec3 &color, float alpha, float time );
 	void						Event_SetShaderParm( int parmnum, float value );
 	void						Event_StartMusic( const char *name );
 	void						Event_Warning( const char *text );
@@ -209,8 +209,8 @@ private:
 	//BC PRIVATE
 	void						Event_getClassEntity(const char *classname, int lastFound);
 	void						Event_getClassCount(const char *classname);
-	void						Event_PlayFX(const char *fxName, idVec3 position, idVec3 angle);
-	void						Event_PlayParticle(const char *particleName, idVec3 position, idVec3 angle);
+	void						Event_PlayFX(const char *fxName, const idVec3 &position, const idVec3 &angle);
+	void						Event_PlayParticle(const char *particleName, const idVec3 &position, const idVec3 &angle);
 	void						Event_MakeParticleZoo();
 	void						Event_MakeItemZoo();
 	void						Event_MakePropZoo();
@@ -218,7 +218,7 @@ private:
 	void						Event_GetTraceSky(void);
 	void						Event_GetTraceGlass(void);
 	void						Event_DebugArrowsimple(const idVec3 &end);
-	void						Event_SpawnInterestpoint(const char *interestDefname, idVec3 position);
+	void						Event_SpawnInterestpoint(const char *interestDefname, const idVec3 &position);
 	void						Event_ParseTimeMS(float value);
 	void						Event_ParseTimeSec(float value);
 	void						Event_LoadMap(const char *mapName);
@@ -230,10 +230,10 @@ private:
 	void						Event_getworldspawnint(const char *keyname);
 	void						Event_FadeOutMusic( float fadeToDb, float seconds );
 	void						Event_SetMusicMultiplier(float multVar);
-	void						Event_getEntityInBounds(const char* name, idVec3 mins, idVec3 maxs);
+	void						Event_getEntityInBounds(const char* name, const idVec3 &mins, const idVec3 &maxs);
 	void						Event_RandomChar(void);
-	void						Event_IsAirlessAtPoint(idVec3 point);
-	void						Event_RemoveEntitiesWithinBounds(const char* matchString, idVec3 mins, idVec3 maxs);
+	void						Event_IsAirlessAtPoint(const idVec3 &point);
+	void						Event_RemoveEntitiesWithinBounds(const char* matchString, const idVec3 &mins, const idVec3 &maxs);
 	void						Event_RemoveAllDecals(void);
 	void						Event_ClearInterestPoints(void);
 	void						Event_RequirementMet(const char* entityName, int removeItem);
@@ -243,7 +243,7 @@ private:
 	void						Event_CacheSkin(const char* skinName);
 	void						Event_CacheEntityDef(const char* defName);
 
-
+	void						Event_steamOpenStoreOverlay();
 
 	//BC private end.
 

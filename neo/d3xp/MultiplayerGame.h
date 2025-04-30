@@ -364,7 +364,7 @@ private:
 
 	// rankings are used by UpdateScoreboard and UpdateHud
 	int				numRankedPlayers;		// ranked players, others may be empty slots or spectators
-	idPlayer *		rankedPlayers[MAX_CLIENTS];
+	idPlayer*		rankedPlayers[MAX_CLIENTS] = {};
 
 	bool			pureReady;				// defaults to false, set to true once server game is running with pure checksums
 	int				fragLimitTimeout;

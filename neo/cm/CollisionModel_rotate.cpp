@@ -1286,13 +1286,13 @@ void idCollisionModelManagerLocal::Rotation180( trace_t *results, const idVec3 &
 	tw.axisIntersectsTrm = false;
 	tw.quickExit = false;
 	tw.angle = endAngle - startAngle;
-	assert( tw.angle > -180.0f && tw.angle < 180.0f );
+	assert_debugonly( tw.angle > -180.0f && tw.angle < 180.0f );
 	tw.maxTan = initialTan = idMath::Fabs( tan( ( idMath::PI / 360.0f ) * tw.angle ) );
 	tw.model = idCollisionModelManagerLocal::models[model];
 	tw.start = start - modelOrigin;
 	// rotation axis, axis is assumed to be normalized
 	tw.axis = axis;
-	assert( tw.axis[0] * tw.axis[0] + tw.axis[1] * tw.axis[1] + tw.axis[2] * tw.axis[2] > 0.99f );
+	assert_debugonly( tw.axis[0] * tw.axis[0] + tw.axis[1] * tw.axis[1] + tw.axis[2] * tw.axis[2] > 0.99f );
 	// rotation origin projected into rotation plane through tw.start
 	tw.origin = rorg - modelOrigin;
 	d = (tw.axis * tw.origin) - ( tw.axis * tw.start );
@@ -1379,7 +1379,7 @@ void idCollisionModelManagerLocal::Rotation180( trace_t *results, const idVec3 &
 		} else {
 			results->fraction = idMath::Fabs( atan( tw.maxTan ) * ( 2.0f * 180.0f / idMath::PI ) / tw.angle );
 		}
-		assert( results->fraction <= 1.0f );
+		assert_debugonly( results->fraction <= 1.0f );
 		endRotation.Set( rorg, axis, startAngle + (endAngle-startAngle) * results->fraction );
 		endRotation.RotatePoint( results->endpos );
 		results->endAxis.Identity();
@@ -1589,7 +1589,7 @@ void idCollisionModelManagerLocal::Rotation180( trace_t *results, const idVec3 &
 	} else {
 		results->fraction = idMath::Fabs( atan( tw.maxTan ) * ( 2.0f * 180.0f / idMath::PI ) / tw.angle );
 	}
-	assert( results->fraction <= 1.0f );
+	assert_debugonly( results->fraction <= 1.0f );
 	endRotation.Set( rorg, axis, startAngle + (endAngle-startAngle) * results->fraction );
 	endRotation.RotatePoint( results->endpos );
 	results->endAxis = trmAxis * endRotation.ToMat3();
@@ -1616,8 +1616,8 @@ void idCollisionModelManagerLocal::Rotation( trace_t *results, const idVec3 &sta
 	idVec3 tmp;
 	float maxa, stepa, a, lasta;
 
-	assert( ((byte *)&start) < ((byte *)results) || ((byte *)&start) > (((byte *)results) + sizeof( trace_t )) );
-	assert( ((byte *)&trmAxis) < ((byte *)results) || ((byte *)&trmAxis) > (((byte *)results) + sizeof( trace_t )) );
+	assert_debugonly( ((byte *)&start) < ((byte *)results) || ((byte *)&start) > (((byte *)results) + sizeof( trace_t )) );
+	assert_debugonly( ((byte *)&trmAxis) < ((byte *)results) || ((byte *)&trmAxis) > (((byte *)results) + sizeof( trace_t )) );
 
 	memset( results, 0, sizeof( *results ) );
 

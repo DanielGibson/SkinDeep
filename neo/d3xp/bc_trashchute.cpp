@@ -45,6 +45,15 @@ idTrashchute::idTrashchute(void)
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
 
+	platform = nullptr;
+
+	detectionTimer = false;
+	stateTimer = false;
+
+	trashState = false;
+
+	gateModel = nullptr;
+
 	shutterState = SHT_IDLE;
 	shutterTimer = 0;
 }
@@ -162,10 +171,43 @@ void idTrashchute::Event_PostSpawn(void) //We need to do this post-spawn because
 
 void idTrashchute::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( platform ); // idMover * platform
+
+	savefile->WriteInt( detectionTimer ); // int detectionTimer
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteInt( trashState ); // int trashState
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteObject( gateModel ); // idEntity * gateModel
+
+	savefile->WriteInt( shutterState ); // int shutterState
+	savefile->WriteInt( shutterTimer ); // int shutterTimer
 }
 
 void idTrashchute::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( CastClassPtrRef(platform) ); // idMover * platform
+
+	savefile->ReadInt( detectionTimer ); // int detectionTimer
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadInt( trashState ); // int trashState
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadObject( gateModel ); // idEntity * gateModel
+
+	savefile->ReadInt( shutterState ); // int shutterState
+	savefile->ReadInt( shutterTimer ); // int shutterTimer
 }
 
 void idTrashchute::Think(void)
@@ -206,6 +248,10 @@ void idTrashchute::Think(void)
 					if (ent == gameLocal.GetLocalPlayer())
 					{
 						if (static_cast<idPlayer *>(ent)->noclip) //ignore player if they're in noclip.
+							continue;
+
+						//BC ignore player if player is currently jockeying.
+						if (static_cast<idPlayer*>(ent)->IsJockeying())
 							continue;
 					}
 
@@ -397,7 +443,28 @@ void idTrashchute::Think(void)
                     idStr ejectFX = ent->spawnArgs.GetString("fx_eject");
                     if (ejectFX.Length() > 0)
                     {
-                        idEntityFx::StartFx(ejectFX, GetPhysics()->GetOrigin(), mat3_identity);
+                        //idEntityFx::StartFx(ejectFX, GetPhysics()->GetOrigin(), mat3_identity);
+
+						//BC 3-12-2025: Manually do the FX, so that we can give it a speakername.
+						idDict args;
+						args.SetBool("start", true);
+						args.Set("fx", ejectFX.c_str());
+						args.Set("speakername", "#str_speaker_pirate");
+						idEntityFx* nfx = static_cast<idEntityFx*>(gameLocal.SpawnEntityType(idEntityFx::Type, &args));
+						if (nfx)
+						{
+							nfx->SetOrigin(GetPhysics()->GetOrigin());
+							
+							// SW 17th March 2025: Playing the VO here instead of inside the FX so that we can correctly assign its channel and use the VO manager
+							idStr ejectVO = ent->spawnArgs.GetString("snd_vo_eject");
+							if (ejectVO.Length() > 0)
+							{
+								gameLocal.voManager.SayVO(nfx, ejectVO.c_str(), VO_CATEGORY_BARK);
+							}
+						}
+
+						//BC 2-13-2025: player response.
+						gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay_msDelayed("snd_vo_trash_skull", 1200);
                     }
 
 					//Teleport the object.

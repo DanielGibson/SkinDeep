@@ -51,10 +51,18 @@ void idHanddryer::Spawn(void)
 
 void idHanddryer::Save(idSaveGame *savefile) const
 {
+	savefile->WriteTraceModel( trm ); // idTraceModel trm
+	savefile->WriteInt( frobTimer ); // int frobTimer
+	savefile->WriteInt( deathTimer ); // int deathTimer
+	savefile->WriteBool( hasDied ); // bool hasDied
 }
 
 void idHanddryer::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadTraceModel( trm ); // idTraceModel trm
+	savefile->ReadInt( frobTimer ); // int frobTimer
+	savefile->ReadInt( deathTimer ); // int deathTimer
+	savefile->ReadBool( hasDied ); // bool hasDied
 }
 
 void idHanddryer::Think(void)
@@ -107,6 +115,8 @@ void idHanddryer::Killed(idEntity *inflictor, idEntity *attacker, int damage, co
 
 	if (!fl.takedamage)
 		return;
+
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
 
 	gameLocal.SpawnInterestPoint(this, GetPhysics()->GetOrigin(), spawnArgs.GetString("def_deathinterest"));
 

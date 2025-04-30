@@ -11,6 +11,8 @@ public:
 	~idSpectateNode();
 
 	void					Spawn(void);
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
 	virtual void			Think(void);
 
 	void					Draw();

@@ -19,6 +19,8 @@ END_CLASS
 idUpgradecargo::idUpgradecargo(void)
 {
 	fl.takedamage = false;
+
+	gameLocal.upgradecargoEntities.Append(this);
 }
 
 idUpgradecargo::~idUpgradecargo(void)
@@ -28,7 +30,6 @@ idUpgradecargo::~idUpgradecargo(void)
 
 void idUpgradecargo::Spawn(void)
 {
-	gameLocal.upgradecargoEntities.Append(this);
 
 	upgradeDef = NULL;
 	GetPhysics()->SetContents(CONTENTS_RENDERMODEL);
@@ -55,10 +56,16 @@ void idUpgradecargo::Spawn(void)
 
 void idUpgradecargo::Save(idSaveGame *savefile) const
 {
+	savefile->WriteEntityDef( upgradeDef ); // const idDeclEntityDef * upgradeDef
+	savefile->WriteInt( state ); // int state
+	savefile->WriteObject( lockplateEnt ); // idEntity * lockplateEnt
 }
 
 void idUpgradecargo::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadEntityDef( upgradeDef ); // const idDeclEntityDef * upgradeDef
+	savefile->ReadInt( state ); // int state
+	savefile->ReadObject( lockplateEnt ); // idEntity * lockplateEnt
 }
 
 void idUpgradecargo::Think(void)
@@ -97,6 +104,7 @@ void idUpgradecargo::SetAvailable()
 {
 	state = UC_AVAILABLE;
 	lockplateEnt->PostEventMS(&EV_Remove, 0);
+	lockplateEnt = nullptr;
 
 
 

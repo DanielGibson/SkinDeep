@@ -1,6 +1,7 @@
 #include "trigger.h"
 #include "framework/DeclEntityDef.h"
 #include "Player.h"
+#include "idlib/LangDict.h"
 
 #include "bc_meta.h"
 #include "bc_trigger_deodorant.h"
@@ -12,7 +13,7 @@ EVENT(EV_Touch, idTrigger_deodorant::Event_Touch)
 END_CLASS
 
 idTrigger_deodorant::idTrigger_deodorant()
-{	
+{
 }
 
 idTrigger_deodorant::~idTrigger_deodorant(void)
@@ -21,7 +22,7 @@ idTrigger_deodorant::~idTrigger_deodorant(void)
 
 void idTrigger_deodorant::Spawn()
 {
-	displayName = "Flammable Gas";
+	displayName = common->GetLanguageDict()->GetString("#str_def_gameplay_flammablegas");
 
 	fl.takedamage = true;
 	idTrigger_Multi::Spawn();
@@ -38,9 +39,21 @@ void idTrigger_deodorant::Spawn()
 	splashArgs.Set("start_off", "1");
 	splashArgs.SetVector("origin", this->GetPhysics()->GetOrigin());
 	particleEmitter = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &splashArgs));
-	particleEmitter->SetActive(true);
+	particleEmitter.GetEntity()->SetActive(true);
 }
 
+void idTrigger_deodorant::Save(idSaveGame* savefile) const
+{
+	savefile->WriteBool( active ); // bool active
+	particleEmitter.Save( savefile ); // idFuncEmitter * particleEmitter
+	savefile->WriteInt( maxlifetime ); // int maxlifetime
+}
+void idTrigger_deodorant::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadBool( active ); // bool active
+	particleEmitter.Restore( savefile ); // idFuncEmitter * particleEmitter
+	savefile->ReadInt( maxlifetime ); // int maxlifetime
+}
 
 
 void idTrigger_deodorant::Event_Touch(idEntity* other, trace_t* trace)
@@ -73,7 +86,7 @@ void idTrigger_deodorant::BurstIntoFlames(idEntity *inflictor)
 	if (inflictor != nullptr)
 	{
 		idStr inflictorname = (inflictor->displayName.Length() > 0) ? inflictor->displayName : idStr(inflictor->GetName());
-		idStr ignitionText = idStr::Format("#str_def_gameplay_cloud_ignited", inflictorname.c_str());
+		idStr ignitionText = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_cloud_ignited"), inflictorname.c_str());
 		gameLocal.AddEventLog(ignitionText.c_str(), GetPhysics()->GetOrigin());
 
 		static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->DoHighlighter(inflictor, this);
@@ -84,12 +97,12 @@ void idTrigger_deodorant::BurstIntoFlames(idEntity *inflictor)
 	idDict args;
 	args.Set("classname", "env_fireball");
 	args.SetVector("origin", this->GetPhysics()->GetOrigin());
-	args.Set("displayname", "Fireball");
+	args.Set("displayname", "#str_def_gameplay_900059"); //BC 3-20-2025: fixed loc bug (fireball)
 	gameLocal.SpawnEntityDef(args, &fireballEnt);
 
-	if (particleEmitter)
+	if (particleEmitter.IsValid())
 	{
-		particleEmitter->PostEventMS(&EV_Remove, 500); //let the particle linger a bit so that it disappears during the middle of the fireball.
+		particleEmitter.GetEntity()->PostEventMS(&EV_Remove, 500); //let the particle linger a bit so that it disappears during the middle of the fireball.
 	}
 
 	//Remove self.
@@ -114,10 +127,10 @@ void idTrigger_deodorant::Think()
 	if (!active)
 		return;
 
-	if (gameLocal.time > maxlifetime)
+	if (gameLocal.time > maxlifetime && particleEmitter.IsValid())
 	{
-		particleEmitter->SetActive(false);
-		particleEmitter->PostEventMS(&EV_Remove, 1000);
+		particleEmitter.GetEntity()->SetActive(false);
+		particleEmitter.GetEntity()->PostEventMS(&EV_Remove, 1000);
 
 		this->PostEventMS(&EV_Remove, 0);
 	}

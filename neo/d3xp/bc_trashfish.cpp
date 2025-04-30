@@ -61,10 +61,40 @@ void idTrashfish::Spawn(void)
 
 void idTrashfish::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( airlockEnt ); // idEntityPtr<idEntity> airlockEnt
+
+	savefile->WriteInt( fishState ); // int fishState
+	savefile->WriteInt( fishIndex ); // int fishIndex
+
+	savefile->WriteObject( targetCube ); // idEntityPtr<idEntity> targetCube
+
+	savefile->WriteInt( totalMovetime ); // int totalMovetime
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteVec3( startPosition ); // idVec3 startPosition
+	savefile->WriteVec3( endPosition ); // idVec3 endPosition
+
+	savefile->WriteObject( hiveOwner ); // idEntityPtr<idEntity> hiveOwner
+
+	savefile->WriteInt( bubbleTimer ); // int bubbleTimer
 }
 
 void idTrashfish::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( airlockEnt ); // idEntityPtr<idEntity> airlockEnt
+
+	savefile->ReadInt( fishState ); // int fishState
+	savefile->ReadInt( fishIndex ); // int fishIndex
+
+	savefile->ReadObject( targetCube ); // idEntityPtr<idEntity> targetCube
+
+	savefile->ReadInt( totalMovetime ); // int totalMovetime
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadVec3( startPosition ); // idVec3 startPosition
+	savefile->ReadVec3( endPosition ); // idVec3 endPosition
+
+	savefile->ReadObject( hiveOwner ); // idEntityPtr<idEntity> hiveOwner
+
+	savefile->ReadInt( bubbleTimer ); // int bubbleTimer
 }
 
 void idTrashfish::Think(void)
@@ -288,7 +318,7 @@ void idTrashfish::Killed(idEntity *inflictor, idEntity *attacker, int damage, co
 	//Place decal.
 	gameLocal.clip.TracePoint(trRay, inflictor->GetPhysics()->GetOrigin(), GetPhysics()->GetOrigin(), MASK_SOLID, NULL);
 
-	if (trRay.fraction < 1)
+	if (trRay.fraction < 1 && g_bloodEffects.GetBool())
 	{
 		gameLocal.ProjectDecal(trRay.endpos, -trRay.c.normal, 8.0f, true, 48, "textures/decals/trashfish_blood");
 	}

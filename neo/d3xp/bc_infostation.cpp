@@ -6,6 +6,7 @@
 #include "Player.h"
 //#include "Fx.h"
 #include "framework/DeclEntityDef.h"
+#include "idlib/LangDict.h"
 
 #include "bc_ventdoor.h"
 #include "bc_meta.h"
@@ -52,6 +53,13 @@ idInfoStation::idInfoStation(void)
 {
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
+
+	//make it repairable.
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
+
+	hackboxEnt = 0;
+	lastSaveTime = 0;
 }
 
 idInfoStation::~idInfoStation(void)
@@ -60,6 +68,8 @@ idInfoStation::~idInfoStation(void)
 	{
 		gameRenderWorld->FreeLightDef(headlightHandle);
 	}
+
+	repairNode.Remove();
 }
 
 void idInfoStation::Spawn(void)
@@ -77,10 +87,6 @@ void idInfoStation::Spawn(void)
 	idleSmoke = NULL;
 	lastFTLPauseState = false;
 	hasSetupSelfMarker = false;
-
-	//make it repairable.
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 	PostEventMS(&EV_PostSpawn, 0);
 
@@ -120,6 +126,8 @@ void idInfoStation::Spawn(void)
 	
 	initialLockdoorDisplayTimer = gameLocal.time + 1000;
 	initialLockdoorDisplayDone = false;
+
+	lastSaveTime = 0;
 }
 
 void idInfoStation::Event_PostSpawn(void)
@@ -150,6 +158,8 @@ void idInfoStation::Event_PostSpawn(void)
 	}
 
 	SetupRoomLabels();
+
+	Event_SetGuiParm("in_endgame", gameLocal.IsInEndGame() ? "1" : "0");
 
 	BecomeActive(TH_THINK);
 }
@@ -191,10 +201,55 @@ void idInfoStation::SetupRoomLabels()
 
 void idInfoStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( infoState ); // int infoState
+
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+
+	savefile->WriteObject( FTLDrive_ptr ); // idEntityPtr<idEntity> FTLDrive_ptr
+	savefile->WriteBool( lastFTLPauseState ); // bool lastFTLPauseState
+
+	savefile->WriteBool( hasSetupSelfMarker ); // bool hasSetupSelfMarker
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteObject( hackboxEnt ); // idEntity * hackboxEnt
+	savefile->WriteInt( soulUpdateTimer ); // int soulUpdateTimer
+
+	savefile->WriteBool( trackingHuman ); // bool trackingHuman
+	savefile->WriteBool( trackingCat ); // bool trackingCat
+
+	savefile->WriteBool( initialLockdoorDisplayDone ); // bool initialLockdoorDisplayDone
+	savefile->WriteInt( initialLockdoorDisplayTimer ); // int initialLockdoorDisplayTimer
 }
 
 void idInfoStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( infoState ); // int infoState
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+
+	savefile->ReadObject( FTLDrive_ptr ); // idEntityPtr<idEntity> FTLDrive_ptr
+	savefile->ReadBool( lastFTLPauseState ); // bool lastFTLPauseState
+
+	savefile->ReadBool( hasSetupSelfMarker ); // bool hasSetupSelfMarker
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadObject( hackboxEnt ); // idEntity * hackboxEnt
+	savefile->ReadInt( soulUpdateTimer ); // int soulUpdateTimer
+
+	savefile->ReadBool( trackingHuman ); // bool trackingHuman
+	savefile->ReadBool( trackingCat ); // bool trackingCat
+
+	savefile->ReadBool( initialLockdoorDisplayDone ); // bool initialLockdoorDisplayDone
+	savefile->ReadInt( initialLockdoorDisplayTimer ); // int initialLockdoorDisplayTimer
+
+	lastSaveTime = 0;
 }
 
 void idInfoStation::Think(void)
@@ -308,8 +363,38 @@ void idInfoStation::DoGenericImpulse(int index)
     }
 	else if (index == BUTTON_SAVEGAME)
 	{
-		//if (/*Do the save game here...*/)
-		//{
+		if (lastSaveTime + 1000 < gameLocal.hudTime)
+		{
+			lastSaveTime = gameLocal.hudTime;
+
+			//BC 4-15-2025: combat state check.
+			//only allow save when world is in non-combatstate.
+			if (static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->combatMetastate == COMBATSTATE_COMBAT)
+			{
+				//Tell player they can't save during combat state.
+				StartSound("snd_saveerror", SND_CHANNEL_BODY);
+				Event_GuiNamedEvent(1, "onSaveCombat");
+
+				Event_SetGuiParm("repairstatus", common->GetLanguageDict()->GetString("#str_gui_doorframe_infopanel_100045")); /*Use WALKIE-TALKIE or BRIDGE SECURITY MIC to end combat alert.*/
+				Event_GuiNamedEvent(1, "updateRepairStatus");
+			}
+			else
+			{
+				//Do the save.
+
+				cmdSystem->BufferCommandText(CMD_EXEC_APPEND, va("savegamesession", name.c_str()));
+
+				//TODO: get confirmation whether save was successful before doing the confirmation gui
+				Event_SetGuiParm("repairstatus", common->GetLanguageDict()->GetString("#str_gui_spectate_100510")); /*game saved*/
+				Event_GuiNamedEvent(1, "updateRepairStatus");
+
+				//BC 4-16-2025: distinct sound when doing a save.
+				StartSound("snd_savesuccess", SND_CHANNEL_BODY);
+			}
+		}
+		/*game saved*/	
+		//if (idSessionLocal::SaveGameSession(args))
+		//
 		//	//make gui confirmation.
 		//	Event_SetGuiParm("repairstatus", "#str_gui_spectate_100510"); /*game saved*/			
 		//}
@@ -318,8 +403,6 @@ void idInfoStation::DoGenericImpulse(int index)
 		//	//failed to save...
 		//	Event_SetGuiParm("repairstatus", "#str_gui_spectate_100511"); /*error: save failed*/			
 		//}
-		//
-		//Event_GuiNamedEvent(1, "updateRepairStatus");
 
 		return;
 	}
@@ -529,6 +612,7 @@ void idInfoStation::Damage(idEntity *inflictor, idEntity *attacker, const idVec3
 		return;
 
 	health = 0;
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
 
 	//blow it up. TODO: explosion effect
 	gameLocal.DoParticle("explosion_gascylinder.prt", GetPhysics()->GetOrigin());
@@ -685,6 +769,10 @@ void idInfoStation::UpdateSoulsLocation()
 				continue;
 
 			if (!entity->IsType(idAI::Type))
+				continue;
+
+			//BC 2-22-2025: cull out swordfishes.
+			if (!entity->spawnArgs.GetBool("can_talk", "1"))
 				continue;
 
 			//Mark position on map.

@@ -53,11 +53,16 @@ public:
 	void				Enable( bool b ) { enabled = b; }
 	void				ReadFromDemoFile( idDemoFile *f );
 	void				WriteToDemoFile( idDemoFile *f );
-	void				WriteToSaveGame( idFile *savefile );
-	void				ReadFromSaveGame( idFile *savefile );
+	void				WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void				ReadFromSaveGame( idRestoreGame *savefile );
 };
 
 ID_INLINE idRegister::idRegister( void ) {
+	enabled = false;
+	type = -1;
+	regCount = 0;
+	memset(regs, 0, sizeof(regs));
+	var = NULL;
 }
 
 ID_INLINE idRegister::idRegister( const char *p, int t ) {
@@ -65,6 +70,7 @@ ID_INLINE idRegister::idRegister( const char *p, int t ) {
 	type = t;
 	assert( t >= 0 && t < NUMTYPES );
 	regCount = REGCOUNT[t];
+	memset(regs, 0, sizeof(regs));
 	enabled = ( type == STRING ) ? false : true;
 	var = NULL;
 };
@@ -91,8 +97,8 @@ public:
 	void				Reset();
 	void				ReadFromDemoFile( idDemoFile *f );
 	void				WriteToDemoFile( idDemoFile *f );
-	void				WriteToSaveGame( idFile *savefile );
-	void				ReadFromSaveGame( idFile *savefile );
+	void				WriteToSaveGame( idSaveGame *savefile ) const;
+	void				ReadFromSaveGame( idRestoreGame *savefile );
 
 private:
 	idList<idRegister*>	regs;

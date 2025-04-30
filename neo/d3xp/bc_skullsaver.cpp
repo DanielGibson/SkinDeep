@@ -17,6 +17,7 @@
 #include "bc_meta.h"
 #include "bc_lostandfound.h"
 #include "bc_skullsaver.h"
+#include "bc_catpod_interior.h"
 
 //const int PEPPERSPEW_FALLSPEED_THRESHOLD = 200; //speed at which pepperbag must hit surface before spewing pepper.
 //const int PEPPER_LIFETIME = 9000;
@@ -36,6 +37,16 @@ const int YELL_INITIAL_DELAY = 5000; //when skullsaver first spawns, have an ini
 const int YELL_MINTIME = 8000;
 const int YELL_RANDOMVARIATIONTIME = 6000;
 
+const int RANT_MISSIONTIMER = 360000; //how many MS before the rant is allowed to happen.
+const int RANT_CHANCE = 20; // probability chance out of XX that rant can happen.
+
+//Debug for making skull yell often. DO NOT CHECK IN THESE VALUES!
+//const int YELL_INITIAL_DELAY = 1000; //when skullsaver first spawns, have an initial delay. This is so it doesn't just immediately alert everyone nearby.
+//const int YELL_MINTIME = 3000;
+//const int YELL_RANDOMVARIATIONTIME = 100;
+
+const idStr REGENERATIONTIME = "5000";
+
 
 const int JUMP_CLOSEDISTANCE_THRESHOLD = 64; //when skullsaver less than this distance to player, it will attempt to jump AWAY from player. if further than this, it will attempt to jump CLOSER to player.
 
@@ -43,6 +54,8 @@ const int ENEMY_FROBINDEX = 7; //Determines when an enemy frobs the skullsaver (
 
 const int CONVEY_RESPAWNBEACON_OFFSET = 68; //how high off the respawn beacon do we float to.
 const float CONVEY_PATH_WIDTH = 8.0f;
+
+const int NINAREPLY_TIMEGAP = 150; //how many milliseconds between the skull noise + nina's reply.
 
 CLASS_DECLARATION(idMoveableItem, idSkullsaver)
 
@@ -63,6 +76,9 @@ idSkullsaver::idSkullsaver(void)
 	isLowHealthState = false;
 	damageParticleFlyTime = 0;
 	damageParticle = NULL;
+
+	waitingForNinaReply = false;
+	ninaReplyTimer = 0;
 }
 
 idSkullsaver::~idSkullsaver(void)
@@ -79,10 +95,12 @@ idSkullsaver::~idSkullsaver(void)
 		if (this->pathBeamTarget[i])
 		{
 			this->pathBeamTarget[i]->PostEventMS(&EV_Remove, 0);
+			pathBeamTarget[i] = nullptr;
 		}
 		if (this->pathBeamOrigin[i])
 		{
 			this->pathBeamOrigin[i]->PostEventMS(&EV_Remove, 0);
+			pathBeamOrigin[i] = nullptr;
 		}
 	}
 }
@@ -119,6 +137,16 @@ void idSkullsaver::Spawn(void)
 	soundwaves->SetOrigin(GetPhysics()->GetOrigin());
 	soundwaves->Bind(this, true);
 	heybarkTimer = gameLocal.time + YELL_INITIAL_DELAY + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
+
+
+	//BC 2-14-2025: regeneration particles.
+	args.Clear();
+	args.Set("model", spawnArgs.GetString("model_regeneration"));
+	args.Set("start_off", "1");
+	regnerationParticle = static_cast<idFuncEmitter*>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &args));
+	regnerationParticle->SetOrigin(GetPhysics()->GetOrigin());
+	regnerationParticle->Bind(this, true);
+	
 
 	conveyorDelayTime = gameLocal.time + spawnArgs.GetInt("convey_delay_time", "2000");
 	conveyorRespawnpoint = NULL;
@@ -180,10 +208,129 @@ void idSkullsaver::Event_PostSpawn(void)
 
 void idSkullsaver::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( bodyOwner ); // idEntityPtr<idEntity> bodyOwner
+	savefile->WriteObject( springPartner ); // idEntityPtr<idEntity> springPartner
+
+	savefile->WriteInt( nextJumpTime ); // int nextJumpTime
+	savefile->WriteInt( lifetime ); // int lifetime
+
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteParticle( idleSmoke ); // const idDeclParticle * idleSmoke
+	savefile->WriteInt( idleSmokeFlyTime ); // int idleSmokeFlyTime
+
+	savefile->WriteInt( heybarkTimer ); // int heybarkTimer
+
+	savefile->WriteObject( soundwaves ); // idFuncEmitter * soundwaves
+
+	savefile->WriteObject( regnerationParticle ); // idFuncEmitter* regnerationParticle
+
+
+	savefile->WriteInt( conveyorDelayTime ); // int conveyorDelayTime
+	savefile->WriteObject( conveyorRespawnpoint ); // idEntityPtr<idEntity> conveyorRespawnpoint
+	savefile->WriteFloat( conveyorTotalMoveTime ); // float conveyorTotalMoveTime
+	savefile->WriteVec3( conveyorStartPosition ); // idVec3 conveyorStartPosition
+	savefile->WriteInt( conveyorStartMoveTime ); // int conveyorStartMoveTime
+	savefile->WriteVec3( conveyorDestPosition ); // idVec3 conveyorDestPosition
+	savefile->WriteVec3( conveyorRespawnPos ); // idVec3 conveyorRespawnPos
+	
+	// idAAS* aas // regen
+	//	aas = gameLocal.GetAAS( "aas32_flybot" );
+
+	//if ( !aas )
+	//{
+	//	gameLocal.Warning( "Skullsaver: map does not have aas32_flybot data. Falling back to aas24." );
+	//	aas = gameLocal.GetAAS( "aas24" );
+	//}
+	//
+	savefile->WriteInt( destinationArea ); // int destinationArea
+
+	SaveFileWriteArray( pathPoints, pathPoints.Num(), WriteVec3 ); // idList<idVec3> pathPoints
+	SaveFileWriteArray( pathBeamOrigin, CONVEY_MAX_PATH, WriteObject ); // idBeam* pathBeamOrigin[CONVEY_MAX_PATH]
+	SaveFileWriteArray( pathBeamTarget, CONVEY_MAX_PATH, WriteObject ); // idBeam* pathBeamTarget[CONVEY_MAX_PATH]
+
+	savefile->WriteBool( hasStoredSkull ); // bool hasStoredSkull
+
+	savefile->WriteBool( isLowHealthState ); // bool isLowHealthState
+	savefile->WriteParticle( damageParticle ); // const idDeclParticle * damageParticle
+	savefile->WriteInt( damageParticleFlyTime ); // int damageParticleFlyTime
+	savefile->WriteObject( damageEmitter ); // idFuncEmitter * damageEmitter
+
+	savefile->WriteObject( lostandfoundMachine ); // idEntityPtr<idEntity> lostandfoundMachine
+
+	aiSpawnLocOrig.Save( savefile ); // idEntityPtr<idLocationEntity> aiSpawnLocOrig
+
+	savefile->WriteBool( waitingForNinaReply ); // bool waitingForNinaReply
+	savefile->WriteInt( ninaReplyTimer ); // int ninaReplyTimer
+
+	savefile->WriteBool( rantcheckDone ); // bool rantcheckDone
 }
 
 void idSkullsaver::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( bodyOwner ); // idEntityPtr<idEntity> bodyOwner
+	savefile->ReadObject( springPartner ); // idEntityPtr<idEntity> springPartner
+
+	savefile->ReadInt( nextJumpTime ); // int nextJumpTime
+	savefile->ReadInt( lifetime ); // int lifetime
+
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadParticle( idleSmoke ); // const idDeclParticle * idleSmoke
+	savefile->ReadInt( idleSmokeFlyTime ); // int idleSmokeFlyTime
+
+	savefile->ReadInt( heybarkTimer ); // int heybarkTimer
+
+	savefile->ReadObject( CastClassPtrRef(soundwaves) ); // idFuncEmitter * soundwaves
+
+	savefile->ReadObject( CastClassPtrRef(regnerationParticle) ); // idFuncEmitter* regnerationParticle
+
+	savefile->ReadInt( conveyorDelayTime ); // int conveyorDelayTime
+	savefile->ReadObject( conveyorRespawnpoint ); // idEntityPtr<idEntity> conveyorRespawnpoint
+	savefile->ReadFloat( conveyorTotalMoveTime ); // float conveyorTotalMoveTime
+	savefile->ReadVec3( conveyorStartPosition ); // idVec3 conveyorStartPosition
+	savefile->ReadInt( conveyorStartMoveTime ); // int conveyorStartMoveTime
+	savefile->ReadVec3( conveyorDestPosition ); // idVec3 conveyorDestPosition
+	savefile->ReadVec3( conveyorRespawnPos ); // idVec3 conveyorRespawnPos
+
+	// idAAS* aas // regen
+	aas = gameLocal.GetAAS( "aas32_flybot" );
+	if ( !aas )
+	{
+		gameLocal.Warning( "Skullsaver: map does not have aas32_flybot data. Falling back to aas24." );
+		aas = gameLocal.GetAAS( "aas24" );
+	}
+	
+	savefile->ReadInt( destinationArea ); // int destinationArea
+
+	SaveFileReadList( pathPoints, ReadVec3 ); // idList<idVec3> pathPoints
+	SaveFileReadArrayCast( pathBeamOrigin, ReadObject, idClass*& ); // idBeam* pathBeamOrigin[CONVEY_MAX_PATH]
+	SaveFileReadArrayCast( pathBeamTarget, ReadObject, idClass*& ); // idBeam* pathBeamTarget[CONVEY_MAX_PATH]
+
+	savefile->ReadBool( hasStoredSkull ); // bool hasStoredSkull
+
+	savefile->ReadBool( isLowHealthState ); // bool isLowHealthState
+	savefile->ReadParticle( damageParticle ); // const idDeclParticle * damageParticle
+	savefile->ReadInt( damageParticleFlyTime ); // int damageParticleFlyTime
+	savefile->ReadObject( CastClassPtrRef(damageEmitter) ); // idFuncEmitter * damageEmitter
+
+	savefile->ReadObject( lostandfoundMachine ); // idEntityPtr<idEntity> lostandfoundMachine
+
+	aiSpawnLocOrig.Restore( savefile ); // idEntityPtr<idLocationEntity> aiSpawnLocOrig
+
+	savefile->ReadBool( waitingForNinaReply ); // bool waitingForNinaReply
+	savefile->ReadInt( ninaReplyTimer ); // int ninaReplyTimer
+
+	savefile->ReadBool( rantcheckDone ); // bool rantcheckDone
 }
 
 idEntity* idSkullsaver::FindLostandfoundMachine()
@@ -206,7 +353,7 @@ idEntity* idSkullsaver::FindLostandfoundMachine()
 
 void idSkullsaver::Think(void)
 {
-	UpdateSparkTimer();
+	//UpdateSparkTimer();
 
 	if (state == SKULLSAVER_INESCAPEPOD)
 	{
@@ -286,7 +433,7 @@ void idSkullsaver::Think(void)
 			}
 
 			//Do the yell.
-			if (gameLocal.time > heybarkTimer)
+			if (gameLocal.time > heybarkTimer && !gameLocal.GetLocalPlayer()->IsJockeying()) //BC 4-15-2025: don't do skull conversation if player is jockeying
 			{
 				if ((gameLocal.GetLocalPlayer()->HasEntityInCarryableInventory(this) && gameLocal.GetLocalPlayer()->GetCarryable() != this))
 				{
@@ -307,7 +454,7 @@ void idSkullsaver::Think(void)
 
 					//Check if player is actively holding the skull.
 					bool holdingMe = false;
-					if (gameLocal.GetLocalPlayer()->GetCarryable() != NULL) //Only do the jump if player is not holding onto the skull.
+					if (gameLocal.GetLocalPlayer()->GetCarryable() != NULL) //See if player is holding onto the skull.
 					{
 						if (gameLocal.GetLocalPlayer()->GetCarryable() == this)
 						{
@@ -315,17 +462,45 @@ void idSkullsaver::Think(void)
 						}
 					}
 
-					if (holdingMe)
+					//BC 2-18-2025: do nothing if in mech.
+					bool doSoundwave = true;
+					if (gameLocal.GetLocalPlayer()->IsInMech() && holdingMe)
 					{
-						StartSound("snd_held", SND_CHANNEL_VOICE);
+						doSoundwave = false;
+					}
+					else if (holdingMe)
+					{
+						//BC 2-14-2025: skullsaver rant check.
+						//Check for conditions to allow for rant to happen. We only allow it if XX time has passed in mission, and a random check passes.
+						bool doRant = false;						
+						if (!rantcheckDone && gameLocal.time > RANT_MISSIONTIMER)
+						{
+							rantcheckDone = true;
+
+							if (gameLocal.random.RandomInt(RANT_CHANCE) <= 0)
+							{
+								doRant = true;
+							}
+						}
+
+						int length;
+						if (StartSound(doRant  ? "snd_vo_heldrant" : "snd_held", SND_CHANNEL_VOICE, 0, false, &length)) //skull says something to nina.
+						{
+							//BC 2-14-2025: logic for nina replying to skull
+							waitingForNinaReply = true;
+							ninaReplyTimer = gameLocal.time + length + NINAREPLY_TIMEGAP;
+						}
 					}
 					else
 					{
-						StartSound("snd_hey", SND_CHANNEL_VOICE);
+						StartSound("snd_hey", SND_CHANNEL_VOICE); //skullsaver rolling around on ground.
 						gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), spawnArgs.GetString("interest_yell"));
 					}
 
-					soundwaves->SetActive(true);
+					if (doSoundwave)
+					{
+						soundwaves->SetActive(true);
+					}
 				}
 
 				heybarkTimer = gameLocal.time + YELL_MINTIME + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
@@ -363,6 +538,20 @@ void idSkullsaver::Think(void)
 		//{
 		//	doRespawnJump();
 		//}
+
+		if (waitingForNinaReply && gameLocal.time > ninaReplyTimer)
+		{
+			waitingForNinaReply = false;
+
+			//see if it's valid for nina to reply.
+			if (gameLocal.GetLocalPlayer()->GetCarryable() != NULL) //See if player is holding onto the skull.
+			{
+				if (gameLocal.GetLocalPlayer()->GetCarryable() == this)
+				{
+					gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay("snd_vo_ninaskullrespond");					
+				}
+			}
+		}
 	}
 	else if (state == SKULLSAVER_CONVEYJUMP)
 	{
@@ -370,7 +559,21 @@ void idSkullsaver::Think(void)
 		{
 			conveyorRespawnpoint = GetNearestRespawnpoint(aiSpawnLocOrig.GetEntity());
 
-			if (conveyorRespawnpoint.IsValid())
+			// SW 22nd April 2025: Do not let the skullsaver attempt to convey while inside the cat pod (this causes all kinds of problems).
+			// Try to find a catpod interior entity nearby. If it is, we assume we're inside (it's a fairly safe assumption since the cat pod lives in its own little pocket dimension)
+			idEntity* entities[64];
+			bool inCatPod = false;
+			int entCount = gameLocal.EntitiesWithinRadius(this->GetPhysics()->GetOrigin(), 256, entities, 64);
+			for (int i = 0; i < entCount; i++)
+			{
+				if (entities[i]->IsType(idCatpodInterior::Type))
+				{
+					inCatPod = true;
+					break;
+				}
+			}
+
+			if (conveyorRespawnpoint.IsValid() && !inCatPod)
 			{
 				state = SKULLSAVER_CONVEYING;
 				BecomeInactive(TH_PHYSICS);
@@ -379,12 +582,21 @@ void idSkullsaver::Think(void)
 				GetPhysics()->SetGravity(idVec3(0, 0, 0));
 				//GetPhysics()->SetContents(CONTENTS_CORPSE);
 
-				StartSound("snd_convey", SND_CHANNEL_VOICE2);
+				StartSound("snd_convey", SND_CHANNEL_BODY); // SW 17th March 2025: Moving this to a body channel (it shouldn't be affected by the voice volume slider)
 				gameLocal.DoParticle("skullsaver_conveystart.prt", GetPhysics()->GetOrigin());
 
 				conveyorRespawnPos = conveyorRespawnpoint.GetEntity()->GetPhysics()->GetOrigin() + idVec3( 0, 0, CONVEY_RESPAWNBEACON_OFFSET );
 
 				SetupPath();
+
+
+				//BC 2-13-2025: make Nina say vo if shes sees skull start conveying.
+				if (DoesPlayerHaveLOStoMe_Simple())
+				{
+					gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay("snd_vo_see_skull");
+				}
+
+				heybarkTimer = gameLocal.time + 2500; //BC 2-14-2025: force a delay before first convey bark can happen.
 			}
 			else
 			{
@@ -433,10 +645,13 @@ void idSkullsaver::Think(void)
 				{
 					//has arrived. Do respawn.
 					state = SKULLSAVER_STARTRESPAWN;
-					nextJumpTime = gameLocal.time + spawnArgs.GetInt("convey_respawn_time", "5000");
+					nextJumpTime = gameLocal.time + spawnArgs.GetInt("convey_respawn_time", REGENERATIONTIME);
 
 					StartSound("snd_vo_respawn", SND_CHANNEL_VOICE);
 					StartSound( "snd_startrespawn", SND_CHANNEL_BODY3 );
+					soundwaves->SetActive(true);
+
+					regnerationParticle->SetActive(true);
 				}
 				else
 				{
@@ -444,6 +659,17 @@ void idSkullsaver::Think(void)
 				}
 			}
 		}
+
+
+		//BC 2-14-2025: Skull barks when it's conveying.
+		if (gameLocal.time > heybarkTimer)
+		{
+			StartSound("snd_vo_respawn", SND_CHANNEL_VOICE);
+			heybarkTimer = gameLocal.time + YELL_MINTIME + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
+			soundwaves->SetActive(true);
+		}		
+
+
 	}
 	else if (state == SKULLSAVER_STARTRESPAWN)
 	{
@@ -569,6 +795,11 @@ void idSkullsaver::Think(void)
 		}
 	}
 
+	// SW 24th Feb 2025
+	if (soundwaves != NULL)
+	{
+		soundwaves->Show();
+	}
 
 	UpdateSpacePush();
 	RunPhysics();
@@ -879,6 +1110,12 @@ void idSkullsaver::Hide(void)
 		gameRenderWorld->FreeLightDef(headlightHandle);
 		headlightHandle = -1;
 	}
+	
+	// SW 24th Feb 2025
+	if (soundwaves != NULL)
+	{
+		soundwaves->Hide();
+	}
 }
 
 void idSkullsaver::SetInEscapePod()
@@ -998,6 +1235,8 @@ void idSkullsaver::ResetConveyTime()
 	{
 		pathBeamOrigin[i]->Hide();
 	}
+
+	regnerationParticle->SetActive(false);
 }
 
 void idSkullsaver::Damage(idEntity* inflictor, idEntity* attacker, const idVec3& dir, const char* damageDefName, const float damageScale, const int location, const int materialType)
@@ -1035,4 +1274,17 @@ void idSkullsaver::SetBodyOwner(idEntity* ent)
 	bodyOwner = ent;
 
 	Event_SetGuiParm("ownername", ent->displayName.c_str());
+}
+
+//BC 2-20-2025: yell when thrown in space.
+void idSkullsaver::JustThrown()
+{
+	idMoveableItem::JustThrown();
+
+	if (gameLocal.GetAirlessAtPoint(GetPhysics()->GetOrigin()))
+	{
+		//gameLocal.voManager.SayVO(this, "snd_vo_ejectspace", VO_CATEGORY_BARK);
+		StartSound("snd_vo_ejectspace", SND_CHANNEL_VOICE);
+		soundwaves->SetActive(true);
+	}
 }

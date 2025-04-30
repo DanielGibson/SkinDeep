@@ -12,7 +12,7 @@ public:
 							idRadioWall(void);
 	virtual					~idRadioWall(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -36,14 +36,14 @@ private:
 
 	int						activateTimer;
 
-	idFuncEmitter			*musicNotes;
-	idFuncEmitter			*soundwaves;
+	idFuncEmitter			*musicNotes = nullptr;
+	idFuncEmitter			*soundwaves = nullptr;
 
 	int						interestTimer;
 	idEntityPtr<idEntity>	interestPoint;
 
 	idVec3					GetSpeakerPos();
 
-	idFuncEmitter			*idleSmoke;
+	idFuncEmitter			*idleSmoke = nullptr;
 };
 //#pragma once

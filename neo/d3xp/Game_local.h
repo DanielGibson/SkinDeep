@@ -85,6 +85,7 @@ class idTypeInfo;
 class idThread;
 class idEditEntities;
 class idLocationEntity;
+class idFeedAlertWindow;
 
 //============================================================================
 extern const int NUM_RENDER_PORTAL_BITS;
@@ -159,6 +160,12 @@ struct eventlog_t
 #define CARRYFROB_INDEX			-777	//special frobindex when player frobs the thing they're holding.
 #define PEEKFROB_INDEX			-760	//special frobindex when frobbing while peeking (for exiting cryopod, vents)
 #define JOCKEYFROB_INDEX		-750	//special frobindex when jockeying frobs something.
+
+
+#define VOICEPRINT_A		0
+#define VOICEPRINT_B		1
+#define VOICEPRINT_BOSS		2
+
 
 
 #define ROOMLABELCOUNT 8
@@ -318,6 +325,7 @@ enum
 {
 	EL_NONE,
 	EL_DEATH,
+	EL_DESTROYED,
 	EL_DAMAGE,
 	EL_HEAL,
 	EL_INTERESTPOINT,
@@ -367,7 +375,7 @@ public:
 							idEntityPtr();
 
 	// save games
-	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
+	void					Save( idSaveGame *savefile ) const;	// blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
 	idEntityPtr<type> &		operator=( type *ent );
@@ -755,6 +763,8 @@ public:
 	idEntity *				SpawnInterestPoint(idEntity *ownerEnt, idVec3 position, const char *interestDef);
 	void					ClearInterestPoints(void);
 
+	bool					IsInEndGame();
+
 	idLinkList<idEntity>	bafflerEntities;
 	idLinkList<idEntity>	interestEntities;
 	idLinkList<idEntity>	searchnodeEntities;
@@ -789,6 +799,7 @@ public:
 
 	bool					menuPause;
 	bool					spectatePause;
+	bool					requestPauseMenu;
 
 	int						GetAmountEnemiesSeePlayer(bool onlyAlerted);
 
@@ -799,13 +810,15 @@ public:
 	int						nextPetTime;
 
 	idListGUI *				eventlogGuiList;
+	idFeedAlertWindow*		eventLogAlerts = nullptr;
 	void					InitEventLog(void);
+	void					ShutdownEventLog();
 	void					InitEventLogFile(bool startOfSession);
 	void					CloseEventLogFile(void);
 	void					AddEventLog(const char *text, idVec3 _position, bool showInfoFeed = true, int eventType = 0);
 	void					AddEventlogDamage(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname);
-	void					AddEventlogDeath(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname);
-	void					DisplayEventLogAlert(const char *text, const char * icon = nullptr, idVec4 * textColor = nullptr, idVec4 * bgColor = nullptr, idVec4 * iconColor = nullptr, float durationSeconds = 0.0f, bool allowDupes = false);
+	void					AddEventlogDeath(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname, int eventType);
+	void					DisplayEventLogAlert(const char *text, const char * icon = nullptr, idVec4 * textColor = nullptr, idVec4 * bgColor = nullptr, idVec4 * iconColor = nullptr, float durationSeconds = 0.0f, bool allowDupes = true);
 	static void				TestEventLogFeed();
 	idList<eventlog_t>		eventLogList;
 
@@ -849,18 +862,22 @@ public:
 
 	idStr					GetMilestonenameViaLevelIndex(int levelIndex, int milestoneIndex);
 
+	idDict					mouseButtonDict;
 	idDict					controllerButtonDicts[CT_NUM];
 
 	void					DoSpewBurst(idEntity* ent, int spewType);
 
 	idStr					GetMapdisplaynameViaProgressIndex(int index);
+	idStr					GetMapdisplaynameViaMapfile(idStr mapfilename);
 
 	void					BindStickyItemViaTrace(idEntity* stickyItem, trace_t tr);
 
+	idStr					GetCatViaModel(idStr modelname, int* voiceprint);
 
+	idStr					GetBindingnameViaBind(idStr bindname);
 
-
-
+	static void				TestTimedFunc_f(const idCmdArgs& args);
+	void					TestTimedFunc(const idCmdArgs& args);
 	//BC PUBLIC end
 
 
@@ -994,7 +1011,7 @@ private:
 
 	idStr					GetLogAttackerName(idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname);
 
-
+	idStr					currentSessionSaveGamePath;
 
 	//BC PRIVATE END
 };
@@ -1020,12 +1037,12 @@ ID_INLINE idEntityPtr<type>::idEntityPtr() {
 
 template< class type >
 ID_INLINE void idEntityPtr<type>::Save( idSaveGame *savefile ) const {
-	savefile->WriteInt( spawnId );
+	savefile->WriteInt( spawnId ); // int spawnId
 }
 
 template< class type >
 ID_INLINE void idEntityPtr<type>::Restore( idRestoreGame *savefile ) {
-	savefile->ReadInt( spawnId );
+	savefile->ReadInt( spawnId ); // int spawnId
 }
 
 template< class type >

@@ -12,7 +12,7 @@ public:
 							idUpgradecargo(void);
 	virtual					~idUpgradecargo(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -38,7 +38,7 @@ public:
 	bool					SetInfo(const char *upgradeName);
 	
 		
-	const idDeclEntityDef *upgradeDef;
+	const idDeclEntityDef *upgradeDef = nullptr;
 
 private:
 
@@ -46,7 +46,7 @@ private:
 	int						state;
 
 
-	idEntity				*lockplateEnt;
+	idEntity				*lockplateEnt = nullptr;
 
 
 	

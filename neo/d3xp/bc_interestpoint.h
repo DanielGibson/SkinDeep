@@ -17,7 +17,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -40,7 +40,7 @@ public:
 	bool					cleanupWhenUnobserved;	// SW: This interestpoint has ceased to be remarkable. We can destroy it, but only if there are no active investigators/observers.
 	bool					forceCombat;			// Forces the AI to enter combat state.
 	bool					onlyLocalPVS;			// AI has to be in same PVS as the interestpoint. Only for audio interestpoints. This is so the AI ignores things in other PVSs, i.e. skullsaver yelling.
-	idEntityPtr<idEntity>	interestOwner;
+	idEntityPtr<idEntity>	interestOwner;			// the entity associated with this interestpoint.
 
 	void					SetClaimed(bool value, idAI* claimant = NULL);
 	int						GetExpirationTime(void);

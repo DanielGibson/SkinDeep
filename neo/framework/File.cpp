@@ -377,6 +377,19 @@ int idFile::ReadFloat( float &value ) {
 	return result;
 }
 
+
+/*
+=================
+idFile::ReadLong
+=================
+*/
+int idFile::ReadLong( long &value ) {
+	int result = Read( &value, sizeof( value ) );
+	value = LittleLong( value );
+	return result;
+}
+
+
 /*
  =================
  idFile::ReadBool
@@ -520,12 +533,22 @@ int idFile::WriteUnsignedChar( const unsigned char value ) {
 }
 
 /*
- =================
- idFile::WriteFloat
- =================
- */
+=================
+idFile::WriteFloat
+=================
+*/
 int idFile::WriteFloat( const float value ) {
 	float v = LittleFloat(value);
+	return Write( &v, sizeof( v ) );
+}
+
+/*
+=================
+idFile::WriteLong
+=================
+*/
+int idFile::WriteLong( const long value ) {
+	long v = LittleLong(value);
 	return Write( &v, sizeof( v ) );
 }
 

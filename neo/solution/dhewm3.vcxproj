@@ -131,7 +131,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_D3XP;CTF;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;_D3XP;CTF;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <UndefinePreprocessorDefinitions>__DOOM_DLL__;GAME_DLL</UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -187,7 +187,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_D3XP;CTF;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;_D3XP;CTF;WIN32;_WINDOWS;_DEBUG;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <UndefinePreprocessorDefinitions>__DOOM_DLL__;GAME_DLL</UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -244,7 +244,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Release";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="Release";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
@@ -296,7 +296,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="MinSizeRel";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="MinSizeRel";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
@@ -348,9 +348,9 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="RelWithDebInfo";_RELWITHDEBINFO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="RelWithDebInfo";_RELWITHDEBINFO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
-      <UndefinePreprocessorDefinitions>__DOOM_DLL__;GAME_DLL</UndefinePreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>__DOOM_DLL__;GAME_DLL;</UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -398,7 +398,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="RelWithDebInfo";_RELWITHDEBINFO;DEMO;ID_CONSOLE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__BLENDO_SIMD_INLINE__;__BLENDO_SIMD__;_D3XP;CTF;WIN32;_WINDOWS;_ALLOW_KEYWORD_MACROS;WINVER=0x0501;_WIN32_WINNT=0x0501;CMAKE_INTDIR="RelWithDebInfo";_RELWITHDEBINFO;DEMO;ID_CONSOLE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <UndefinePreprocessorDefinitions>__DOOM_DLL__;GAME_DLL</UndefinePreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -845,6 +845,8 @@
     <ClCompile Include="..\d3xp\bc_wrench.cpp" />
     <ClCompile Include="..\d3xp\bc_yarnboard.cpp" />
     <ClCompile Include="..\d3xp\bc_zena.cpp" />
+    <ClCompile Include="..\d3xp\epicutilities.cpp" />
+    <ClCompile Include="..\d3xp\nullutilities.cpp" />
     <ClCompile Include="..\d3xp\steamutilities.cpp" />
     <ClCompile Include="..\d3xp\sw_signmap.cpp" />
     <ClCompile Include="..\renderer\ShaderGL.cpp" />
@@ -892,6 +894,9 @@
     <ClInclude Include="..\d3xp\bc_wrench.h" />
     <ClInclude Include="..\d3xp\bc_yarnboard.h" />
     <ClInclude Include="..\d3xp\bc_zena.h" />
+    <ClInclude Include="..\d3xp\epicutilities.h" />
+    <ClInclude Include="..\d3xp\nullutilities.h" />
+    <ClInclude Include="..\d3xp\platformutilties.h" />
     <ClInclude Include="..\d3xp\steamutilities.h" />
     <ClInclude Include="..\d3xp\sw_signmap.h" />
     <ClInclude Include="..\renderer\ShaderGL.h" />

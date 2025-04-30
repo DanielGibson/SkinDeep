@@ -353,6 +353,11 @@ idLight::idLight() {
 
 	fxBreak.Clear();
 
+	// blendo eric: default repairable, but check if disabled when spawning
+	//				so the repair list is set on creation, not spawn (savegame doesn't use spawn)
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
+
 }
 
 /*
@@ -379,28 +384,45 @@ archives object for save game file
 ================
 */
 void idLight::Save( idSaveGame *savefile ) const {
-	savefile->WriteRenderLight( renderLight );
+	savefile->WriteRenderLight( renderLight ); // renderLight_t renderLight
+	savefile->WriteInt( lightDefHandle ); // int lightDefHandle
 
-	savefile->WriteBool( renderLight.prelightModel != NULL );
+	savefile->WriteBool( renderLight.prelightModel != NULL ); // regen below
 
-	savefile->WriteVec3( localLightOrigin );
-	savefile->WriteMat3( localLightAxis );
+	savefile->WriteVec3( localLightOrigin ); // idVec3 localLightOrigin
+	savefile->WriteMat3( localLightAxis ); // idMat3 localLightAxis
+	savefile->WriteString( brokenModel ); // idString brokenModel
+	savefile->WriteInt( levels ); // int levels
+	savefile->WriteInt( currentLevel ); // int currentLevel
+	savefile->WriteVec3( baseColor ); // idVec3 baseColor
+	savefile->WriteBool( breakOnTrigger ); // bool breakOnTrigger
+	savefile->WriteInt( count ); // int count
+	savefile->WriteInt( triggercount ); // int triggercount
+	savefile->WriteObject( lightParent ); // idEntity * lightParent
+	savefile->WriteVec4( fadeFrom ); // idVec4 fadeFrom
+	savefile->WriteVec4( fadeTo ); // idVec4 fadeTo
+	savefile->WriteInt( fadeStart ); // int fadeStart
+	savefile->WriteInt( fadeEnd ); // int fadeEnd
+	savefile->WriteBool( soundWasPlaying ); // bool soundWasPlaying
 
-	savefile->WriteString( brokenModel );
-	savefile->WriteInt( levels );
-	savefile->WriteInt( currentLevel );
+	savefile->WriteInt( skyTints.Num() ); // idList<skyTint_t> skyTints
+	for (int idx = 0; idx < skyTints.Num(); idx++)
+	{
+		savefile->WriteMaterial( skyTints[idx].sky ); // const idMaterial* sky
+		savefile->WriteVec3( skyTints[idx].color ); // idVec3 color
+	}
 
-	savefile->WriteVec3( baseColor );
-	savefile->WriteBool( breakOnTrigger );
-	savefile->WriteInt( count );
-	savefile->WriteInt( triggercount );
-	savefile->WriteObject( lightParent );
+	savefile->WriteInt( skyCenters.Num() ); // idList<skyCenter_t> skyCenters
+	for (int idx = 0; idx < skyCenters.Num(); idx++)
+	{
+		savefile->WriteMaterial( skyCenters[idx].sky ); // const idMaterial* sky
+		savefile->WriteVec3( skyCenters[idx].center ); // idVec3 color
+	}
 
-	savefile->WriteVec4( fadeFrom );
-	savefile->WriteVec4( fadeTo );
-	savefile->WriteInt( fadeStart );
-	savefile->WriteInt( fadeEnd );
-	savefile->WriteBool( soundWasPlaying );
+	savefile->WriteDict( &shardDict ); // idDict shardDict
+	savefile->WriteString( fxBreak ); // idString fxBreak
+	savefile->WriteVec4( originalColor ); // idVec4 originalColor
+	savefile->WriteBool( originalAffectLightmeter ); // bool originalAffectLightmeter
 }
 
 /*
@@ -411,12 +433,16 @@ unarchives object from save game file
 ================
 */
 void idLight::Restore( idRestoreGame *savefile ) {
+	savefile->ReadRenderLight( renderLight ); // renderLight_t renderLight
+	savefile->ReadInt( lightDefHandle ); // int lightDefHandle
+	if ( lightDefHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( lightDefHandle, &renderLight );
+	}
+
 	bool hadPrelightModel;
-
-	savefile->ReadRenderLight( renderLight );
-
 	savefile->ReadBool( hadPrelightModel );
-	renderLight.prelightModel = renderModelManager->CheckModel( va( "_prelight_%s", name.c_str() ) );
+	// renderLight.prelightModel = renderModelManager->CheckModel( va( "_prelight_%s", name.c_str() ) );
+	// blendo eric: this is loaded by renderlight now
 	if ( ( renderLight.prelightModel == NULL ) && hadPrelightModel ) {
 		assert( 0 );
 		if ( developer.GetBool() ) {
@@ -428,26 +454,43 @@ void idLight::Restore( idRestoreGame *savefile ) {
 		}
 	}
 
-	savefile->ReadVec3( localLightOrigin );
-	savefile->ReadMat3( localLightAxis );
+	savefile->ReadVec3( localLightOrigin ); // idVec3 localLightOrigin
+	savefile->ReadMat3( localLightAxis ); // idMat3 localLightAxis
+	savefile->ReadString( brokenModel ); // idString brokenModel
+	savefile->ReadInt( levels ); // int levels
+	savefile->ReadInt( currentLevel ); // int currentLevel
+	savefile->ReadVec3( baseColor ); // idVec3 baseColor
+	savefile->ReadBool( breakOnTrigger ); // bool breakOnTrigger
+	savefile->ReadInt( count ); // int count
+	savefile->ReadInt( triggercount ); // int triggercount
+	savefile->ReadObject( lightParent ); // idEntity * lightParent
+	savefile->ReadVec4( fadeFrom ); // idVec4 fadeFrom
+	savefile->ReadVec4( fadeTo ); // idVec4 fadeTo
+	savefile->ReadInt( fadeStart ); // int fadeStart
+	savefile->ReadInt( fadeEnd ); // int fadeEnd
+	savefile->ReadBool( soundWasPlaying ); // bool soundWasPlaying
 
-	savefile->ReadString( brokenModel );
-	savefile->ReadInt( levels );
-	savefile->ReadInt( currentLevel );
+	int num;
+	savefile->ReadInt( num ); // idList<skyTint_t> skyTints
+	skyTints.SetNum( num );
+	for (int idx = 0; idx < skyTints.Num(); idx++)
+	{
+		savefile->ReadMaterial( skyTints[idx].sky ); // const idMaterial* sky
+		savefile->ReadVec3( skyTints[idx].color ); // idVec3 color
+	}
 
-	savefile->ReadVec3( baseColor );
-	savefile->ReadBool( breakOnTrigger );
-	savefile->ReadInt( count );
-	savefile->ReadInt( triggercount );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( lightParent ) );
+	savefile->ReadInt( num ); // idList<skyCenter_t> skyCenters
+	skyCenters.SetNum( num );
+	for (int idx = 0; idx < skyCenters.Num(); idx++)
+	{
+		savefile->ReadMaterial( skyCenters[idx].sky ); // const idMaterial* sky
+		savefile->ReadVec3( skyCenters[idx].center ); // idVec3 color
+	}
 
-	savefile->ReadVec4( fadeFrom );
-	savefile->ReadVec4( fadeTo );
-	savefile->ReadInt( fadeStart );
-	savefile->ReadInt( fadeEnd );
-	savefile->ReadBool( soundWasPlaying );
-
-	lightDefHandle = -1;
+	savefile->ReadDict( &shardDict ); // idDict shardDict
+	savefile->ReadString( fxBreak ); // idString fxBreak
+	savefile->ReadVec4( originalColor ); // idVec4 originalColor
+	savefile->ReadBool( originalAffectLightmeter ); // bool originalAffectLightmeter
 
 	SetLightLevel();
 }
@@ -599,10 +642,9 @@ void idLight::Spawn( void ) {
 
 	UpdateVisuals();
 
-	if (spawnArgs.GetBool("repairable", "1"))
+	if (!spawnArgs.GetBool("repairable", "0")) //BC 4-24-2025: now removes repairable node if light is not repairable.
 	{
-		repairNode.SetOwner(this);
-		repairNode.AddToEnd(gameLocal.repairEntities);
+		repairNode.Remove();  // blendo eric: disable instead of enable here, so the list is set on creation, not spawn
 	}
 
 	
@@ -1091,6 +1133,9 @@ void idLight::Think( void ) {
 			} else {
 				color = fadeTo;
 				fadeEnd = 0;
+				// SM: If we've faded to black, also set to current level of 0
+				if (color.Compare(colorBlack))
+					currentLevel = 0;
 				BecomeInactive( TH_THINK );
 			}
 			SetColor( color );
@@ -1613,7 +1658,7 @@ void idLight::SetAffectLightmeter(bool value)
 	renderLight.affectLightMeter = value;
 }
 
-void idLight::Event_SetSpotlightTarget(idVec3 vec)
+void idLight::Event_SetSpotlightTarget(const idVec3 &vec)
 {
 	SetLightTarget(vec);
 

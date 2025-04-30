@@ -54,6 +54,19 @@ void idTrigger_moneypile::Event_PostSpawn(void)
 	}
 }
 
+void idTrigger_moneypile::Save(idSaveGame* savefile) const
+{
+	savefile->WriteBool( waitingForTrigger ); // bool waitingForTrigger
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+	savefile->WriteObject( zenaEnt ); // idEntityPtr<idEntity> zenaEnt
+}
+void idTrigger_moneypile::Restore(idRestoreGame* savefile)
+{
+	savefile->ReadBool( waitingForTrigger ); // bool waitingForTrigger
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+	savefile->ReadObject( zenaEnt ); // idEntityPtr<idEntity> zenaEnt
+}
+
 void idTrigger_moneypile::Think(void)
 {
 	if (gameLocal.time > thinkTimer)

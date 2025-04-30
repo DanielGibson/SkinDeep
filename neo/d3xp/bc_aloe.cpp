@@ -20,10 +20,12 @@ END_CLASS
 
 void idAloe::Save(idSaveGame *savefile) const
 {
+	// blendo eric: no saveload data
 }
 
 void idAloe::Restore(idRestoreGame *savefile)
 {
+	// blendo eric: no saveload data
 }
 
 void idAloe::Spawn(void)
@@ -74,7 +76,8 @@ bool idAloe::DoFrob(int index, idEntity * frobber)
         
 		if (!isSmelly && burnwoundCount <= 0)
 		{
-			gameLocal.GetLocalPlayer()->SetCenterMessage("#str_def_gameplay_aloeerror");
+			// SW 17th Feb 2025: fixed missing underscore in loc string
+			gameLocal.GetLocalPlayer()->SetCenterMessage("#str_def_gameplay_aloe_error");
 		}
 		else if (isSmelly && burnwoundCount > 0)
 		{

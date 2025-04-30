@@ -11,6 +11,9 @@
 #include "WorldSpawn.h"
 #include "bc_duper.h"
 #include "bc_skullsaver.h"
+#include "bc_walkietalkie.h"
+#include "bc_tablet.h"
+#include "bc_spearprojectile.h"
 
 
 
@@ -27,10 +30,20 @@ END_CLASS
 
 void idDuper::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( chargesRemaining ); //  int chargesRemaining
+	savefile->WriteInt( misfireCooldownTimer ); //  int misfireCooldownTimer
+	savefile->WriteBool( lastAimState ); //  bool lastAimState
+	savefile->WriteObject( aimedEnt ); //  idEntityPtr<idEntity> aimedEnt
+	savefile->WriteInt( spawnTime ); //  int spawnTime
 }
 
 void idDuper::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( chargesRemaining ); //  int chargesRemaining
+	savefile->ReadInt( misfireCooldownTimer ); //  int misfireCooldownTimer
+	savefile->ReadBool( lastAimState ); //  bool lastAimState
+	savefile->ReadObject( aimedEnt ); //  idEntityPtr<idEntity> aimedEnt
+	savefile->ReadInt( spawnTime ); //  int spawnTime
 }
 
 void idDuper::Spawn(void)
@@ -53,7 +66,7 @@ void idDuper::Spawn(void)
 void idDuper::Think(void)
 {
 	//only do the item detection of it's being held by the player.
-	if (gameLocal.GetLocalPlayer()->GetCarryable() != NULL)
+	if (gameLocal.GetLocalPlayer()->GetCarryable() != NULL && chargesRemaining > 0)
 	{
 		if (gameLocal.GetLocalPlayer()->GetCarryable() == this)
 		{
@@ -102,28 +115,104 @@ idEntity *idDuper::FindAimedEntity()
 		gameLocal.GetLocalPlayer()->firstPersonViewOrigin,
 		gameLocal.GetLocalPlayer()->firstPersonViewOrigin + gameLocal.GetLocalPlayer()->viewAngles.ToForward() * 1024,
 		MASK_SHOT_RENDERMODEL, NULL);
+	
+	if (IsValidDupeItemTr(tr))
+		return gameLocal.entities[tr.c.entityNum];
 
+	//3-18-2025: fallback check. Do an extra check for nearby objects, to make aiming more lenient.
+	if (1)
+	{
+		idEntity* entityList[MAX_GENTITIES];
+		int				nodeList, i;
+		int				closestDistance = 9999;
+		int				closestIndex = -1;
+
+		#define FROB_RADIUS_CHECKDISTANCE 8
+		nodeList = gameLocal.EntitiesWithinRadius(tr.endpos, FROB_RADIUS_CHECKDISTANCE, entityList, MAX_GENTITIES);
+
+		for (i = 0; i < nodeList; i++)
+		{
+			idEntity* curEnt = entityList[i];
+			float			curDist;
+			idVec2			itemScreenpos;
+
+			if (!curEnt)
+				continue;
+
+			if (!IsValidDupeItemEnt(curEnt))
+				continue;
+
+			itemScreenpos = gameLocal.GetLocalPlayer()->GetWorldToScreen(curEnt->GetPhysics()->GetOrigin());
+			curDist = (itemScreenpos - idVec2(320, 240)).Length();
+
+			if (curDist > closestDistance)
+				continue;
+
+			//Do a traceline check. To make sure the object isn't behind geometry.
+			idVec3 entForward;
+			trace_t tr;
+			curEnt->GetPhysics()->GetAxis().ToAngles().ToVectors(&entForward, NULL, NULL); //we extrude forward a bit just in case the object is placed directly on a wall.
+			gameLocal.clip.TracePoint(tr, gameLocal.GetLocalPlayer()->GetEyePosition(), curEnt->GetPhysics()->GetOrigin() + (entForward * .3f), MASK_SOLID, curEnt);
+			if (tr.fraction < 1.0f)
+			{
+				//failed. try again. This time, move the origin point slightly up, just in case the item is on the ground.
+				gameLocal.clip.TracePoint(tr, gameLocal.GetLocalPlayer()->GetEyePosition(), curEnt->GetPhysics()->GetOrigin() + idVec3(0, 0, .5f), MASK_SOLID, curEnt);
+
+				if (tr.fraction < 1.0f)
+				{
+					continue;
+				}
+			}
+
+			closestIndex = curEnt->entityNumber;
+			closestDistance = curDist;
+		}
+
+		if (closestIndex >= 0)
+		{
+			return gameLocal.entities[closestIndex];
+		}
+	}
+
+	return NULL;
+}
+
+bool idDuper::IsValidDupeItemTr(trace_t tr)
+{
 	//Skip if it's worldspawn...
 	if (tr.fraction >= 1 || tr.c.entityNum == ENTITYNUM_WORLD || tr.c.entityNum <= 0)
-		return NULL;
+		return false;
 
+	return IsValidDupeItemEnt(gameLocal.entities[tr.c.entityNum]);	
+}
+
+bool idDuper::IsValidDupeItemEnt(idEntity *ent)
+{
 	//Skip if it's null....
-	if (gameLocal.entities[tr.c.entityNum] == NULL)
-		return NULL;	
+	if (ent == NULL)
+		return false;
+
+	// SW 31st March 2025: duper should not be able to target itself
+	if (ent == this)
+		return false;
 
 	//TODO: do we want things that are not idmoveableitem?
-	if (!gameLocal.entities[tr.c.entityNum]->IsType(idMoveableItem::Type))
-		return NULL;
-	
+	if (!ent->IsType(idMoveableItem::Type))
+		return false;
+
 	//Skip hidden objects.
-	if (gameLocal.entities[tr.c.entityNum]->IsHidden())
-		return NULL;
+	if (ent->IsHidden())
+		return false;
 
 	//Don't allow dupe of skull.
-	if (gameLocal.entities[tr.c.entityNum]->IsType(idSkullsaver::Type))
-		return NULL;
+	if (ent->IsType(idSkullsaver::Type))
+		return false;
 
-	return gameLocal.entities[tr.c.entityNum];
+	// SW 15th April 2025: don't let the player dupe spearbots (sorry)
+	if (ent->IsType(idSpearprojectile::Type))
+		return false;
+
+	return true;
 }
 
 idEntity *idDuper::FindMisfireEntity()
@@ -226,6 +315,31 @@ void idDuper::DoMisfire()
 	aimedEnt = NULL;
 }
 
+// SW 24th Feb 2025:
+// Adds support for conditional spawnargs based on properties of the object being duplicated.
+// This allows us to dupe things more 'accurately' in theory
+// Right now, this only handles walkie-talkie batteries.
+// If you're reading this now and have time to spare, here's some other ideas for you!
+// - Duping a weapon duplicates the ammo inside it too
+// - Duping a radio that's turned on will create a radio that is also turned on
+// - Duping a post office package will duplicate the random item inside it 
+// - Duping a skullsaver will [REDACTED] oh god oh no [REDACTED][REDACTED] what have I done 
+void idDuper::AddConditionalSpawnArgs(idDict* args, idEntity* aimedEnt)
+{
+	if (aimedEnt->IsType(idWalkietalkie::Type))
+	{
+		args->SetInt("initialbattery", static_cast<idWalkietalkie*>(aimedEnt)->GetBatteryAmount());
+	}
+
+	// SW 15th April 2025: copy tablet contents
+	if (aimedEnt->IsType(idTablet::Type))
+	{
+		args->Set("gui_parm0", aimedEnt->spawnArgs.GetString("gui_parm0")); // text
+		args->Set("gui_parm1", aimedEnt->spawnArgs.GetString("gui_parm1")); // font size
+		args->Set("target0", aimedEnt->spawnArgs.GetString("target0")); // target (for keypad codes, if applicable)
+	}
+}
+
 void idDuper::DoDupe()
 {
 	if (chargesRemaining <= 0)
@@ -277,6 +391,7 @@ void idDuper::DoDupe()
 		idDict args;
 		args.Set("classname", aimedEnt.GetEntity()->spawnArgs.GetString("classname"));
 		args.SetVector("origin", spawnPos);
+		AddConditionalSpawnArgs(&args, aimedEnt.GetEntity()); // SW 24th Feb 2025
 		gameLocal.SpawnEntityDef(args, &clonedEnt);
 		if (clonedEnt)
 		{

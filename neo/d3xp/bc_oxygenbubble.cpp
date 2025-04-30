@@ -47,10 +47,14 @@ void idOxygenbubble::Spawn(void)
 
 void idOxygenbubble::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( bubbleState ); // int bubbleState
+	savefile->WriteInt( bubbleTimer ); // int bubbleTimer
 }
 
 void idOxygenbubble::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( bubbleState ); // int bubbleState
+	savefile->ReadInt( bubbleTimer ); // int bubbleTimer
 }
 
 void idOxygenbubble::Think(void)

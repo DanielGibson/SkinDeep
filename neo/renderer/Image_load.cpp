@@ -1872,7 +1872,8 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight, bo
 	//GetDownsize( imageWidth, imageHeight );
 	//GetDownsize( potWidth, potHeight );
 
-	qglReadBuffer( GL_BACK );
+	// SM: We don't seem to need to call read buffer here anymore, causes a glError
+	//qglReadBuffer( GL_BACK );
 
 	// only resize if the current dimensions can't hold it at all,
 	// otherwise subview renderings could thrash this

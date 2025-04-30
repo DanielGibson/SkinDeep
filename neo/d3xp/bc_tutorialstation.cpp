@@ -29,6 +29,7 @@ void idTutorialStation::Spawn(void)
 {
 	tutState = TUTSTAT_IDLE;
 	stateTimer = 0;
+	idleSmoke = nullptr;
 
 	StartSound("snd_ambient", SND_CHANNEL_BODY, 0, false, NULL);
 	SetSkin(declManager->FindSkin("skins/objects/tutorialstation/default"));
@@ -41,10 +42,16 @@ void idTutorialStation::Spawn(void)
 
 void idTutorialStation::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( tutState ); // bool tutState
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
 }
 
 void idTutorialStation::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( tutState ); // bool tutState
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
 }
 
 void idTutorialStation::Think(void)

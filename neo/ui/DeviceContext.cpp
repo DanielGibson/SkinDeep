@@ -41,6 +41,8 @@ idVec4 idDeviceContext::colorBlack;
 idVec4 idDeviceContext::colorWhite;
 idVec4 idDeviceContext::colorNone;
 
+idCVar lang_enable_breakbefore(	"lang_enable_breakbefore",	"1", CVAR_GAME | CVAR_BOOL,	"enables jp can break before char ruleset" );
+
 // SM: Removed with BFG changes
 // idList<fontInfoEx_t> idDeviceContext::fonts;
 // 
@@ -90,6 +92,226 @@ idVec4 idDeviceContext::colorNone;
 // }
 
 
+// blendo eric: ordered common break opportunity characters in unicode-32 languages
+// these break AFTER
+enum UNI_CANBREAK_CHARS
+{   // 0000 ascii start
+	UNI_0009_TAB = 0x00000009,
+	UNI_0020_SPACE = 0x00000020,
+	UNI_003A_COLON = 0x0000003A,
+	UNI_0097_EM_DASH = 0x00000097,
+
+	// 2000 general punctuation block
+	UNI_2000_EM_SPACE = 0x00002000,
+	UNI_2001_EM_SPACE = 0x00002001,
+	UNI_2002_EM_SPACE = 0x00002002,
+	UNI_2003_EM_SPACE = 0x00002003,
+	UNI_2004_EM_SPACE = 0x00002004,
+	UNI_2005_EM_SPACE = 0x00002005,
+	UNI_2006_EM_SPACE = 0x00002006,
+	// UNI_2007_EM_BREAK = 0x00002007,
+	UNI_2008_EM_SPACE = 0x00002008,
+	UNI_2009_EM_SPACE = 0x00002009,
+	// UNI_2010_EM_BREAK = 0x00002010,
+	UNI_200A_EM_SPACE = 0x0000200A,
+	UNI_200B_ZERO_SPACE = 0x0000200B,
+	UNI_200C_ZERO_SPACE = 0x0000200C,
+	UNI_200D_ZERO_SPACE = 0x0000200D,
+	UNI_2014_EM_DASH = 0x00002014,
+	UNI_2024_ELLIPSIS1 = 0x00002024,
+	UNI_2025_ELLIPSIS2 = 0x00002025,
+	UNI_2026_ELLIPSIS3 = 0x00002026,
+	UNI_2027_ELLIPSIS4 = 0x00002027,
+	UNI_2028_HYPHENPOINT = 0x00002028,
+
+	// 3000 CJK block (chinese japanese korean)
+	UNI_3000_IDEO_SPACE = 0x00003000, // JP full-width space
+	UNI_3001_IDEO_COMMA = 0x00003001, // JP full-width comma
+	UNI_3002_IDEO_FULLSTOP = 0x00003002, // JP full-width period
+	UNI_3009_IDEO_RIGHT_ANGLEBRACKET = 0x00003009,
+	UNI_300B_RIGHT_DOUBLEANGLEBRACKET = 0x0000300B, 
+	UNI_300D_RIGHT_CORNERBRACKET = 0x0000300D,
+	UNI_300F_RIGHT_WHITEBRACKET = 0x0000300F,
+	UNI_3011_RIGHT_LENBRACKET = 0x00003011,
+	UNI_3015_RIGHT_SHELLBRACKET = 0x00003015,
+	UNI_3017_RIGHT_LENWHITEBRACKET = 0x00003017,
+	UNI_3019_RIGHT_SHELLWHITEBRACKET = 0x00003019,
+	UNI_301B_RIGHT_WHITESQUAREBRACKET = 0x0000301B,
+	UNI_301E_RIGHT_PRIME = 0x0000301E, // quotation
+	UNI_301F_RIGHT_LOWPRIME = 0x0000301F, // low quotation
+
+	UNI_303F_HALF_FILL_VIS = 0x0000303F, // visible half-width space
+
+	UNI_30FB_INTERPUNCT = 0x000030FB, // JP word separator (rarely kanji number separator?)
+
+	// FF00 full & half-width JP/KR block
+	UNI_FF01_FULL_EXCLAIMATION = 0x0000FF01,
+	UNI_FF09_FULL_RIGHT_PARENTHESIS = 0x0000FF09,
+	UNI_FF0C_FULL_COMMA = 0x0000FF0C,
+	UNI_FF0E_FULL_FULLSTOP = 0x0000FF0E,
+	UNI_FF1A_FULL_COLON = 0x0000FF1A,
+	UNI_FF1B_FULL_SEMICOLON = 0x0000FF1B,
+	UNI_FF1F_FULL_QUESTION = 0x0000FF1F,
+	UNI_FF3D_FULL_RIGHT_SQUAREBRACKET = 0x0000FF3D,
+	UNI_FF60_FULL_RIGHT_WHITEPARENTHESIS = 0x0000FF60,
+
+	UNI_FF61_HALF_FULLSTOP = 0x0000FF61,
+	UNI_FF63_HALF_RIGHT_CORNERBRACKET = 0x0000FF63, 
+	UNI_FF64_HALF_COMMA = 0x0000FF64,
+	UNI_FF65_HALF_INTERPUNCT = 0x0000FF65, // JP word separator
+
+	UNI_FFA0_HALF_WIDTH_FILL = 0x0000FFA0, // KR separator
+
+	UNI_FFFF_LAST = 0x0000FFFF //  U+FFFF undefined char
+};
+
+const uint32 UNI_BLOCK_CODE_SIZE = 0x00001000; // unicode defined U+1000 block groups
+const int UNI_CANBREAK_LIST_COUNT = 52;
+const uint32 UNI_CANBREAK_LIST[UNI_CANBREAK_LIST_COUNT] = {
+		UNI_0009_TAB,
+		UNI_0020_SPACE,
+		UNI_003A_COLON,
+		UNI_0097_EM_DASH,
+		UNI_2000_EM_SPACE,
+		UNI_2001_EM_SPACE,
+		UNI_2002_EM_SPACE,
+		UNI_2003_EM_SPACE,
+		UNI_2004_EM_SPACE,
+		UNI_2005_EM_SPACE,
+		UNI_2006_EM_SPACE,
+		UNI_2008_EM_SPACE,
+		UNI_2009_EM_SPACE,
+		UNI_200A_EM_SPACE,
+		UNI_200B_ZERO_SPACE,
+		UNI_200C_ZERO_SPACE,
+		UNI_200D_ZERO_SPACE,
+		UNI_2014_EM_DASH,
+		UNI_2024_ELLIPSIS1,
+		UNI_2025_ELLIPSIS2,
+		UNI_2026_ELLIPSIS3,
+		UNI_2027_ELLIPSIS4,
+		UNI_2028_HYPHENPOINT,
+		UNI_3000_IDEO_SPACE,
+		UNI_3001_IDEO_COMMA,
+		UNI_3002_IDEO_FULLSTOP,
+		UNI_300B_RIGHT_DOUBLEANGLEBRACKET,
+		UNI_300D_RIGHT_CORNERBRACKET,
+		UNI_300F_RIGHT_WHITEBRACKET,
+		UNI_3011_RIGHT_LENBRACKET,
+		UNI_3015_RIGHT_SHELLBRACKET,
+		UNI_3017_RIGHT_LENWHITEBRACKET,
+		UNI_3019_RIGHT_SHELLWHITEBRACKET,
+		UNI_301B_RIGHT_WHITESQUAREBRACKET,
+		UNI_301E_RIGHT_PRIME,
+		UNI_301F_RIGHT_LOWPRIME,
+		UNI_303F_HALF_FILL_VIS,
+		UNI_30FB_INTERPUNCT,
+		UNI_FF01_FULL_EXCLAIMATION,
+		UNI_FF09_FULL_RIGHT_PARENTHESIS,
+		UNI_FF0C_FULL_COMMA,
+		UNI_FF0E_FULL_FULLSTOP,
+		UNI_FF1A_FULL_COLON,
+		UNI_FF1B_FULL_SEMICOLON,
+		UNI_FF1F_FULL_QUESTION,
+		UNI_FF3D_FULL_RIGHT_SQUAREBRACKET,
+		UNI_FF60_FULL_RIGHT_WHITEPARENTHESIS,
+		UNI_FF61_HALF_FULLSTOP,
+		UNI_FF63_HALF_RIGHT_CORNERBRACKET,
+		UNI_FF64_HALF_COMMA,
+		UNI_FF65_HALF_INTERPUNCT,
+		UNI_FFA0_HALF_WIDTH_FILL,
+	};
+
+const int UNI_CANBREAK_BLOCK_START_COUNT = 5;
+const uint32 UNI_CANBREAK_LAST_BLOCK = UNI_BLOCK_CODE_SIZE * UNI_CANBREAK_BLOCK_START_COUNT;
+
+// find the first index of character codes in or higher than each block
+ID_INLINE int* UnicodeCanBreakBlockStartSetup()
+{
+	static int blockStartIndices[UNI_CANBREAK_BLOCK_START_COUNT];
+	blockStartIndices[0] = 0;
+	int curBlock = 0;
+	uint32 nextBlockCode = UNI_BLOCK_CODE_SIZE;
+	for (int idx = 1; idx < UNI_CANBREAK_LIST_COUNT; ++idx) {
+		assert(UNI_CANBREAK_LIST[idx - 1] < UNI_CANBREAK_LIST[idx]); // verify order and uniqueness
+		while (UNI_CANBREAK_LIST[idx] >= nextBlockCode && curBlock < UNI_CANBREAK_BLOCK_START_COUNT - 1) {
+			curBlock++;
+			blockStartIndices[curBlock] = idx;
+			nextBlockCode += UNI_BLOCK_CODE_SIZE;
+		}
+	}
+	return blockStartIndices;
+}
+
+// indices of first can break char in or above U+1000/0x1000 blocks
+const int * UNI_CANBREAK_BLOCK_START_INDICES = UnicodeCanBreakBlockStartSetup(); 
+
+// blendo eric: detect common break opportunity unicode-32 characters
+ID_INLINE bool UnicodeCharacterCanBreakAfter(uint32 ch) {
+	// start at the smallest break char index of U+1000/0x1000 blocks in break char list to speed up search
+	int startChIdx = ch < UNI_CANBREAK_LAST_BLOCK ? UNI_CANBREAK_BLOCK_START_INDICES[(ch/UNI_BLOCK_CODE_SIZE)] : UNI_CANBREAK_BLOCK_START_INDICES[UNI_CANBREAK_BLOCK_START_COUNT-1];
+	for (int chIdx = startChIdx; chIdx < UNI_CANBREAK_LIST_COUNT; chIdx++) {
+		if (ch < UNI_CANBREAK_LIST[chIdx]) {
+			return false; // try to exit out early
+		} else if (ch == UNI_CANBREAK_LIST[chIdx]) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// JP, allow break on phonemes/ideographs
+// these can break BEFORE
+const int UNI_CANBREAKBEFORE_RANGES_COUNT = 8;
+const int UNI_CANBREAKBEFORE_RANGES[UNI_CANBREAKBEFORE_RANGES_COUNT][2] = {
+	{0x00003041,0x00003096}, // jp-hiragana, excludes voiced marks
+	{0x000030A1,0x000031FF}, // jp-katakana, excludes conjunction
+	{0x000032D0,0x000032FE}, // jp-katakana, circled
+	{0x00003300,0x00003357}, // jp-katakana, square
+	{0x0000FF66,0x0000FF9D}, // jp-katakana halfwidth
+	{0x000031F0,0x00003357}, // jp-katakana 2
+	{0x00004E00,0x00009FFF}, // cjk-unified-ideograph (hanzi/kanji)
+	{0x0000FF66,0x0000FF9D}, // jp-katakana fullwidth
+};
+
+ID_INLINE bool UnicodeCharacterCanBreakBefore(uint32 ch) {
+	if (ch < UNI_CANBREAKBEFORE_RANGES[0][0] || ch > UNI_CANBREAKBEFORE_RANGES[UNI_CANBREAKBEFORE_RANGES_COUNT - 1][1]) {
+		return false; // fast out of range of all blocks, useful for non jp lang
+	}
+
+	for (int idx = 0; idx < UNI_CANBREAKBEFORE_RANGES_COUNT; idx++) {
+		if ( ch < UNI_CANBREAKBEFORE_RANGES[idx][0] ) { // out of range, early out
+			return false;
+		} else if ( ch <= UNI_CANBREAKBEFORE_RANGES[idx][1]) { // in range
+			return true;
+		}
+	}
+	return false;
+}
+
+
+const int UNI_CANBREAK_ZEROSPACE_COUNT = 4;
+const uint32 UNI_CANBREAK_ZEROSPACE_LIST[UNI_CANBREAK_ZEROSPACE_COUNT] = {
+		UNI_200B_ZERO_SPACE,
+		UNI_200C_ZERO_SPACE,
+		UNI_200D_ZERO_SPACE,
+		UNI_303F_HALF_FILL_VIS, // usually visible, but invis here
+};
+
+// blendo eric: special language characters that do not affect rendering
+bool UnicodeCharacterZeroSpace(uint32 ch) {
+	if (ch < UNI_CANBREAK_ZEROSPACE_LIST[0]) {
+		return false; // fast out, if it's below the first item
+	}
+
+	for (int idx = 0; idx < UNI_CANBREAK_ZEROSPACE_COUNT; idx++) {
+		if (ch == UNI_CANBREAK_ZEROSPACE_LIST[idx]) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void idDeviceContext::Init() {
 	xScale = 0.0;
 	SetSize(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
@@ -135,6 +357,10 @@ void idDeviceContext::Init() {
 	initialized = true;
 
 	activeFontMaterial = NULL; // blendo eric
+
+	// DG: this is used for the "make sure menus are rendered as 4:3" hack
+	fixScaleForMenu.Set(1, 1);
+	fixOffsetForMenu.Set(0, 0);
 }
 
 void idDeviceContext::Shutdown() {
@@ -255,8 +481,65 @@ bool idDeviceContext::ClippedCoords(float *x, float *y, float *w, float *h, floa
 	return (*w == 0 || *h == 0) ? true : false;
 }
 
+// DG: this is used for the "make sure menus are rendered as 4:3" hack
+void idDeviceContext::SetMenuScaleFix(bool enable) {
+	if(enable) {
+		float w = renderSystem->GetScreenWidth();
+		float h = renderSystem->GetScreenHeight();
+		float aspectRatio = w/h;
+		static const float virtualAspectRatio = 16.0f/9.0f;
+		if(aspectRatio > (virtualAspectRatio + 0.1f)) {
+			// widescreen (4:3 is 1.333 3:2 is 1.5, 16:10 is 1.6, 16:9 is 1.7778)
+			// => we need to scale and offset X
+			// All the coordinates here assume 640x480 (VIRTUAL_WIDTH x VIRTUAL_HEIGHT)
+			// screensize, so to fit a 4:3 menu into 640x480 stretched to a widescreen,
+			// we need do decrease the width to something smaller than 640 and center
+			// the result with an offset
+			float scaleX = virtualAspectRatio/aspectRatio;
+			float offsetX = (1.0f-scaleX)*(VIRTUAL_WIDTH*0.5f); // (640 - scale*640)/2
+			fixScaleForMenu.Set(scaleX, 1);
+			fixOffsetForMenu.Set(offsetX, 0);
+		} else {
+			fixScaleForMenu.Set(1, 1);
+			fixOffsetForMenu.Set(0, 0);
+		}
+	} else {
+		fixScaleForMenu.Set(1, 1);
+		fixOffsetForMenu.Set(0, 0);
+	}
+}
 
 void idDeviceContext::AdjustCoords(float *x, float *y, float *w, float *h) {
+
+	if (x) {
+		*x *= xScale;
+
+		if (x && w && (*x + *w > 0))
+		{
+			*x *= fixScaleForMenu.x; // DG: for "render menus as 4:3" hack
+			*x += fixOffsetForMenu.x;
+		}
+	}
+	if (y) {
+		*y *= yScale;
+
+		*y *= fixScaleForMenu.y; // DG: for "render menus as 4:3" hack
+		*y += fixOffsetForMenu.y;
+	}
+	if (w) {
+		*w *= xScale;
+
+		*w *= fixScaleForMenu.x; // DG: for "render menus as 4:3" hack
+	}
+	if (h) {
+		*h *= yScale;
+
+		*h *= fixScaleForMenu.y; // DG: for "render menus as 4:3" hack
+	}
+}
+
+// DG: same as AdjustCoords, but ignore fixupMenus because for the cursor that must be handled seperately
+void idDeviceContext::AdjustCursorCoords(float *x, float *y, float *w, float *h) {
 	if (x) {
 		*x *= xScale;
 	}
@@ -645,16 +928,20 @@ void idDeviceContext::DrawCursor(float *x, float *y, float size) {
 	}
 
 	renderSystem->SetColor(colorWhite);
-	AdjustCoords(x, y, &size, &size);
+	AdjustCursorCoords(x, y, &size, &size);
+	float sizeW = size * fixScaleForMenu.x;
+	float sizeH = size * fixScaleForMenu.y;
+	float fixedX = *x * fixScaleForMenu.x + fixOffsetForMenu.x;
+	float fixedY = *y * fixScaleForMenu.y + fixOffsetForMenu.y;
 
 	if (cursor == CURSOR_ARROW)
 	{
-		DrawStretchPic(*x - 1, *y - 1, size - 4 /*BC so it's more proportional*/, size, 0, 0, 1, 1, cursorImages[cursor]);
+		DrawStretchPic(fixedX - 1, fixedY - 1, sizeW - 4 /*BC so it's more proportional*/, sizeH, 0, 0, 1, 1, cursorImages[cursor]);
 	}
 	else
 	{
 		//For hte finger cursor.
-		DrawStretchPic(*x - (size/2), *y - (size), size - 4, size * 2, 0, 0, 1, 1, cursorImages[cursor]);
+		DrawStretchPic(fixedX - (sizeW /2), fixedY - (sizeH), sizeW - 4, sizeH * 2, 0, 0, 1, 1, cursorImages[cursor]);
 	}
 }
 /*
@@ -921,8 +1208,12 @@ void idDeviceContext::DrawEditCursor( float x, float y, float scale ) {
 }
 
 
+
+
+
+
 // SM: Replaced with version from BFG
-// blendo eric: adding letter spacing (faux kerning) option
+// blendo eric: adding letter spacing (faux kerning) option, and some cjk punctuation correction
 int idDeviceContext::DrawText( const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int> *breaks, int limit, float letterSpace ) {
 	int			count = 0;
 	int			charIndex = 0;
@@ -938,6 +1229,11 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 
 	bool		lineBreak = false;
 	bool		wordBreak = false;
+
+	float		prevTextWidth = 0.0f;
+	int			prevTextIndex = 0;
+	uint32		prevChar = 0;
+	bool		prevCharCanBreak = false;
 
 	idStr drawText = text;
 	idStr textBuffer;
@@ -959,8 +1255,10 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 	while (charIndex < drawText.Length()) {
 		uint32 textChar = drawText.UTF8Char( charIndex ); // blendo eric: note UTF8Char() increments the index value
 
+		bool isNewLine = textChar == '\n' || textChar == '\r';
+
 		// See if we need to start a new line.
-		if (textChar == '\n' || textChar == '\r' || charIndex == drawText.Length()) {
+		if (isNewLine || charIndex == drawText.Length()) {
 			lineBreak = true;
 			if (charIndex < drawText.Length()) {
 				// New line character and we still have more text to read.
@@ -980,8 +1278,19 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 			textChar = drawText.UTF8Char( charIndex );
 		}
 
+		bool zeroWidthBreak = false;
+#if 0 // this was when it was planned to use zero width white space to break
+		// blendo eric: remove whitespace after cjk break chars
+		const uint32 ZeroWidthBreakChar = ' ';
+		const uint32 ZeroWidthAfterCharRange = 0x00003000;
+		zeroWidthBreak = (textChar == ZeroWidthBreakChar) && prevCharCanBreak && (prevChar > ZeroWidthAfterCharRange);
+#endif
+
+		bool charCanBreakAfter = UnicodeCharacterCanBreakAfter(textChar);
+		bool charCanBreakBefore = lang_enable_breakbefore.GetBool() && UnicodeCharacterCanBreakBefore(textChar) && textBuffer.Length() > 0;
+
 		// If the character isn't a new line then add it to the text buffer.
-		if (textChar != '\n' && textChar != '\r') {
+		if (!isNewLine && !UnicodeCharacterZeroSpace(textChar) && !zeroWidthBreak) {
 			textWidth += activeFont->GetGlyphWidth( textScale, textChar ) + letterSpaceWidth;
 			textBuffer.AppendUTF8Char( textChar );
 		}
@@ -989,10 +1298,17 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 		if ((!lineBreak || charIndex == drawText.Length()) && ( textWidth >= rectDraw.w )) {
 
 			// blendo eric: edge case for a word break right on a space
-			if ((wrap && (textChar == ' ' || textChar == '\t')))
+			if (wrap && charCanBreakAfter)
 			{
 				lastBreak = textBuffer.Length();
 				textWidthAtLastBreak = textWidth;
+				lineBreak = true;
+			}
+			else if ( lang_enable_breakbefore.GetBool() && wrap && charCanBreakBefore )
+			{ 
+				// blendo eric: set break before this (after prev char)
+				lastBreak = prevTextIndex;
+				textWidthAtLastBreak = prevTextWidth;
 				lineBreak = true;
 			}
 			else
@@ -1006,11 +1322,21 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 				wordBreak = true;
 			}
 		}
-		else if (lineBreak || ( wrap && ( textChar == ' ' || textChar == '\t' ) )) {
+		else if (lineBreak || (wrap && charCanBreakAfter)) {
 			// The next character is in view, so if we are a break character, store our position
 			lastBreak = textBuffer.Length();
 			textWidthAtLastBreak = textWidth;
 		}
+		else if (lang_enable_breakbefore.GetBool() && wrap && charCanBreakBefore && textBuffer.Length() > 0 ) {
+			// set break after prev char / before this
+			lastBreak = prevTextIndex;
+			textWidthAtLastBreak = prevTextWidth;
+		}
+
+		prevChar = textChar;
+		prevTextIndex = textBuffer.Length();
+		prevCharCanBreak = charCanBreakAfter;
+		prevTextWidth = textWidth;
 
 		// We need to go to a new line
 		if (lineBreak || wordBreak) {
@@ -1079,6 +1405,14 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 
 			if (!calcOnly && y > rectDraw.Bottom()) {
 				break;
+			}
+
+			// SM: When calculating the breaks we need to roll back characters or the last line
+			// can get cut off
+			if (calcOnly && breaks && textBuffer.Length() > 0)
+			{
+				charIndex -= textBuffer.Length();
+				textBuffer.Clear();
 			}
 
 			// If breaks were requested then make a note of this one.

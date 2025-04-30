@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "framework/FileSystem.h"
 #include "framework/Session.h"
 #include "renderer/RenderWorld.h"
+#include "gamesys/SaveGame.h"
 
 #include "sound/snd_local.h"
 #include "renderer/tr_local.h"
@@ -308,7 +309,8 @@ void idSoundWorldLocal::StartWritingDemo( idDemoFile *demo ) {
 	writeDemo->WriteInt( SCMD_STATE );
 
 	// use the normal save game code to archive all the emitters
-	WriteToSaveGame( writeDemo );
+	idSaveGame save = idSaveGame::Begin( demo ); // blendo eric: hack to compile, but it should write out the necessary save info to reconstruct
+	WriteToSaveGame( &save );
 }
 
 /*
@@ -337,9 +339,13 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 		return;
 	}
 
-	int dc;
+	// blendo eric: hack: were not using demo code, so just getting this function compiling, not functional
+	idRestoreGame saveRestore = idRestoreGame::Begin(readDemo);
+	idRestoreGame * savefile = &saveRestore;
 
-	if ( !readDemo->ReadInt( dc ) ) {
+	int dc;
+	savefile->ReadInt( dc );
+	if ( dc ) {
 		return;
 	}
 
@@ -349,7 +355,7 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 		// other instances of calling idSoundWorldLocal::ReadFromSaveGame do this while the sound code is muted
 		// setting muted and going right in may not be good enough here, as we async thread may already be in an async tick (in which case we could still race to it)
 		Sys_EnterCriticalSection();
-		ReadFromSaveGame( readDemo );
+		ReadFromSaveGame( savefile );
 		Sys_LeaveCriticalSection();
 		UnPause();
 		break;
@@ -360,16 +366,16 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 			int		listenerId;
 			int		gameTime;
 
-			readDemo->ReadVec3( origin );
-			readDemo->ReadMat3( axis );
-			readDemo->ReadInt( listenerId );
-			readDemo->ReadInt( gameTime );
+			savefile->ReadVec3( origin );
+			savefile->ReadMat3( axis );
+			savefile->ReadInt( listenerId );
+			savefile->ReadInt( gameTime );
 
 			PlaceListener( origin, axis, listenerId, gameTime, "" );
 		};
 		break;
 	case SCMD_ALLOC_EMITTER:
-		readDemo->ReadInt( index );
+		savefile->ReadInt( index );
 		if ( index < 1 || index > emitters.Num() ) {
 			common->Error( "idSoundWorldLocal::ProcessDemoCommand: bad emitter number" );
 		}
@@ -388,8 +394,8 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 		{
 			int	immediate;
 
-			readDemo->ReadInt( index );
-			readDemo->ReadInt( immediate );
+			savefile->ReadInt( index );
+			savefile->ReadInt( immediate );
 			EmitterForIndex( index )->Free( immediate != 0 );
 		}
 		break;
@@ -399,15 +405,15 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 			int listenerId;
 			soundShaderParms_t parms;
 
-			readDemo->ReadInt( index );
-			readDemo->ReadVec3( origin );
-			readDemo->ReadInt( listenerId );
-			readDemo->ReadFloat( parms.minDistance );
-			readDemo->ReadFloat( parms.maxDistance );
-			readDemo->ReadFloat( parms.volume );
-			readDemo->ReadFloat( parms.shakes );
-			readDemo->ReadInt( parms.soundShaderFlags );
-			readDemo->ReadInt( parms.soundClass );
+			savefile->ReadInt( index );
+			savefile->ReadVec3( origin );
+			savefile->ReadInt( listenerId );
+			savefile->ReadFloat( parms.minDistance );
+			savefile->ReadFloat( parms.maxDistance );
+			savefile->ReadFloat( parms.volume );
+			savefile->ReadFloat( parms.shakes );
+			savefile->ReadInt( parms.soundShaderFlags );
+			savefile->ReadInt( parms.soundClass );
 			EmitterForIndex( index )->UpdateEmitter( origin, listenerId, &parms );
 		}
 		break;
@@ -418,11 +424,11 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 			float		diversity;
 			int			shaderFlags;
 
-			readDemo->ReadInt( index );
-			shader = declManager->FindSound( readDemo->ReadHashString() );
-			readDemo->ReadInt( channel );
-			readDemo->ReadFloat( diversity );
-			readDemo->ReadInt( shaderFlags );
+			savefile->ReadInt( index );
+			shader = declManager->FindSound( readDemo->ReadHashString() ); // blendo eric: fix this
+			savefile->ReadInt( channel );
+			savefile->ReadFloat( diversity );
+			savefile->ReadInt( shaderFlags );
 			EmitterForIndex( index )->StartSound( shader, (s_channelType)channel, diversity, shaderFlags );
 		}
 		break;
@@ -431,14 +437,14 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 			int		channel;
 			soundShaderParms_t parms;
 
-			readDemo->ReadInt( index );
-			readDemo->ReadInt( channel );
-			readDemo->ReadFloat( parms.minDistance );
-			readDemo->ReadFloat( parms.maxDistance );
-			readDemo->ReadFloat( parms.volume );
-			readDemo->ReadFloat( parms.shakes );
-			readDemo->ReadInt( parms.soundShaderFlags );
-			readDemo->ReadInt( parms.soundClass );
+			savefile->ReadInt( index );
+			savefile->ReadInt( channel );
+			savefile->ReadFloat( parms.minDistance );
+			savefile->ReadFloat( parms.maxDistance );
+			savefile->ReadFloat( parms.volume );
+			savefile->ReadFloat( parms.shakes );
+			savefile->ReadInt( parms.soundShaderFlags );
+			savefile->ReadInt( parms.soundClass );
 			EmitterForIndex( index )->ModifySound( (s_channelType)channel, &parms );
 		}
 		break;
@@ -446,8 +452,8 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 		{
 			int		channel;
 
-			readDemo->ReadInt( index );
-			readDemo->ReadInt( channel );
+			savefile->ReadInt( index );
+			savefile->ReadInt( channel );
 			EmitterForIndex( index )->StopSound( (s_channelType)channel );
 		}
 		break;
@@ -456,10 +462,10 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile *readDemo ) {
 			int		channel;
 			float	to, over;
 
-			readDemo->ReadInt( index );
-			readDemo->ReadInt( channel );
-			readDemo->ReadFloat( to );
-			readDemo->ReadFloat( over );
+			savefile->ReadInt( index );
+			savefile->ReadInt( channel );
+			savefile->ReadFloat( to );
+			savefile->ReadFloat( over );
 			EmitterForIndex( index )->FadeSound((s_channelType)channel, to, over );
 		}
 		break;
@@ -1266,7 +1272,7 @@ void idSoundWorldLocal::OffsetSoundTime( int offset44kHz ) {
 idSoundWorldLocal::WriteToSaveGame
 ===================
 */
-void idSoundWorldLocal::WriteToSaveGame( idFile *savefile ) {
+void idSoundWorldLocal::WriteToSaveGame( idSaveGame *savefile ) {
 	int i, j, num, currentSoundTime;
 	const char *name;
 
@@ -1293,7 +1299,7 @@ void idSoundWorldLocal::WriteToSaveGame( idFile *savefile ) {
 
 		if ( def->removeStatus != REMOVE_STATUS_ALIVE ) {
 			int skip = -1;
-			savefile->Write( &skip, sizeof( skip ) );
+			savefile->WriteInt(skip);
 			continue;
 		}
 
@@ -1339,10 +1345,33 @@ void idSoundWorldLocal::WriteToSaveGame( idFile *savefile ) {
 		savefile->WriteInt( end );
 	}
 
+	savefile->WriteInt( SOUND_MAX_CLASSES ); // idSoundFade autoDuckClassFade[SOUND_MAX_CLASSES];
+	for (int idx = 0; idx < SOUND_MAX_CLASSES; idx++)
+	{
+		savefile->WriteInt( soundClassFade[idx].fadeStart44kHz ); // int fadeStart44kHz
+		savefile->WriteInt( soundClassFade[idx].fadeEnd44kHz ); // int fadeEnd44kHz
+		savefile->WriteFloat( soundClassFade[idx].fadeStartVolume ); // float fadeStartVolume
+		savefile->WriteFloat( soundClassFade[idx].fadeEndVolume ); // float fadeEndVolume
+	}
+
+	savefile->WriteInt( SOUND_MAX_CLASSES ); // idSoundFade autoDuckClassFade[SOUND_MAX_CLASSES];
+	for (int idx = 0; idx < SOUND_MAX_CLASSES; idx++)
+	{
+		savefile->WriteInt( autoDuckClassFade[idx].fadeStart44kHz ); // int fadeStart44kHz
+		savefile->WriteInt( autoDuckClassFade[idx].fadeEnd44kHz ); // int fadeEnd44kHz
+		savefile->WriteFloat( autoDuckClassFade[idx].fadeStartVolume ); // float fadeStartVolume
+		savefile->WriteFloat( autoDuckClassFade[idx].fadeEndVolume ); // float fadeEndVolume
+	}
+
+
 	// new in Doom3 v1.2
 	savefile->Write( &slowmoActive, sizeof( slowmoActive ) );
 	savefile->Write( &slowmoSpeed, sizeof( slowmoSpeed ) );
 	savefile->Write( &enviroSuitActive, sizeof( enviroSuitActive ) );
+
+	savefile->WriteFloat( multiplierMusic ); // float multiplierMusic
+
+	savefile->WriteInt( autoDuckCount ); // int autoDuckCount
 }
 
 /*
@@ -1350,7 +1379,7 @@ void idSoundWorldLocal::WriteToSaveGame( idFile *savefile ) {
  idSoundWorldLocal::WriteToSaveGameSoundShaderParams
  ===================
  */
-void idSoundWorldLocal::WriteToSaveGameSoundShaderParams( idFile *saveGame, soundShaderParms_t *params ) {
+void idSoundWorldLocal::WriteToSaveGameSoundShaderParams( idSaveGame *saveGame, soundShaderParms_t *params ) {
 	saveGame->WriteFloat(params->minDistance);
 	saveGame->WriteFloat(params->maxDistance);
 	saveGame->WriteFloat(params->volume);
@@ -1364,11 +1393,11 @@ void idSoundWorldLocal::WriteToSaveGameSoundShaderParams( idFile *saveGame, soun
  idSoundWorldLocal::WriteToSaveGameSoundChannel
  ===================
  */
-void idSoundWorldLocal::WriteToSaveGameSoundChannel( idFile *saveGame, idSoundChannel *ch ) {
+void idSoundWorldLocal::WriteToSaveGameSoundChannel( idSaveGame *saveGame, idSoundChannel *ch ) {
 	saveGame->WriteBool( ch->triggerState );
-	saveGame->WriteUnsignedChar( 0 );
-	saveGame->WriteUnsignedChar( 0 );
-	saveGame->WriteUnsignedChar( 0 );
+	saveGame->WriteByte( 0 );
+	saveGame->WriteByte( 0 );
+	saveGame->WriteByte( 0 );
 	saveGame->WriteInt( ch->trigger44kHzTime );
 	saveGame->WriteInt( ch->triggerGame44kHzTime );
 	WriteToSaveGameSoundShaderParams( saveGame, &ch->parms );
@@ -1391,7 +1420,7 @@ void idSoundWorldLocal::WriteToSaveGameSoundChannel( idFile *saveGame, idSoundCh
 idSoundWorldLocal::ReadFromSaveGame
 ===================
 */
-void idSoundWorldLocal::ReadFromSaveGame( idFile *savefile ) {
+void idSoundWorldLocal::ReadFromSaveGame( idRestoreGame *savefile ) {
 	int i, num, handle, listenerId, gameTime, channel;
 	int savedSoundTime, currentSoundTime, soundTimeOffset;
 	idSoundEmitterLocal *def;
@@ -1504,15 +1533,30 @@ void idSoundWorldLocal::ReadFromSaveGame( idFile *savefile ) {
 		}
 	}
 
-	if ( session->GetSaveGameVersion() >= 17 ) {
-		savefile->Read( &slowmoActive, sizeof( slowmoActive ) );
-		savefile->Read( &slowmoSpeed, sizeof( slowmoSpeed ) );
-		savefile->Read( &enviroSuitActive, sizeof( enviroSuitActive ) );
-	} else {
-		slowmoActive		= false;
-		slowmoSpeed			= 0;
-		enviroSuitActive	= false;
+	savefile->ReadInt( num ); // idSoundFade autoDuckClassFade[SOUND_MAX_CLASSES];
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadInt( soundClassFade[idx].fadeStart44kHz ); // int fadeStart44kHz
+		savefile->ReadInt( soundClassFade[idx].fadeEnd44kHz ); // int fadeEnd44kHz
+		savefile->ReadFloat( soundClassFade[idx].fadeStartVolume ); // float fadeStartVolume
+		savefile->ReadFloat( soundClassFade[idx].fadeEndVolume ); // float fadeEndVolume
 	}
+
+	savefile->ReadInt( num ); // idSoundFade autoDuckClassFade[SOUND_MAX_CLASSES];
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadInt( autoDuckClassFade[idx].fadeStart44kHz ); // int fadeStart44kHz
+		savefile->ReadInt( autoDuckClassFade[idx].fadeEnd44kHz ); // int fadeEnd44kHz
+		savefile->ReadFloat( autoDuckClassFade[idx].fadeStartVolume ); // float fadeStartVolume
+		savefile->ReadFloat( autoDuckClassFade[idx].fadeEndVolume ); // float fadeEndVolume
+	}
+
+	savefile->Read( &slowmoActive, sizeof( slowmoActive ) );
+	savefile->Read( &slowmoSpeed, sizeof( slowmoSpeed ) );
+	savefile->Read( &enviroSuitActive, sizeof( enviroSuitActive ) );
+
+	savefile->ReadFloat( multiplierMusic ); // float multiplierMusic
+	savefile->ReadInt( autoDuckCount ); // int autoDuckCount
 }
 
 /*
@@ -1520,7 +1564,7 @@ void idSoundWorldLocal::ReadFromSaveGame( idFile *savefile ) {
  idSoundWorldLocal::ReadFromSaveGameSoundShaderParams
  ===================
  */
-void idSoundWorldLocal::ReadFromSaveGameSoundShaderParams( idFile *saveGame, soundShaderParms_t *params ) {
+void idSoundWorldLocal::ReadFromSaveGameSoundShaderParams( idRestoreGame *saveGame, soundShaderParms_t *params ) {
 	saveGame->ReadFloat(params->minDistance);
 	saveGame->ReadFloat(params->maxDistance);
 	saveGame->ReadFloat(params->volume);
@@ -1534,13 +1578,13 @@ void idSoundWorldLocal::ReadFromSaveGameSoundShaderParams( idFile *saveGame, sou
  idSoundWorldLocal::ReadFromSaveGameSoundChannel
  ===================
  */
-void idSoundWorldLocal::ReadFromSaveGameSoundChannel( idFile *saveGame, idSoundChannel *ch ) {
+void idSoundWorldLocal::ReadFromSaveGameSoundChannel( idRestoreGame *saveGame, idSoundChannel *ch ) {
 	saveGame->ReadBool( ch->triggerState );
 	char tmp;
 	int i;
-	saveGame->ReadChar( tmp );
-	saveGame->ReadChar( tmp );
-	saveGame->ReadChar( tmp );
+	saveGame->ReadByte( (byte&)tmp );
+	saveGame->ReadByte( (byte&)tmp );
+	saveGame->ReadByte( (byte&)tmp );
 	saveGame->ReadInt( ch->trigger44kHzTime );
 	saveGame->ReadInt( ch->triggerGame44kHzTime );
 	ReadFromSaveGameSoundShaderParams( saveGame, &ch->parms );
@@ -2394,7 +2438,7 @@ float idSoundWorldLocal::FindIntensityArtificial(idSoundEmitterLocal* sound, con
 		float volume = 1.0f;
 		if (listenerPosition) {
 			volume = parms->volume;
-			//volume = soundSystemLocal.dB2Scale(volume);
+			volume = soundSystemLocal.dB2Scale(volume);
 
 			if (listenerPosition && !(parms->soundShaderFlags & SSF_GLOBAL)) {
 				// check for overrides

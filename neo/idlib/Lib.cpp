@@ -452,6 +452,20 @@ int		LittleInt( int l ) {
 	return SDL_SwapLE32(l);
 }
 
+long	BigLong( long l ) {
+	if (sizeof(long) == 8) {
+		return SDL_SwapBE64(l);
+	}
+	return SDL_SwapBE32(l);
+}
+
+long	LittleLong( long l ) {
+	if (sizeof(long) == 8) {
+		return SDL_SwapLE64(l);
+	}
+	return SDL_SwapLE32(l);
+}
+
 float	BigFloat( float l ) {
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
 	return FloatSwap(l);

@@ -280,6 +280,7 @@ ID_INLINE idImage::idImage() {
 	frameUsed = 0;
 	classification = 0;
 	backgroundLoadInProgress = false;
+	memset( &bgl, 0, sizeof(bgl) );
 	bgl.opcode = DLTYPE_FILE;
 	bgl.f = NULL;
 	bglNext = NULL;

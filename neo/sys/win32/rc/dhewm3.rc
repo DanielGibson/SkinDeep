@@ -47,12 +47,12 @@ IDD_CRASHHANDLER DIALOGEX 0, 0, 310, 208
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Skin Deep - Crash Handler"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
-BEGIN
-    DEFPUSHBUTTON   "Done",IDOK,252,192,50,14
-    PUSHBUTTON      "Copy Message",IDC_COPY,6,192,60,14
-    PUSHBUTTON      "Break in Debugger",IDC_BREAK,72,192,80,14
-	PUSHBUTTON		"Save Crash Dump",IDC_DUMP,160,192,80,14
-    CTEXT           "There was a catastrophic error. Please click SAVE CRASH DUMP and send the file to us.",IDC_STATIC,42,6,222,18
+BEGIN    
+    PUSHBUTTON      "SEND LOG",IDC_COPY,6,187,100,20    
+    PUSHBUTTON      "Break in Debugger",IDC_BREAK,110,192,70,14
+	PUSHBUTTON		"Save Crash Dump",IDC_DUMP,185,192,70,14
+    DEFPUSHBUTTON   "Done", IDOK, 262, 192, 40, 14
+    CTEXT           "There was a catastrophic error.\nPlease click SEND LOG so we can try to fix it.",IDC_STATIC,42,6,222,18
     EDITTEXT        IDC_STACK,6,30,294,156,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL
     ICON            "",IDC_ERRORICON,6,6,20,20
 END

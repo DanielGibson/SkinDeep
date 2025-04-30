@@ -14,7 +14,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	virtual void			Think( void );
@@ -53,7 +53,7 @@ private:
 
 	void					DoGravityCheck();
 
-	idEntity				*leverEnt;
+	idEntity				*leverEnt = nullptr;
 
 	void					Event_isSealed();
 	void					Event_setSeal();

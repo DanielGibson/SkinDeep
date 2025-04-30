@@ -67,7 +67,7 @@ void idLandmine::Spawn(void)
 	team = spawnArgs.GetInt("team", "1");
 
 	SetColor(1, 1, 0); //blinks yellow when it is arming.
-	SetSkin(declManager->FindSkin("skins/landmine/skin_blinkfast"));
+	SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_blinkfast")));
 
 	readyForWarning = true;
 
@@ -93,10 +93,41 @@ void idLandmine::Spawn(void)
 
 void idLandmine::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( mineState ); // int mineState
+	savefile->WriteInt( mineTimer ); // int mineTimer
+
+	savefile->WriteInt( idleTimer ); // int idleTimer
+
+	savefile->WriteInt( thinkTimer ); // int thinkTimer
+
+	savefile->WriteBool( readyForWarning ); // bool readyForWarning
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
+
+	savefile->WriteInt( lightflashState ); // int lightflashState
+	savefile->WriteInt( lightflashTimer ); // int lightflashTimer
 }
 
 void idLandmine::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( mineState ); // int mineState
+	savefile->ReadInt( mineTimer ); // int mineTimer
+
+	savefile->ReadInt( idleTimer ); // int idleTimer
+
+	savefile->ReadInt( thinkTimer ); // int thinkTimer
+
+	savefile->ReadBool( readyForWarning ); // bool readyForWarning
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
+
+	savefile->ReadInt( lightflashState ); // int lightflashState
+	savefile->ReadInt( lightflashTimer ); // int lightflashTimer
 }
 
 
@@ -114,7 +145,7 @@ void idLandmine::Think(void)
 			mineState = STATE_ARMED;
 			idleTimer = gameLocal.time + IDLE_DELAYTIME;
 			gameLocal.DoParticle(spawnArgs.GetString("smoke_sound"), GetPhysics()->GetOrigin() + idVec3(0, 0, 4));
-			SetSkin(declManager->FindSkin("skins/landmine/default"));
+			SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_default")));
 
 			lightflashTimer = gameLocal.time; //do the light immediately.
 		}
@@ -290,35 +321,32 @@ void idLandmine::Killed(idEntity *inflictor, idEntity *attacker, int damage, con
 	StartTripDelay();
 }
 
-//bool idLandmine::DoFrob(int index, idEntity * frobber)
-//{
-//	if (frobber == gameLocal.GetLocalPlayer())
-//	{
-//		if (mineState == STATE_ARMED || mineState == STATE_ARMING || mineState == STATE_TRIPDELAY || mineState == STATE_RADIUSWARNING)
-//		{
-//			//disarm.
-//			StartSound("snd_disarm", SND_CHANNEL_BODY2);
-//			mineState = STATE_ARMED;
-//			isFrobbable = false;
-//
-//			
-//			SetSkin(declManager->FindSkin("skins/landmine/default"));
-//			team = TEAM_FRIENDLY;
-//			DoLightFlash(LIGHT_FLASHTIMELONG);
-//
-//			gameLocal.DoParticle("hack01.prt", GetPhysics()->GetOrigin() + idVec3(0, 0, 4));
-//		}		
-//	}
-//
-//	return true;
-//}
+// SW 11th March 2025
+// Restoring the old frob functionality as hack functionality
+void idLandmine::DoHack()
+{
+	if (mineState == STATE_ARMED || mineState == STATE_ARMING || mineState == STATE_TRIPDELAY || mineState == STATE_RADIUSWARNING)
+	{
+		//disarm.
+		StartSound("snd_disarm", SND_CHANNEL_BODY2);
+		mineState = STATE_ARMED;
+		isFrobbable = false;
+
+			
+		SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_default")));
+		team = TEAM_FRIENDLY;
+		DoLightFlash(LIGHT_FLASHTIMELONG);
+
+		gameLocal.DoParticle("hack01.prt", GetPhysics()->GetOrigin() + idVec3(0, 0, 4));
+	}		
+}
 
 void idLandmine::StartTripDelay()
 {
 	if (mineState == STATE_TRIPDELAY)
 		return;
 
-	SetSkin(declManager->FindSkin("skins/landmine/skin_blinkfast"));
+	SetSkin(declManager->FindSkin(spawnArgs.GetString("skin_blinkfast")));
 	StartSound("snd_trigger", SND_CHANNEL_BODY);
 	mineState = STATE_TRIPDELAY;
 	mineTimer = gameLocal.time + TRIPDELAY;

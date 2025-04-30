@@ -10,7 +10,7 @@ public:
 							idTurret(void);
 	virtual					~idTurret(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Spawn( void );
@@ -51,10 +51,10 @@ private:
 	idMat3					turretAxis;
 	idVec3					turretSpawnDir;
 
-	idBeam*					beamStart;	
-	idBeam*					beamEnd;
+	idBeam*					beamStart = nullptr;
+	idBeam*					beamEnd = nullptr;
 
-	idEntity*				laserdot;
+	idEntity*				laserdot = nullptr;
 
 	idVec3					laserAimPos;
 	int						laserAimtimer;
@@ -117,7 +117,7 @@ private:
 
 	bool					electricalActive;
 
-	idLight *				spotlight;
+	idLight *				spotlight = nullptr;
 
 	bool					playingRotationSound;
 
@@ -127,5 +127,7 @@ private:
 
 	idEntityPtr<idEntity>	inflictorEnt;
 	idEntityPtr<idEntity>	searchEnt;
+
+	void					SetInspectable(bool value);
 
 };

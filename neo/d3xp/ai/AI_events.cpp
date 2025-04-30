@@ -2601,7 +2601,7 @@ void idAI::Event_TravelDistanceBetweenEntities( idEntity *source, idEntity *dest
 	idThread::ReturnFloat( time );
 }
 
-void idAI::Event_LookAtPoint(idVec3 _point, float duration)
+void idAI::Event_LookAtPoint(const idVec3 &_point, float duration)
 {	
 	focusEntity = NULL;
 	alignHeadTime = gameLocal.time;
@@ -3419,7 +3419,7 @@ void idAI::Event_ThrowObjectAtEnemy(idEntity *ent, float speed)
 	}
 }
 
-bool idAI::Event_ThrowObjectAtPosition(idEntity *ent, idVec3 targetPosition)
+bool idAI::Event_ThrowObjectAtPosition(idEntity *ent, const idVec3 &targetPosition)
 {
 	float		speed;
 	idVec3		vel;	
@@ -3677,13 +3677,13 @@ idEntity *idAI::GetSearchNode()
 
 
 //Laser will END at this point.
-void idAI::Event_SetLaserEndLock(idVec3 laserPos)
+void idAI::Event_SetLaserEndLock(const idVec3 &laserPos)
 {
 	laserEndLockPosition = laserPos;
 }
 
 //Laser will pass through this point.
-void idAI::Event_SetLaserLock(idVec3 laserPos)
+void idAI::Event_SetLaserLock(const idVec3 &laserPos)
 {
 	laserLockPosition = laserPos;
 }
@@ -3841,7 +3841,7 @@ bool idAI::CanHitFromAnim(const char *animname, idVec3 targetPos)
 	return false;		
 }
 
-void idAI::Event_CanHitFromAnim(const char *animname, idVec3 targetPos)
+void idAI::Event_CanHitFromAnim(const char *animname, const idVec3 &targetPos)
 {
 	idThread::ReturnInt(CanHitFromAnim(animname, targetPos));
 }
@@ -3870,7 +3870,7 @@ void idAI::Event_SetLaserActive(int active)
 }
 
 
-void idAI::Event_CheckForwardDot(idVec3 lookPoint)
+void idAI::Event_CheckForwardDot(const idVec3 &lookPoint)
 {
 	float vdot;
 	idVec3 dirToEnemy;
@@ -3886,7 +3886,7 @@ void idAI::Event_CheckForwardDot(idVec3 lookPoint)
 	idThread::ReturnFloat(vdot);
 }
 
-void idAI::Event_CheckSearchLook(idVec3 lookPoint, int useFacing)
+void idAI::Event_CheckSearchLook(const idVec3 &lookPoint, int useFacing)
 {
 	idThread::ReturnInt(CheckSearchLook(lookPoint, useFacing, true) ? 1 : 0);
 }
@@ -3965,13 +3965,13 @@ bool idAI::CheckSearchLook(idVec3 lookPoint, int useFacing, bool doProximityChec
 
 
 
-void idAI::Event_SetLastVisiblePos(idVec3 pos)
+void idAI::Event_SetLastVisiblePos(const idVec3 &pos)
 {
 	lastVisibleEnemyPos = pos;
 }
 
 //Darkmod.
-void idAI::Event_GetObservationPosition(const idVec3& pointToObserve)
+void idAI::Event_GetObservationPosition(const idVec3 &pointToObserve)
 {
 	idVec3 observeFromPos = GetObservationPosition(pointToObserve, 1.0f, 0); // grayman #4347
 	idThread::ReturnVector(observeFromPos);
@@ -3979,7 +3979,7 @@ void idAI::Event_GetObservationPosition(const idVec3& pointToObserve)
 }
 
 
-void idAI::Event_GetObservationViaNodes(idVec3 pointToObserve)
+void idAI::Event_GetObservationViaNodes(const idVec3 &pointToObserve)
 {
 	idThread::ReturnVector(GetObservationViaNodes(pointToObserve));
 }

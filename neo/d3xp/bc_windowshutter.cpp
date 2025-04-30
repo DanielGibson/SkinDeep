@@ -5,6 +5,7 @@
 #include "Light.h"
 #include "Player.h"
 #include "Fx.h"
+#include "idlib/LangDict.h"
 
 //#include "SmokeParticles.h"
 //#include "Game_local.h"
@@ -29,6 +30,8 @@ idWindowShutter::idWindowShutter()
 
 	shutterState = SHT_IDLE;
 	shutterTimer = 0;
+
+	locbox = NULL;
 }
 
 idWindowShutter::~idWindowShutter(void)
@@ -53,6 +56,23 @@ void idWindowShutter::Spawn(void)
 		//Starts off/hidden.
 		SetShutterOpen(true);
 	}
+
+
+	//BC 3-26-2025
+	idBounds shutterBounds = GetPhysics()->GetAbsBounds();
+	idVec3 locboxPos = shutterBounds.GetCenter();
+	locboxPos.z = shutterBounds[0].z;
+	
+	#define LOCBOXRADIUS 12
+	idDict args;
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_label_ventbarricade"));
+	args.SetVector("origin", locboxPos);
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	locbox = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+
 
 	BecomeActive(TH_THINK);
 	PostEventMS(&EV_PostSpawn, 0);
@@ -101,10 +121,22 @@ bool idWindowShutter::DoesWindowIntersect(idEntity *windowEnt)
 
 void idWindowShutter::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( assignedWindow ); // idEntityPtr<idEntity> assignedWindow
+
+	savefile->WriteInt( shutterState ); // int shutterState
+	savefile->WriteInt( shutterTimer ); // int shutterTimer
+
+	savefile->WriteObject( locbox ); // iidEntity* locbox
 }
 
 void idWindowShutter::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( assignedWindow ); // idEntityPtr<idEntity> assignedWindow
+
+	savefile->ReadInt( shutterState ); // int shutterState
+	savefile->ReadInt( shutterTimer ); // int shutterTimer
+
+	savefile->ReadObject( locbox ); // iidEntity* locbox
 }
 
 void idWindowShutter::SetShutterOpen(bool value)
@@ -127,6 +159,8 @@ void idWindowShutter::SetShutterOpen(bool value)
 
 		this->fl.takedamage = false;
 		GetPhysics()->SetContents(0);
+
+		locbox->Hide();
 
 	}
 	else

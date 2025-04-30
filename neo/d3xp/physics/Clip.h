@@ -48,6 +48,7 @@ class idRestoreGame;
 
 class idClip;
 class idEntity;
+template <class T> class idEntityPtr;
 
 
 //===============================================================
@@ -72,7 +73,7 @@ public:
 	void					LoadModel( const idTraceModel &trm );
 	void					LoadModel( const int renderModelHandle );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					Link( idClip &clp );				// must have been linked with an entity and id before
@@ -115,9 +116,9 @@ public:
 
 private:
 	bool					enabled;				// true if this clip model is used for clipping
-	idEntity *				entity;					// entity using this clip model
+	idEntityPtr<idEntity> *	entity;					// entity using this clip model
+	idEntityPtr<idEntity> *	owner;					// owner of the entity that owns this clip model
 	int						id;						// id for entities that use multiple clip models
-	idEntity *				owner;					// owner of the entity that owns this clip model
 	idVec3					origin;					// origin of clip model
 	idMat3					axis;					// orientation of clip model
 	idBounds				bounds;					// bounds
@@ -176,14 +177,6 @@ ID_INLINE int idClipModel::GetContents( void ) const {
 	return contents;
 }
 
-ID_INLINE void idClipModel::SetEntity( idEntity *newEntity ) {
-	entity = newEntity;
-}
-
-ID_INLINE idEntity *idClipModel::GetEntity( void ) const {
-	return entity;
-}
-
 ID_INLINE void idClipModel::SetId( int newId ) {
 	id = newId;
 }
@@ -192,13 +185,6 @@ ID_INLINE int idClipModel::GetId( void ) const {
 	return id;
 }
 
-ID_INLINE void idClipModel::SetOwner( idEntity *newOwner ) {
-	owner = newOwner;
-}
-
-ID_INLINE idEntity *idClipModel::GetOwner( void ) const {
-	return owner;
-}
 
 ID_INLINE const idBounds &idClipModel::GetBounds( void ) const {
 	return bounds;

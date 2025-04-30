@@ -15,10 +15,14 @@
 #define PAUSETIME 300
 #define FOV_AMOUNT -20
 
-#define LOCBOXRADIUS 1.5
+// SW 26th March 2026: enlarging locbox slightly to improve detection
+#define LOCBOXRADIUS 2
 
 const idEventDef EV_SetYarnInfo("setyarninfo", "ssvs");
 
+//BC 4-15-2025: fix some logic with yarnboard locboxes
+//When yarnboard is a static model, set the locbox info.
+const idEventDef EV_SetYarnLoc("setyarnloc", "s");
 
 //Haiku for the Yarn Board
 
@@ -29,6 +33,7 @@ const idEventDef EV_SetYarnInfo("setyarninfo", "ssvs");
 
 CLASS_DECLARATION(idStaticEntity, idYarnBoard)
 	EVENT(EV_SetYarnInfo, idYarnBoard::SetYarnInfo)
+	EVENT(EV_SetYarnLoc, idYarnBoard::SetLocboxVisibilityScript)
 END_CLASS
 
 
@@ -95,7 +100,8 @@ void idYarnBoard::Spawn(void)
 		args.Clear();
 		args.Set("text", yarnText.c_str());
 		args.SetVector("origin", pos);
-		args.SetBool("playerlook_trigger", true);		
+		args.SetBool("playerlook_trigger", true);
+		args.SetFloat("locboxDistScale", 3.0f); // SW 26th March 2025: Makes it easier to activate the locbox
 		args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
 		args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
 		locboxes[i] = static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
@@ -149,11 +155,36 @@ idStr idYarnBoard::GetLocboxDefinitionViaIndex(int index)
 
 void idYarnBoard::Save(idSaveGame *savefile) const
 {
+	savefile->WriteBool( hasFrobbed ); // bool hasFrobbed
+
+	savefile->WriteObject( sparkleParticles ); // idFuncEmitter * sparkleParticles
+
+	savefile->WriteString( model_endName ); // idString model_endName
+	savefile->WriteVec3( lookOffset ); // idVec3 lookOffset
+
+	savefile->WriteInt( stateTimer ); // int stateTimer
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteString( voName ); // idString voName
+
+	SaveFileWriteArray( locboxes, YARNLOCBOXCOUNT, WriteObject ); // idEntity* locboxes[YARNLOCBOXCOUNT]
 }
 
 void idYarnBoard::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadBool( hasFrobbed ); // bool hasFrobbed
 
+	savefile->ReadObject( CastClassPtrRef(sparkleParticles) ); // idFuncEmitter * sparkleParticles
+
+	savefile->ReadString( model_endName ); // idString model_endName
+	savefile->ReadVec3( lookOffset ); // idVec3 lookOffset
+
+	savefile->ReadInt( stateTimer ); // int stateTimer
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadString( voName ); // idString voName
+
+	SaveFileReadArrayCast( locboxes, ReadObject, idClass*& ); // idEntity* locboxes[YARNLOCBOXCOUNT]
 }
 
 bool idYarnBoard::DoFrob(int index, idEntity * frobber)
@@ -224,7 +255,7 @@ void idYarnBoard::Think(void)
 }
 
 //Gets called via script when map is loaded.
-void idYarnBoard::SetYarnInfo(const char* startModel, const char* endModel, idVec3 _lookOffset, const char* voString )
+void idYarnBoard::SetYarnInfo(const char* startModel, const char* endModel, const idVec3 &_lookOffset, const char* voString )
 {
 	SetModel(startModel);
 	model_endName = endModel;
@@ -243,64 +274,72 @@ void idYarnBoard::SetYarnInfo(const char* startModel, const char* endModel, idVe
 	BecomeActive(TH_THINK);
 }
 
+//BC 4-15-2025: script call for loc visibility
+void idYarnBoard::SetLocboxVisibilityScript(const char* modelname)
+{
+	SetLocboxVisibility(modelname);
+}
+
+// SW 7th April 2025: Swapping the show/hide calls for trigger enable/disable calls 
+// (this correctly sets their contents and fixes trace issues where a 'hidden' locbox is overriding a 'visible' one)
 //hack, hard code the visibility of the locbox signage
 void idYarnBoard::SetLocboxVisibility(idStr modelname)
 {
 	//first, make all locboxes hidden.
 	for (int i = 0; i < YARNLOCBOXCOUNT; i++)
 	{
-		locboxes[i]->Hide();
+		static_cast<idTrigger*>(locboxes[i])->Disable();
 	}
 
 	if (idStr::FindText(modelname.c_str(), "phase1.ase") >= 0)
 	{
-		locboxes[LB_ZENAMASKED]->Show();
-		locboxes[LB_LEADSPIRATES]->Show();
-		locboxes[LB_PIRATESKILL]->Show();
-		locboxes[LB_SKULLSAVER]->Show();
+		static_cast<idTrigger*>(locboxes[LB_ZENAMASKED])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LEADSPIRATES])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PIRATESKILL])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_SKULLSAVER])->Enable();
 	}
 	else if (idStr::FindText(modelname.c_str(), "phase4.ase") >= 0)
 	{
-		locboxes[LB_IDO]->Show();
-		locboxes[LB_NINA]->Show();
-		locboxes[LB_LEADSPIRATES]->Show();
-		locboxes[LB_PIRATESKILL]->Show();
-		locboxes[LB_SKULLSAVER]->Show();
+		static_cast<idTrigger*>(locboxes[LB_IDO])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_NINA])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LEADSPIRATES])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PIRATESKILL])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_SKULLSAVER])->Enable();
 	}
 	else if (idStr::FindText(modelname.c_str(), "phase4b.ase") >= 0)
 	{
-		locboxes[LB_IDO]->Show();
-		locboxes[LB_NINA]->Show();
-		locboxes[LB_LEADSPIRATES]->Show();
-		locboxes[LB_PIRATESKILL]->Show();
-		locboxes[LB_SKULLSAVER]->Show();
-		locboxes[LB_LITTLELION]->Show();
+		static_cast<idTrigger*>(locboxes[LB_IDO])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_NINA])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LEADSPIRATES])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PIRATESKILL])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_SKULLSAVER])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LITTLELION])->Enable();
 	}
 	else if (idStr::FindText(modelname.c_str(), "phase7.ase") >= 0)
 	{
-		locboxes[LB_IDO]->Show();
-		locboxes[LB_NINA]->Show();
-		locboxes[LB_LEADSPIRATES]->Show();
-		locboxes[LB_PIRATESKILL]->Show();
-		locboxes[LB_SKULLSAVER]->Show();
-		locboxes[LB_LITTLELION]->Show();
-		locboxes[LB_PARTNERCRIME]->Show();
-		locboxes[LB_RICHRUDE]->Show();
-		locboxes[LB_FINALMISSION]->Show();
-		locboxes[LB_NEWSPAPER]->Show();
+		static_cast<idTrigger*>(locboxes[LB_IDO])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_NINA])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LEADSPIRATES])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PIRATESKILL])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_SKULLSAVER])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LITTLELION])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PARTNERCRIME])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_RICHRUDE])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_FINALMISSION])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_NEWSPAPER])->Enable();
 	}
 	else if (idStr::FindText(modelname.c_str(), "phase11.ase") >= 0)
 	{
-		locboxes[LB_ZENACLONE]->Show();
-		locboxes[LB_NINA]->Show();
-		locboxes[LB_LEADSPIRATES]->Show();
-		locboxes[LB_PIRATESKILL]->Show();
-		locboxes[LB_SKULLSAVER]->Show();
-		locboxes[LB_LITTLELION]->Show();
-		locboxes[LB_PARTNERCRIME]->Show();
-		locboxes[LB_RICHRUDE]->Show();
-		locboxes[LB_FINALMISSION]->Show();
-		locboxes[LB_NEWSPAPER]->Show();
+		static_cast<idTrigger*>(locboxes[LB_ZENACLONE])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_NINA])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LEADSPIRATES])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PIRATESKILL])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_SKULLSAVER])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_LITTLELION])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_PARTNERCRIME])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_RICHRUDE])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_FINALMISSION])->Enable();
+		static_cast<idTrigger*>(locboxes[LB_NEWSPAPER])->Enable();
 	}
 	else if (idStr::FindText(modelname.c_str(), "yarnboard_master.ase") >= 0)
 	{
@@ -309,7 +348,15 @@ void idYarnBoard::SetLocboxVisibility(idStr modelname)
 			if (i == LB_IDO || i == LB_ZENAMASKED)
 				continue;
 
-			locboxes[i]->Show();
+			static_cast<idTrigger*>(locboxes[i])->Enable();
 		}
 	}
+}
+
+//BC 4-2-2025: fix bug where locboxes were staying on when yarnboard was hidden.
+void idYarnBoard::Hide(void)
+{
+	idStaticEntity::Hide();
+
+	SetLocboxVisibility("");
 }

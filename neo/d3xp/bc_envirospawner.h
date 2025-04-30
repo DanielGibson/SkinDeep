@@ -12,7 +12,7 @@ public:
 
 	void					Spawn(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -24,6 +24,7 @@ private:
 	class idAsteroidParms
 	{
 		public:
+			idStr			asteroidArgsName;
 			const idDict*	asteroidSpawnArgs;
 			idBounds		asteroidBox;
 			float			chanceOfSpawning; // Probability (0 to 1) of this asteroid type overriding the default asteroid type. Ignored for the default (index 0)

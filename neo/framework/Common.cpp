@@ -50,7 +50,15 @@ If you have questions concerning this license or the applicable additional terms
 #include "tools/compilers/aas/AASFileManager.h"
 
 #include "framework/Common.h"
+#include "framework/Session_local.h"
 
+#if defined(STEAM)
+#include "steamutilities.h"
+#elif defined(EPICSTORE)
+#include "epicutilities.h"
+#else
+#include "nullutilities.h"
+#endif
 
 
 #define	MAX_PRINT_MSG_SIZE	4096
@@ -155,7 +163,7 @@ public:
 	virtual void				StartupVariable( const char *match, bool once );
 	virtual void				InitTool( const toolFlag_t tool, const idDict *dict );
 	virtual void				ActivateTool( bool active );
-	virtual void				WriteConfigToFile( const char *filename );
+	virtual void				WriteConfigToFile( const char *filename, int excludeFlags = 0 );
 	virtual void				WriteFlaggedCVarsToFile( const char *filename, int flags, const char *setCmd );
 	virtual void				BeginRedirect( char *buffer, int buffersize, void (*flush)( const char * ) );
 	virtual void				EndRedirect( void );
@@ -270,7 +278,7 @@ idCommonLocal::idCommonLocal( void ) {
 	//BC
 	logFile = NULL;
 
-
+	g_SteamUtilities = nullptr;
 }
 
 /*
@@ -1070,7 +1078,7 @@ void idCommonLocal::WriteFlaggedCVarsToFile( const char *filename, int flags, co
 idCommonLocal::WriteConfigToFile
 ==================
 */
-void idCommonLocal::WriteConfigToFile( const char *filename ) {
+void idCommonLocal::WriteConfigToFile( const char *filename, int excludeFlags /* = 0*/ ) {
 	idFile *f;
 #ifdef ID_WRITE_VERSION
 	ID_TIME_T t;
@@ -1099,7 +1107,7 @@ void idCommonLocal::WriteConfigToFile( const char *filename ) {
 #endif
 
 	idKeyInput::WriteBindings( f );
-	cvarSystem->WriteFlaggedVariables( CVAR_ARCHIVE, "seta", f );
+	cvarSystem->WriteFlaggedVariables( CVAR_ARCHIVE, "seta", f, excludeFlags);
 	fileSystem->CloseFile( f );
 }
 
@@ -1126,7 +1134,12 @@ void idCommonLocal::WriteConfiguration( void ) {
 	bool developer = com_developer.GetBool();
 	com_developer.SetBool( false );
 
-	WriteConfigToFile( CONFIG_FILE );
+	// SM: Write the renderer archive varibles to a different config file
+	WriteConfigToFile( CONFIG_FILE, CVAR_RENDERER );
+	WriteFlaggedCVarsToFile( "graphics.cfg", CVAR_ARCHIVE | CVAR_RENDERER, "seta");
+
+	if (g_SteamUtilities)
+		g_SteamUtilities->SteamCloudSaveConfig(CONFIG_FILE);
 
 	//session->WriteCDKey( );
 
@@ -2674,13 +2687,19 @@ idCommonLocal::PrintLoadingMessage
 =================
 */
 void idCommonLocal::PrintLoadingMessage( const char *msg ) {
+
+	
+
 	if ( !( msg && *msg ) ) {
 		return;
 	}
 	renderSystem->BeginFrame( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, declManager->FindMaterial( "splashScreen" ) );
-	int len = strlen( msg );
-	renderSystem->DrawSmallStringExt( ( 640 - len * SMALLCHAR_WIDTH ) / 2, 410, msg, idVec4( 0.0f, 0.81f, 0.94f, 1.0f ), true, declManager->FindMaterial( "textures/bigchars" ) );
+
+	//BC 3-11-2025: this doesn't support localized text, so don't draw text at all here.
+	//int len = strlen( msg );
+	//renderSystem->DrawSmallStringExt( ( 640 - len * SMALLCHAR_WIDTH ) / 2, 410, msg, idVec4( 0.0f, 0.81f, 0.94f, 1.0f ), true, declManager->FindMaterial( "textures/bigchars" ) );
+
 	renderSystem->EndFrame( NULL, NULL );
 }
 
@@ -2690,6 +2709,15 @@ idCommonLocal::InitSIMD
 =================
 */
 void idCommonLocal::InitSIMD( void ) {
+
+	//3-25-2025: when we initialize OpenGL it calls wglChoosePixelFormat which ultimately calls some functions in the dll that do require SSE 4.1
+	if (SDL_HasSSE41() == SDL_FALSE)
+	{
+		idStr errorMsg = idStr::Format("Skin Deep requires a CPU that supports SSE4.1 or higher.\n\n- Please ensure your CPU supports SSE4.1 or higher.\n- If your computer has multiple video cards, please ensure it is using its dedicated video card (not the integrated video card).\n\nExiting now.");
+		MessageBox(NULL, errorMsg.c_str(), "Fatal Error", MB_OK | MB_ICONERROR);
+		exit(1);
+	}
+
 	idSIMD::InitProcessor( "doom", com_forceGenericSIMD.GetBool() );
 	com_forceGenericSIMD.ClearModified();
 }
@@ -2712,7 +2740,10 @@ idCommonLocal::Frame
 void idCommonLocal::Frame( void ) {
 	try {
 
-
+		if (g_SteamUtilities)
+		{
+			g_SteamUtilities->RunCallbacks();
+		}
 
 		//blendo eric: frame only time
 		uint64 frameStartTime = Sys_GetPerformanceCounter();
@@ -3303,7 +3334,12 @@ void idCommonLocal::Init( int argc, char **argv ) {
 		if ( !AddStartupCommands() ) {
 #endif
 			// if the user didn't give any commands, run default action
-			session->StartMenu( true );
+			session->StartMenu(cvarSystem->GetCVarBool("g_showIntro"));
+			idUserInterface* ui = ((idSessionLocal*)session)->GetActiveMenu();
+			if (ui)
+			{
+				ui->SetCursor(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+			}
 		}
 
 		// print all warnings queued during initialization
@@ -3345,7 +3381,14 @@ idCommonLocal::Shutdown
 void idCommonLocal::Shutdown( void ) {
 
 
+	// Steam shutdown/teardown
+	if (g_SteamUtilities)
+	{
+		g_SteamUtilities->SteamShutdown();
 
+		delete g_SteamUtilities;
+		g_SteamUtilities = nullptr;
+	}
 
 	if (async_timer) {
 		SDL_RemoveTimer(async_timer);
@@ -3397,9 +3440,6 @@ void idCommonLocal::Shutdown( void ) {
 
 	Sys_ShutdownThreads();
 
-
-
-
 	SDL_Quit();
 }
 
@@ -3409,7 +3449,20 @@ idCommonLocal::InitGame
 =================
 */
 void idCommonLocal::InitGame( void ) {
+#if defined(STEAM)
+	//Initialize Steam at the very start so that we can setup the save directory for the user
+	g_SteamUtilities = new CSteamUtilities();
+#elif defined(EPICSTORE)
+	g_SteamUtilities = new CEpicUtilities();
+#else
+	g_SteamUtilities = new CNullUtilities();
+#endif
 
+	bool steamInitialized = false;
+	if (g_SteamUtilities)
+	{
+		steamInitialized = g_SteamUtilities->InitializeSteam();
+	}
 
 	// initialize the file system
 	fileSystem->Init();
@@ -3440,8 +3493,39 @@ void idCommonLocal::InitGame( void ) {
 	// initialize the renderSystem data structures, but don't start OpenGL yet
 	renderSystem->Init();
 
+	if (steamInitialized)
+	{
+		g_SteamUtilities->SteamCloudLoad();
 
+		//Set default language at first game start.
+		if (steamInitialized && (fileSystem->ReadFile(CONFIG_FILE, NULL) <= 0))
+		{
+			//if steam is initialized and this is the FIRST TIME that the game is running.
+			const char* steamLang = g_SteamUtilities->GetSteamLanguage();
+			common->Printf("[steam] First-time language auto select: '%s'\n", steamLang);
+			
+			//set default language at game start, using Steam's language setting.
+			idStr newLanguage = "english"; //Default to english.
 
+			//Convert between Steam API Language Name to the idTech4 sys_lang name.
+			if (idStr::Cmp(steamLang, "french") == 0)			{ newLanguage = "french"; }
+			else if (idStr::Cmp(steamLang, "italian") == 0)		{ newLanguage = "italian"; }
+			else if (idStr::Cmp(steamLang, "german") == 0)		{ newLanguage = "german"; }
+			else if (idStr::Cmp(steamLang, "spanish") == 0)		{ newLanguage = "spanish"; } //spanish (spain)
+			else if (idStr::Cmp(steamLang, "russian") == 0)		{ newLanguage = "russian"; }
+			else if (idStr::Cmp(steamLang, "japanese") == 0)	{ newLanguage = "japanese"; }
+			else if (idStr::Cmp(steamLang, "koreana") == 0)		{ newLanguage = "korean"; }
+			else if (idStr::Cmp(steamLang, "schinese") == 0)	{ newLanguage = "chinese"; } //simplified chinese
+			else if (idStr::Cmp(steamLang, "tchinese") == 0)	{ newLanguage = "tradchinese"; } //traditional chinese
+			else if (idStr::Cmp(steamLang, "polish") == 0)		{ newLanguage = "polish"; }
+			else if (idStr::Cmp(steamLang, "brazilian") == 0)	{ newLanguage = "brportuguese"; } //brazilian portuguese
+			else if (idStr::Cmp(steamLang, "turkish") == 0)		{ newLanguage = "turkish"; }
+			else if (idStr::Cmp(steamLang, "portuguese") == 0)	{ newLanguage = "portuguese"; } //portugal portuguese
+			else if (idStr::Cmp(steamLang, "latam") == 0)		{ newLanguage = "latam"; }		//spanish latin america
+
+			cvarSystem->SetCVarString("sys_lang", newLanguage.c_str());
+		}
+	}
 
 	// initialize string database right off so we can use it for loading messages
 	InitLanguageDict();
@@ -3463,6 +3547,7 @@ void idCommonLocal::InitGame( void ) {
 	// skip the config file if "safe" is on the command line
 	if ( !SafeMode() ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "exec " CONFIG_FILE "\n" );
+		cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "exec graphics.cfg\n");
 	}
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "exec autoexec.cfg\n" );
 
@@ -3473,24 +3558,8 @@ void idCommonLocal::InitGame( void ) {
 	if (fileSystem->ReadFile(CONFIG_FILE, NULL) <= 0)
 	{
 		common->Printf("Firstgame setting detected.\n");
-
-		SDL_DisplayMode current;
-		int displayIndex = 0;
-		int videoMode = SDL_GetCurrentDisplayMode(displayIndex, &current);
-
-		if (videoMode == 0)
-		{
-			common->Printf("Setting firstgame video resolution to: %dx%d\n", current.w, current.h);
-
-			cvarSystem->SetCVarInteger("r_customwidth", current.w);
-			cvarSystem->SetCVarInteger("r_customheight", current.h);
-			cvarSystem->SetCVarInteger("r_mode", -1);
-		}
-
 		cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "exec firstgame.cfg\n");		
 	}
-
-
 
 	// reload the language dictionary now that we've loaded config files
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadLanguage\n" );
@@ -3503,6 +3572,25 @@ void idCommonLocal::InitGame( void ) {
 
 	// if any archived cvars are modified after this, we will trigger a writing of the config file
 	cvarSystem->ClearModifiedFlags( CVAR_ARCHIVE );
+
+	// Do first time graphics config AFTER the clear so it gets saved to the cfg immediately
+	if (fileSystem->ReadFile("graphics.cfg", NULL) <= 0)
+	{
+		common->Printf("No graphics settings detected. Doing autodetection.\n");
+		SDL_DisplayMode current;
+		int displayIndex = 0;
+		int videoMode = SDL_GetCurrentDisplayMode(displayIndex, &current);
+
+		if (videoMode == 0)
+		{
+			common->Printf("Setting video resolution to: %dx%d\n", current.w, current.h);
+
+			idStr resString = idStr::Format("%dx%d", current.w, current.h);
+			cvarSystem->SetCVarString("r_resolution", resString);
+			// Default to borderless full screen if no settings
+			cvarSystem->SetCVarInteger("r_fullscreen", 2);
+		}
+	}
 
 	// init the user command input code
 	usercmdGen->Init();

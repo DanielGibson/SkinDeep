@@ -679,19 +679,33 @@ void idRenderModelMD5::DrawJoints( const renderEntity_t *ent, const struct viewD
 	const idMD5Joint	*md5Joint;
 	int					parentNum;
 
+	float axisSize = 8.0f;
+
+
+	if (r_showSkel.GetInteger() == 3) {
+		axisSize = 1.0f;
+	}
+
 	num = ent->numJoints;
 	joint = ent->joints;
 	md5Joint = joints.Ptr();
 	for( i = 0; i < num; i++, joint++, md5Joint++ ) {
+
+		if (r_showSkel.GetInteger() == 3 ) {
+			if ( joints[i].name != "origin" && joints[i].name != "body") {
+				continue;
+			}
+		}
+
 		pos = ent->origin + joint->ToVec3() * ent->axis;
 		if ( md5Joint->parent ) {
 			parentNum = md5Joint->parent - joints.Ptr();
 			session->rw->DebugLine( colorWhite, ent->origin + ent->joints[ parentNum ].ToVec3() * ent->axis, pos );
 		}
 
-		session->rw->DebugLine( colorRed,	pos, pos + joint->ToMat3()[ 0 ] * 8.0f * ent->axis );
-		session->rw->DebugLine( colorGreen,	pos, pos + joint->ToMat3()[ 1 ] * 8.0f * ent->axis );
-		session->rw->DebugLine( colorBlue,	pos, pos + joint->ToMat3()[ 2 ] * 8.0f * ent->axis );
+		session->rw->DebugLine( colorRed,	pos, pos + joint->ToMat3()[ 0 ] * axisSize * ent->axis );
+		session->rw->DebugLine( colorGreen,	pos, pos + joint->ToMat3()[ 1 ] * axisSize * ent->axis );
+		session->rw->DebugLine( colorBlue,	pos, pos + joint->ToMat3()[ 2 ] * axisSize * ent->axis );
 	}
 
 	idBounds bounds;
@@ -706,20 +720,18 @@ void idRenderModelMD5::DrawJoints( const renderEntity_t *ent, const struct viewD
 		scale = r_jointNameScale.GetFloat();
 		joint = ent->joints;
 		num = ent->numJoints;
-		for( i = 0; i < num; i++, joint++ ) {
+		for (i = 0; i < num; i++, joint++) {
 			pos = ent->origin + joint->ToVec3() * ent->axis;
-#if 1
-			session->rw->DrawText( joints[ i ].name, pos + offset, scale, colorWhite, view->renderView.viewaxis, 1 );
-#else
-
-			if(joints[ i ].name == "origin" || joints[ i ].name == "body")
-			{
-				auto jointQuat = joint->ToJointQuat();
+			if (r_showSkel.GetInteger() <= 2) {
+				session->rw->DrawText(joints[i].name, pos + offset, scale, colorWhite, view->renderView.viewaxis, 1);
+			} else {
+				if (r_showSkel.GetInteger() == 3 && joints[i].name != "origin" && joints[i].name != "body") {
+					continue;
+				}
+				auto jointAngles = joint->ToMat3().ToAngles();
 				auto jointPos = joint->ToVec3();
-				session->rw->DrawText( idStr::Format("%03.2f %03.2f %03.2f , %03.2f %03.2f %03.2f",jointQuat.t.x,jointQuat.t.y,jointQuat.t.z, jointPos.x,jointPos.y,jointPos.z), pos + offset*2.0f, scale, colorWhite, view->renderView.viewaxis, 1 );
+				session->rw->DrawText(idStr::Format("%03.1f %03.1f %03.1f / %03.1f %03.1f %03.1f", jointAngles.yaw, jointAngles.pitch, jointAngles.yaw, jointPos.x, jointPos.y, jointPos.z), pos + offset * 2.0f, scale, colorWhite, view->renderView.viewaxis, 1);
 			}
-
-#endif
 		}
 	}
 }
@@ -772,13 +784,14 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 	staticModel->bounds.Clear();
 
 	if ( r_showSkel.GetInteger() ) {
-		if ( ( view != NULL ) && ( !r_skipSuppress.GetBool() || !ent->suppressSurfaceInViewID || ( ent->suppressSurfaceInViewID != view->renderView.viewID ) ) )
+		const struct viewDef_s* viewSub = view ? view : tr.primaryView;
+		if ( (viewSub != NULL ) && ( !r_skipSuppress.GetBool() || !ent->suppressSurfaceInViewID || ( ent->suppressSurfaceInViewID != viewSub->renderView.viewID ) ) )
 		{
 			// only draw the skeleton
-			DrawJoints( ent, view );
+			DrawJoints( ent, viewSub);
 		}
 
-		if ( r_showSkel.GetInteger() > 1 ) {
+		if ( r_showSkel.GetInteger() == 2 ) {
 			// turn off the model when showing the skeleton
 			staticModel->InitEmpty( MD5_SnapshotName );
 			return staticModel;

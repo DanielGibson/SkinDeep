@@ -76,10 +76,24 @@ void idSignalkit::Spawn(void)
 
 void idSignalkit::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); // int state
+	savefile->WriteObject( myItem ); // idEntityPtr<idEntity> myItem
+	savefile->WriteStaticObject( idSignalkit::physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
 }
 
 void idSignalkit::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); // int state
+	savefile->ReadObject( myItem ); // idEntityPtr<idEntity> myItem
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_RigidBody physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
+	}
 }
 
 void idSignalkit::Damage(idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location, const int materialType)

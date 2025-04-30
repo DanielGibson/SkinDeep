@@ -33,6 +33,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "ui/SimpleWindow.h"
 
+extern idCVar r_scaleMenusTo169;
+
 idSimpleWindow::idSimpleWindow(idWindow *win) {
 	gui = win->GetGui();
 	dc = win->dc;
@@ -251,6 +253,13 @@ void idSimpleWindow::Redraw(float x, float y) {
 		return;
 	}
 
+	bool allowFixup = (flags & WIN_RATIOCORRECT) && !(flags & WIN_NORATIOCORRECT);
+	bool fixupFor43 = false;
+	if (allowFixup && r_scaleMenusTo169.GetBool()) {
+		fixupFor43 = true;
+		dc->SetMenuScaleFix(true);
+	}
+
 	CalcClientRect(0, 0);
 	dc->SetFont(font,fontMaterial); // blendo eric: supply font mat
 	drawRect.Offset(x, y);
@@ -280,6 +289,10 @@ void idSimpleWindow::Redraw(float x, float y) {
 	drawRect.Offset(-x, -y);
 	clientRect.Offset(-x, -y);
 	textRect.Offset(-x, -y);
+
+	if (fixupFor43) { // DG: gotta reset that before returning this function
+		dc->SetMenuScaleFix(false);
+	}
 }
 
 intptr_t idSimpleWindow::GetWinVarOffset( idWinVar *wv, drawWin_t* owner) {
@@ -392,49 +405,58 @@ idWinVar *idSimpleWindow::GetWinVarByName(const char *_name) {
 idSimpleWindow::WriteToSaveGame
 ========================
 */
-void idSimpleWindow::WriteToSaveGame( idFile *savefile ) {
+void idSimpleWindow::WriteToSaveGame( idSaveGame *savefile ) const {
+	savefile->WriteCheckType(SG_CHECK_UI);
+	savefile->WriteCheckSizeMarker();
 
-	savefile->Write( &flags, sizeof( flags ) );
-	savefile->Write( &drawRect, sizeof( drawRect ) );
-	savefile->Write( &clientRect, sizeof( clientRect ) );
-	savefile->Write( &textRect, sizeof( textRect ) );
-	savefile->Write( &origin, sizeof( origin ) );
-	//savefile->Write( &fontNum, sizeof( fontNum ) );
-	savefile->Write( &matScalex, sizeof( matScalex ) );
-	savefile->Write( &matScaley, sizeof( matScaley ) );
-	savefile->Write( &borderSize, sizeof( borderSize ) );
-	savefile->Write( &textAlign, sizeof( textAlign ) );
-	savefile->Write( &textAlignx, sizeof( textAlignx ) );
-	savefile->Write( &textAligny, sizeof( textAligny ) );
-	savefile->Write( &textShadow, sizeof( textShadow ) );
-	savefile->Write( &letterSpacing, sizeof(letterSpacing)); // blendo eric
-	// SM: From BFG
-	savefile->WriteString( font->GetName() );
-	savefile->WriteString(fontMaterialName); // blendo eric
+	savefile->WriteString( name ); // idString name
 
-	text.WriteToSaveGame( savefile );
-	visible.WriteToSaveGame( savefile );
-	rect.WriteToSaveGame( savefile );
-	backColor.WriteToSaveGame( savefile );
-	matColor.WriteToSaveGame( savefile );
-	foreColor.WriteToSaveGame( savefile );
-	borderColor.WriteToSaveGame( savefile );
-	textScale.WriteToSaveGame( savefile );
-	rotate.WriteToSaveGame( savefile );
-	shear.WriteToSaveGame( savefile );
-	backGroundName.WriteToSaveGame( savefile );
+	//idUserInterfaceLocal *gui; // idUserInterfaceLocal * gui // initialized in constructor
+	//idDeviceContext *dc; // idDeviceContext * dc // initialized in constructor
 
-	int stringLen;
+	savefile->WriteUInt( flags ); // unsigned int flags
+	savefile->WriteRect( drawRect ); // idRectangle drawRect
+	savefile->WriteRect( clientRect ); // idRectangle clientRect
+	savefile->WriteRect( textRect ); // idRectangle textRect
+	savefile->WriteVec2( origin ); // idVec2 origin
 
-	if ( background ) {
-		stringLen = strlen( background->GetName() );
-		savefile->Write( &stringLen, sizeof( stringLen ) );
-		savefile->Write( background->GetName(), stringLen );
-	} else {
-		stringLen = 0;
-		savefile->Write( &stringLen, sizeof( stringLen ) );
-	}
+	savefile->WriteFloat( matScalex ); // float matScalex
+	savefile->WriteFloat( matScaley ); // float matScaley
+	savefile->WriteFloat( borderSize ); // float borderSize
 
+	savefile->WriteFloat( textAlignx ); // float textAlignx
+	savefile->WriteFloat( textAligny ); // float textAligny
+	textShadow.WriteToSaveGame( savefile ); // idWinInt textShadow
+
+	savefile->WriteCheckSizeMarker();
+
+	text.WriteToSaveGame( savefile ); // idWinStr text
+	visible.WriteToSaveGame( savefile ); // idWinBool visible
+	rect.WriteToSaveGame( savefile ); // idWinRectangle rect
+	backColor.WriteToSaveGame( savefile ); // idWinVec4 backColor
+	matColor.WriteToSaveGame( savefile ); // idWinVec4 matColor
+	foreColor.WriteToSaveGame( savefile ); // idWinVec4 foreColor
+	borderColor.WriteToSaveGame( savefile ); // idWinVec4 borderColor
+	textScale.WriteToSaveGame( savefile ); // idWinFloat textScale
+	rotate.WriteToSaveGame( savefile ); // idWinFloat rotate
+	shear.WriteToSaveGame( savefile ); // idWinVec2 shear
+	textAlign.WriteToSaveGame( savefile ); // idWinInt textAlign
+	letterSpacing.WriteToSaveGame( savefile ); // idWinFloat letterSpacing
+
+	savefile->WriteString( font->GetName() ); // class idFont * font 
+
+	fontMaterialName.WriteToSaveGame( savefile ); // idWinStr fontMaterialName
+	savefile->WriteMaterial( fontMaterial );  // const idMaterial * fontMaterial
+
+	backGroundName.WriteToSaveGame( savefile ); // idWinBackground backGroundName
+	savefile->WriteMaterial( background ); // const idMaterial* background
+
+	//savefile->WriteMiscPtr( CastWriteVoidPtrPtr(mParent) ); // idWindow * mParent
+
+	hideCursor.WriteToSaveGame( savefile ); // idWinBool hideCursor
+
+	savefile->WriteCheckSizeMarker();
+	savefile->WriteCheckType(SG_CHECK_UI);
 }
 
 /*
@@ -442,59 +464,61 @@ void idSimpleWindow::WriteToSaveGame( idFile *savefile ) {
 idSimpleWindow::ReadFromSaveGame
 ========================
 */
-void idSimpleWindow::ReadFromSaveGame( idFile *savefile ) {
+void idSimpleWindow::ReadFromSaveGame( idRestoreGame *savefile ) {
+	savefile->ReadCheckType(SG_CHECK_UI);
+	savefile->ReadCheckSizeMarker();
 
-	savefile->Read( &flags, sizeof( flags ) );
-	savefile->Read( &drawRect, sizeof( drawRect ) );
-	savefile->Read( &clientRect, sizeof( clientRect ) );
-	savefile->Read( &textRect, sizeof( textRect ) );
-	savefile->Read( &origin, sizeof( origin ) );
-	//savefile->Read( &fontNum, sizeof( fontNum ) );
-	savefile->Read( &matScalex, sizeof( matScalex ) );
-	savefile->Read( &matScaley, sizeof( matScaley ) );
-	savefile->Read( &borderSize, sizeof( borderSize ) );
-	savefile->Read( &textAlign, sizeof( textAlign ) );
-	savefile->Read( &textAlignx, sizeof( textAlignx ) );
-	savefile->Read( &textAligny, sizeof( textAligny ) );
-	savefile->Read( &textShadow, sizeof( textShadow ) );
-	savefile->Read( &letterSpacing, sizeof(letterSpacing) ); // blendo eric
+	savefile->ReadString( name ); // idString name
+
+	//idUserInterfaceLocal *gui; // idUserInterfaceLocal * gui // initialized in constructor
+	//idDeviceContext *dc; // idDeviceContext * dc // initialized in constructor
+
+	savefile->ReadUInt( flags ); // unsigned int flags
+	savefile->ReadRect( drawRect ); // idRectangle drawRect
+	savefile->ReadRect( clientRect ); // idRectangle clientRect
+	savefile->ReadRect( textRect ); // idRectangle textRect
+	savefile->ReadVec2( origin ); // idVec2 origin
+
+	savefile->ReadFloat( matScalex ); // float matScalex
+	savefile->ReadFloat( matScaley ); // float matScaley
+	savefile->ReadFloat( borderSize ); // float borderSize
+
+	savefile->ReadFloat( textAlignx ); // float textAlignx
+	savefile->ReadFloat( textAligny ); // float textAligny
+	textShadow.ReadFromSaveGame( savefile ); // idWinInt textShadow
+
+	savefile->ReadCheckSizeMarker();
+
+	text.ReadFromSaveGame( savefile ); // idWinStr text
+	visible.ReadFromSaveGame( savefile ); // idWinBool visible
+	rect.ReadFromSaveGame( savefile ); // idWinRectangle rect
+	backColor.ReadFromSaveGame( savefile ); // idWinVec4 backColor
+	matColor.ReadFromSaveGame( savefile ); // idWinVec4 matColor
+	foreColor.ReadFromSaveGame( savefile ); // idWinVec4 foreColor
+	borderColor.ReadFromSaveGame( savefile ); // idWinVec4 borderColor
+	textScale.ReadFromSaveGame( savefile ); // idWinFloat textScale
+	rotate.ReadFromSaveGame( savefile ); // idWinFloat rotate
+	shear.ReadFromSaveGame( savefile ); // idWinVec2 shear
+	textAlign.ReadFromSaveGame( savefile ); // idWinInt textAlign
+	letterSpacing.ReadFromSaveGame( savefile ); // idWinFloat letterSpacing
+
 	// SM: From BFG
 	idStr fontName;
 	savefile->ReadString( fontName );
-	font = renderSystem->RegisterFont( fontName );
-	// blendo eric
-	idStr fontMatName;
-	savefile->ReadString(fontMatName);
-	fontMaterialName = fontMatName;
-	fontMaterial = fontMaterialName.Length() ? declManager->FindMaterial(fontMaterialName,false) : NULL;
+	font = renderSystem->RegisterFont( fontName ); // class idFont * font
 
-	text.ReadFromSaveGame( savefile );
-	visible.ReadFromSaveGame( savefile );
-	rect.ReadFromSaveGame( savefile );
-	backColor.ReadFromSaveGame( savefile );
-	matColor.ReadFromSaveGame( savefile );
-	foreColor.ReadFromSaveGame( savefile );
-	borderColor.ReadFromSaveGame( savefile );
-	textScale.ReadFromSaveGame( savefile );
-	rotate.ReadFromSaveGame( savefile );
-	shear.ReadFromSaveGame( savefile );
-	backGroundName.ReadFromSaveGame( savefile );
+	fontMaterialName.ReadFromSaveGame( savefile );  // idWinStr fontMaterialName
+	savefile->ReadMaterial(fontMaterial);// const idMaterial * fontMaterial
 
-	int stringLen;
+	backGroundName.ReadFromSaveGame( savefile ); // idWinBackground backGroundName
+	savefile->ReadMaterial( background ); // const idMaterial* background
 
-	savefile->Read( &stringLen, sizeof( stringLen ) );
-	if ( stringLen > 0 ) {
-		idStr backName;
+	//savefile->ReadMiscPtr( CastReadVoidPtrPtr( mParent ) ); // idWindow * mParent
 
-		backName.Fill( ' ', stringLen );
-		savefile->Read( &(backName)[0], stringLen );
+	hideCursor.ReadFromSaveGame( savefile ); // idWinBool hideCursor
 
-		background = declManager->FindMaterial( backName );
-		background->SetSort( SS_GUI );
-	} else {
-		background = NULL;
-	}
-
+	savefile->ReadCheckSizeMarker();
+	savefile->ReadCheckType(SG_CHECK_UI);
 }
 
 

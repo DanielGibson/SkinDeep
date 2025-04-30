@@ -53,6 +53,9 @@ idRenderEntityLocal::idRenderEntityLocal() {
 	needsPortalSky			= false;
 
 	parms.spectrum = SPECTRUM_UNSPECIFIED;
+#if defined(_DEBUG) || defined(_RELWITHDEBINFO)
+	parmsDebug				= nullptr;
+#endif
 }
 
 void idRenderEntityLocal::FreeRenderEntity() {

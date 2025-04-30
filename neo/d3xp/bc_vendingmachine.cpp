@@ -23,6 +23,16 @@ idVendingmachine::idVendingmachine(void)
 {
 	itemDeathSpewCounter = 0;
 	itemDeathSpewTimer = 0;	
+
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
+
+	vendState = 0;
+	stateTimer = 0;
+
+	frobbutton1 = nullptr;
+    itemDef = nullptr;
+	totalItemCounter = 0;
 }
 
 idVendingmachine::~idVendingmachine(void)
@@ -49,6 +59,7 @@ void idVendingmachine::Spawn(void)
 	frobbutton1->SetOrigin(GetPhysics()->GetOrigin());
 	frobbutton1->SetAngles(this->GetPhysics()->GetAxis().ToAngles());
 	frobbutton1->GetPhysics()->GetClipModel()->SetOwner(this);
+	frobbutton1->Bind(this, false);
 	//static_cast<idFrobcube*>(frobbutton1)->SetIndex(1);
 
 	vendState = VENDSTATE_IDLE;
@@ -57,8 +68,6 @@ void idVendingmachine::Spawn(void)
 
 	needsRepair = false;
 	repairrequestTimestamp = 0;
-	repairNode.SetOwner(this);
-	repairNode.AddToEnd(gameLocal.repairEntities);
 
 
 	renderEntity.shaderParms[7] = 1; //make sign turn on.
@@ -90,10 +99,32 @@ void idVendingmachine::Spawn(void)
 
 void idVendingmachine::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( vendState ); // int vendState
+	savefile->WriteInt( stateTimer ); // int stateTimer
+
+	savefile->WriteObject( frobbutton1 ); // idEntity* frobbutton1
+
+	savefile->WriteEntityDef( itemDef ); // const idDeclEntityDef	* itemDef
+
+	savefile->WriteInt( itemDeathSpewTimer ); // int itemDeathSpewTimer
+	savefile->WriteInt( itemDeathSpewCounter ); // int itemDeathSpewCounter
+
+	savefile->WriteInt( totalItemCounter ); // int totalItemCounter
 }
 
 void idVendingmachine::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( vendState ); // int vendState
+	savefile->ReadInt( stateTimer ); // int stateTimer
+
+	savefile->ReadObject( frobbutton1 ); // idEntity* frobbutton1
+
+	savefile->ReadEntityDef( itemDef ); // const idDeclEntityDef	* itemDef
+
+	savefile->ReadInt( itemDeathSpewTimer ); // int itemDeathSpewTimer
+	savefile->ReadInt( itemDeathSpewCounter ); // int itemDeathSpewCounter
+
+	savefile->ReadInt( totalItemCounter ); // int totalItemCounter
 }
 
 void idVendingmachine::Think(void)

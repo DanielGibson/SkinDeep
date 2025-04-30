@@ -48,6 +48,8 @@ const float DOOM_TO_METERS = 0.0254f;					// doom to meters
 const float METERS_TO_DOOM = (1.0f/DOOM_TO_METERS);	// meters to doom
 
 class idSoundSample;
+class idSaveGame;
+class idRestoreGame;
 
 // sound shader flags
 static const int	SSF_PRIVATE_SOUND =		BIT(0);	// only plays for the current listenerId
@@ -131,9 +133,9 @@ private:
 	bool					errorDuringParse;
 	float					leadinVolume;				// allows light breaking leadin sounds to be much louder than the broken loop
 
-	idSoundSample *	leadins[SOUND_MAX_LIST_WAVS];
+	idSoundSample*			leadins[SOUND_MAX_LIST_WAVS] = {};
 	int						numLeadins;
-	idSoundSample *	entries[SOUND_MAX_LIST_WAVS];
+	idSoundSample*			entries[SOUND_MAX_LIST_WAVS] = {};
 	int						numEntries;
 
 private:
@@ -176,7 +178,7 @@ public:
 	virtual void			UpdateEmitter( const idVec3 &origin, int listenerId, const soundShaderParms_t *parms ) = 0;
 
 	// returns the length of the started sound in msec
-	virtual int				StartSound( const idSoundShader *shader, const s_channelType channel, float diversity = 0, int shaderFlags = 0, bool allowSlow = true, int gameTime = -1 /*blendo eric: added debug info for game start time*/) = 0;
+	virtual int				StartSound( const idSoundShader *shader, const s_channelType channel, float diversity = 0, int shaderFlags = 0, bool allowSlow = true, int gameTime = -1 /*blendo eric: added debug info for game start time*/, idStr* outSampleName = nullptr) = 0;
 
 	// pass SCHANNEL_ANY to effect all channels
 	virtual void			ModifySound( const s_channelType channel, const soundShaderParms_t *parms ) = 0;
@@ -195,7 +197,7 @@ public:
 	virtual	float			CurrentAmplitude( void ) = 0;
 
 	// blendo eric: [0,1] estimated intensity of complete sound factoring in distance attenuation
-	virtual	float			OverallIntensity() = 0;
+	virtual	float			OverallIntensity(s_channelType channel) = 0;
 
 	// for save games.  Index will always be > 0
 	virtual	int				Index( void ) const = 0;
@@ -272,8 +274,8 @@ public:
 	virtual void			AVIClose( void ) = 0;
 
 	// SaveGame / demo Support
-	virtual void			WriteToSaveGame( idFile *savefile ) = 0;
-	virtual void			ReadFromSaveGame( idFile *savefile ) = 0;
+	virtual void			WriteToSaveGame( idSaveGame *savefile ) = 0;
+	virtual void			ReadFromSaveGame( idRestoreGame *savefile ) = 0;
 
 	virtual int				EnterSlowmo(void) = 0;
 	virtual void			SetSlowmoSpeed(float speed, int handle) = 0;

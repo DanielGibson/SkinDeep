@@ -93,6 +93,7 @@ public:
 	virtual int				ReadChar( char &value );
 	virtual int				ReadUnsignedChar( unsigned char &value );
 	virtual int				ReadFloat( float &value );
+	virtual int				ReadLong( long &value );
 	virtual int				ReadBool( bool &value );
 	virtual int				ReadString( idStr &string );
 	virtual int				ReadVec2( idVec2 &vec );
@@ -109,6 +110,7 @@ public:
 	virtual int				WriteChar( const char value );
 	virtual int				WriteUnsignedChar( const unsigned char value );
 	virtual int				WriteFloat( const float value );
+	virtual int				WriteLong( const long value ); // blendo eric
 	virtual int				WriteBool( const bool value );
 	virtual int				WriteString( const char *string );
 	virtual int				WriteVec2( const idVec2 &vec );

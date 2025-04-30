@@ -35,6 +35,7 @@ void idTNT::Spawn(void)
 	args.Set("model", "model_tnt");
 	args.Set("start_anim", "closed");
 	animatedEnt = (idAnimated*)gameLocal.SpawnEntityType(idAnimated::Type, &args);	
+	animatedEnt->SetAxis(GetPhysics()->GetAxis());
 	animatedEnt->Bind(this, true);
 
 	state = TNT_MOVEABLE;
@@ -63,10 +64,47 @@ void idTNT::Spawn(void)
 
 void idTNT::Save(idSaveGame* savefile) const
 {
+	savefile->WriteInt( state ); // int state
+
+	savefile->WriteObject( animatedEnt ); // idAnimated* animatedEnt
+	savefile->WriteJoint( clockJoint ); //  saveJoint_t clockJoint
+	savefile->WriteJoint( originJoint ); // saveJoint_t originJoint;
+
+	savefile->WriteInt( detonationTimer ); // int detonationTimer
+
+
+	savefile->WriteBool( loudtick0 ); // bool loudtick0
+	savefile->WriteBool( loudtick1 ); // bool loudtick1
+	savefile->WriteBool( loudtick2 ); // bool loudtick2
+
+	SaveFileWriteArray( damageRayPositions, SPHEREPOINTCOUNT, WriteVec3 ); // idVec3 damageRayPositions[SPHEREPOINTCOUNT]
+	SaveFileWriteArray( damageRayAngles, SPHEREPOINTCOUNT, WriteVec3 ); // idVec3 damageRayAngles[SPHEREPOINTCOUNT]
+	savefile->WriteInt( explosionIndex ); // int explosionIndex
+	savefile->WriteInt( explosionArrayTimer ); // int explosionArrayTimer
+
+	savefile->WriteInt( lastThrowTime ); // int lastThrowTime
 }
 
 void idTNT::Restore(idRestoreGame* savefile)
 {
+	savefile->ReadInt( state ); // int state
+
+	savefile->ReadObject( CastClassPtrRef(animatedEnt) ); // idAnimated* animatedEnt
+	savefile->ReadJoint( clockJoint ); //  saveJoint_t clockJoint
+	savefile->ReadJoint( originJoint ); // saveJoint_t originJoint;
+
+	savefile->ReadInt( detonationTimer ); // int detonationTimer
+
+	savefile->ReadBool( loudtick0 ); // bool loudtick0
+	savefile->ReadBool( loudtick1 ); // bool loudtick1
+	savefile->ReadBool( loudtick2 ); // bool loudtick2
+
+	SaveFileReadArray( damageRayPositions, ReadVec3 ); // idVec3 damageRayPositions[SPHEREPOINTCOUNT]
+	SaveFileReadArray( damageRayAngles, ReadVec3 ); // idVec3 damageRayAngles[SPHEREPOINTCOUNT]
+	savefile->ReadInt( explosionIndex ); // int explosionIndex
+	savefile->ReadInt( explosionArrayTimer ); // int explosionArrayTimer
+
+	savefile->ReadInt( lastThrowTime ); // int lastThrowTime
 }
 
 void idTNT::Think(void)
@@ -213,6 +251,12 @@ void idTNT::Deploy()
 	idAngles spawnAngle = rawAngleValue.ToAngles();
 
 	this->SetAngles(spawnAngle);
+
+	//BC 2-21-2025: workaround fix for TNT animated entity not orienting correctly.
+	animatedEnt->Unbind();
+	animatedEnt->SetAngles(spawnAngle);
+	animatedEnt->Bind(this, true);
+	
 
 	animatedEnt->Event_PlayAnim("unfold", 1);
 
@@ -383,6 +427,14 @@ bool idTNT::Collide(const trace_t& collision, const idVec3& velocity)
 		}
 	}
 
+	//BC 3-6-2025: ignore if I hit a sky brush.
+	if (collision.c.material)
+	{
+		if (collision.c.material->GetSurfaceFlags() >= 256)
+			return false; //It's sky. Exit here.
+	}
+
+
 	#define COLLISION_VELOCITY_THRESHOLD 20
 	float v;
 	v = -(velocity * collision.c.normal);
@@ -391,6 +443,12 @@ bool idTNT::Collide(const trace_t& collision, const idVec3& velocity)
 		idVec3 deployAngle = collision.c.normal;
 		spawnArgs.SetVector("angles", deployAngle);
 		SetOrigin(collision.c.point);
+
+		//BC 3-27-2025: hack fix
+		//animatedEnt->Unbind();
+		//animatedEnt->SetOrigin(GetPhysics()->GetOrigin());
+		//animatedEnt->Bind(this, true);
+
 		Deploy();
 		gameLocal.BindStickyItemViaTrace(this, collision);
 		return false;
@@ -399,3 +457,13 @@ bool idTNT::Collide(const trace_t& collision, const idVec3& velocity)
 	return idMoveableItem::Collide(collision, velocity);
 }
 
+//BC 2-21-2025: Fix for tnt not teleporting correctly (i.e. for trashchute)
+void idTNT::Teleport(const idVec3& origin, const idAngles& angles, idEntity* destination)
+{
+	animatedEnt->Unbind();
+	idEntity::Teleport(origin, angles, destination);
+
+	animatedEnt->SetOrigin(GetPhysics()->GetOrigin());
+	animatedEnt->SetAxis(GetPhysics()->GetAxis());
+	animatedEnt->Bind(this, true);
+}

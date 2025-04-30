@@ -10,8 +10,13 @@ class idGunnerMonster : public idAI
 {
 public:
 	CLASS_PROTOTYPE(idGunnerMonster);
+
+							idGunnerMonster();
 	
 	void					Spawn(void);
+
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	void					Restore( idRestoreGame *savefile );
 	
 	virtual void			Resurrect();
 
@@ -154,7 +159,7 @@ private:
 
 	//Searchnode anim.
 	idEntityPtr<idEntity>	currentSearchNode;
-    const char *            lastIdlenodeAnim; //last idle anim used. So that we don't repeat anims twice in a row.
+    idStr					lastIdlenodeAnim; //last idle anim used. So that we don't repeat anims twice in a row.
     idStr                   GetParsedAnim(idEntity *searchnode);
 	idStr                   GetPathcornerParsedAnim(idEntity *searchnode);
 	int						idlenodeStartTime;
@@ -256,6 +261,9 @@ private:
 	int						highlySuspiciousTimer;
 
 	void					Eventlog_StartCombatAlert();
+
+	void					DoZeroG_Unvacuumable_Check();
+	bool					CanDoUnvacuumableCheck;
 
 	//BC private end
 };

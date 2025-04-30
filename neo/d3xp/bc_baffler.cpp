@@ -24,6 +24,8 @@ END_CLASS
 //TODO: figure out way to make this both placeable and throwable
 idBaffler::idBaffler(void)
 {
+	bafflerNode.SetOwner(this);
+	bafflerNode.AddToEnd(gameLocal.bafflerEntities);
 }
 
 idBaffler::~idBaffler(void)
@@ -34,9 +36,6 @@ idBaffler::~idBaffler(void)
 void idBaffler::Spawn(void)
 {
 	idDict args;
-
-	bafflerNode.SetOwner(this);
-	bafflerNode.AddToEnd(gameLocal.bafflerEntities);
 
 	state = BAFFLER_OFF;
 	timer = gameLocal.time;
@@ -58,14 +57,38 @@ void idBaffler::Spawn(void)
 }
 
 
-
-
 void idBaffler::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+	savefile->WriteInt( timer ); //  int timer
+
+	savefile->WriteObject( bubble ); //  idEntity* bubble
+
+	savefile->WriteParticle( soundParticles ); // const  idDeclParticle * soundParticles
+	savefile->WriteInt( soundParticlesFlyTime ); //  int soundParticlesFlyTime
+
+	savefile->WriteInt( healthState ); //  int healthState
+	savefile->WriteInt( maxHealth ); //  int maxHealth
+
+	savefile->WriteParticle( damageSmoke ); // const  idDeclParticle * damageSmoke
+	savefile->WriteInt( damageSmokeFlyTime ); //  int damageSmokeFlyTime
 }
 
 void idBaffler::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+	savefile->ReadInt( timer ); //  int timer
+
+	savefile->ReadObject( bubble ); //  idEntity* bubble
+
+	savefile->ReadParticle( soundParticles ); // const  idDeclParticle * soundParticles
+	savefile->ReadInt( soundParticlesFlyTime ); //  int soundParticlesFlyTime
+
+	savefile->ReadInt( healthState ); //  int healthState
+	savefile->ReadInt( maxHealth ); //  int maxHealth
+
+	savefile->ReadParticle( damageSmoke ); // const  idDeclParticle * damageSmoke
+	savefile->ReadInt( damageSmokeFlyTime ); //  int damageSmokeFlyTime
 }
 
 

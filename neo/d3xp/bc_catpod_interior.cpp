@@ -2,6 +2,7 @@
 #include "gamesys/SysCvar.h"
 #include "Entity.h"
 
+#include "idlib/LangDict.h"
 //#include "Light.h"
 #include "Player.h"
 //#include "Fx.h"
@@ -86,7 +87,14 @@ void idCatpodInterior::Spawn(void)
 	
 	fanfareTimer = gameLocal.time + 1500;
 
-
+	// SW 3rd April 2025: Make sure the cat pod interior has a valid location
+	if (gameLocal.LocationForEntity(this) == NULL)
+	{
+		args.Clear();
+		args.SetVector("origin", this->GetPhysics()->GetOrigin());
+		args.Set("location", "#str_def_gameplay_100044"); // "Escape pod"
+		gameLocal.SpawnEntityType(idLocationEntity::Type, &args);
+	}
 
 	PostEventMS(&EV_PostSpawn, 100);
 }
@@ -130,7 +138,7 @@ void idCatpodInterior::Event_PostSpawn(void)
 
 		if (trackerSequence == TRK_WAITINGFORPLAYER && currentCatIndex <= 0)
 		{
-			catSpeakername = GetCatViaModel(catmodelname, &catVoiceprint);
+			catSpeakername = gameLocal.GetCatViaModel(catmodelname, &catVoiceprint);
 		}
 
 		idAngles catAngle = GetPhysics()->GetAxis().ToAngles();
@@ -197,76 +205,66 @@ void idCatpodInterior::Event_PostSpawn(void)
 	}
 }
 
-//bc going to do a game crime... just hard code these values
-idStr idCatpodInterior::GetCatViaModel(idStr modelname, int* voiceprint)
-{
-	*voiceprint = 1;
-	if (idStr::FindText(modelname.c_str(), "renfaire", false) <= -1)
-	{
-		*voiceprint = 0;
-		return "#str_emailname_renfaire";
-	}
-	else if (idStr::FindText(modelname.c_str(), "chef", false) <= -1)
-	{
-		return "#str_emailname_chef";
-	}
-	else if (idStr::FindText(modelname.c_str(), "beatpoet", false) <= -1)
-	{
-		return "#str_emailname_poet";
-	}
-	else if (idStr::FindText(modelname.c_str(), "occultrockmusic", false) <= -1)
-	{
-		return "#str_emailname_metal";
-	}
-	else if (idStr::FindText(modelname.c_str(), "lovingcaringmom", false) <= -1)
-	{
-		*voiceprint = 0;
-		return "#str_emailname_mom";
-	}
-	else if (idStr::FindText(modelname.c_str(), "skateboarder", false) <= -1)
-	{
-		*voiceprint = 0;
-		return "#str_emailname_skateboard";
-	}
-	else if (idStr::FindText(modelname.c_str(), "stagemagician", false) <= -1)
-	{
-		return "#str_emailname_magician";
-	}
-	else if (idStr::FindText(modelname.c_str(), "cowboy", false) <= -1)
-	{
-		return "#str_emailname_cowboy";
-	}
-	else if (idStr::FindText(modelname.c_str(), "scubadiving", false) <= -1)
-	{
-		return "#str_emailname_scuba";
-	}
-	else if (idStr::FindText(modelname.c_str(), "writingyanovel", false) <= -1)
-	{
-		*voiceprint = 0;
-		return "#str_emailname_yanovel";
-	}
-	else if (idStr::FindText(modelname.c_str(), "horrorfilmbuff", false) <= -1)
-	{
-		*voiceprint = 0;
-		return "#str_emailname_horror";
-	}
-	else if (idStr::FindText(modelname.c_str(), "farmer", false) <= -1)
-	{
-		*voiceprint = 0;
-		return "#str_emailname_farmer";
-	}
-
-	gameLocal.Warning("INVALID CAT MODEL? '%s'", modelname.c_str());
-	return "";
-}
 
 
 void idCatpodInterior::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( state ); //  int state
+
+	savefile->WriteObject( ceilingLight ); //  idLight *				 ceilingLight
+
+	savefile->WriteObject( frobBar ); //  idEntity*				 frobBar
+
+	savefile->WriteVec3( lastPlayerPosition ); //  idVec3 lastPlayerPosition
+	savefile->WriteAngles( lastPlayerViewangle ); //  idAngles lastPlayerViewangle
+
+
+	savefile->WriteInt( fanfareTimer ); //  int fanfareTimer
+	savefile->WriteInt( fanfareState ); //  int fanfareState
+
+	SaveFileWriteArray(catprisonerModel, CAT_INHABITANTS_MAX, WriteObject); // idAnimated* catprisonerModel[CAT_INHABITANTS_MAX];
+	savefile->WriteInt( totalcatInhabitants ); //  int totalcatInhabitants
+	savefile->WriteBool( playerIsInCatpod ); //  bool playerIsInCatpod
+
+	savefile->WriteInt( trackerSequence ); //  int trackerSequence
+
+	savefile->WriteObject( trackerModel ); //  idAnimated*				 trackerModel
+	savefile->WriteInt( trackerTimer ); //  int trackerTimer
+
+	savefile->WriteFloat( trackerProgressStartValue ); //  float trackerProgressStartValue
+	savefile->WriteFloat( trackerProgressEndValue ); //  float trackerProgressEndValue
+	savefile->WriteInt( trackerProgressState ); //  int trackerProgressState
+	savefile->WriteInt( trackerProgressTimer ); //  int trackerProgressTimer
 }
 
 void idCatpodInterior::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( state ); //  int state
+
+	savefile->ReadObject( CastClassPtrRef(ceilingLight) ); //  idLight *				 ceilingLight
+
+	savefile->ReadObject( frobBar ); //  idEntity*				 frobBar
+
+	savefile->ReadVec3( lastPlayerPosition ); //  idVec3 lastPlayerPosition
+	savefile->ReadAngles( lastPlayerViewangle ); //  idAngles lastPlayerViewangle
+
+
+	savefile->ReadInt( fanfareTimer ); //  int fanfareTimer
+	savefile->ReadInt( fanfareState ); //  int fanfareState
+
+	SaveFileReadArrayCast( catprisonerModel, ReadObject, idClass*& ); // idAnimated* catprisonerModel[CAT_INHABITANTS_MAX];
+	savefile->ReadInt( totalcatInhabitants ); //  int totalcatInhabitants
+	savefile->ReadBool( playerIsInCatpod ); //  bool playerIsInCatpod
+
+	savefile->ReadInt( trackerSequence ); //  int trackerSequence
+
+	savefile->ReadObject( CastClassPtrRef(trackerModel) ); //  idAnimated*				 trackerModel
+	savefile->ReadInt( trackerTimer ); //  int trackerTimer
+
+	savefile->ReadFloat( trackerProgressStartValue ); //  float trackerProgressStartValue
+	savefile->ReadFloat( trackerProgressEndValue ); //  float trackerProgressEndValue
+	savefile->ReadInt( trackerProgressState ); //  int trackerProgressState
+	savefile->ReadInt( trackerProgressTimer ); //  int trackerProgressTimer
 }
 
 void idCatpodInterior::Think(void)
@@ -432,11 +430,36 @@ void idCatpodInterior::SetPlayerEnter()
 	idDict args;
 	args.Clear();
 	args.Set("model", "models/objects/frobcube/cube4x4.ase");
-	args.Set("displayname", "Exit");
+	args.Set("displayname", common->GetLanguageDict()->GetString("#str_gui_hud_100131"));
 	frobBar = gameLocal.SpawnEntityType(idFrobcube::Type, &args);
 	frobBar->SetOrigin(frobPos);
 	frobBar->GetPhysics()->GetClipModel()->SetOwner(this);
 	static_cast<idFrobcube*>(frobBar)->SetIndex(FROBINDEX_EXIT);
+
+
+
+	//BC 3-23-2025: loc box
+	#define LOCBOXRADIUS 2.5f
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_def_gameplay_exitcatpod"));
+	args.SetVector("origin", frobPos);
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+
+
+	//3-30-2025: locbox
+	idVec3 titleLocboxPos = GetPhysics()->GetOrigin() + (forward * 32) + (up * 75);
+	args.Clear();
+	args.Set("text", common->GetLanguageDict()->GetString("#str_def_gameplay_catpod_carepackage"));
+	args.SetVector("origin", titleLocboxPos);
+	args.SetBool("playerlook_trigger", true);
+	args.SetVector("mins", idVec3(-LOCBOXRADIUS, -LOCBOXRADIUS, -LOCBOXRADIUS));
+	args.SetVector("maxs", idVec3(LOCBOXRADIUS, LOCBOXRADIUS, LOCBOXRADIUS));
+	static_cast<idTrigger_Multi*>(gameLocal.SpawnEntityType(idTrigger_Multi::Type, &args));
+
+	
 
 
 	fanfareState = FF_WAITING;
@@ -452,6 +475,10 @@ void idCatpodInterior::SetPlayerEnter()
 
 		// SW 13th Feb 2025: Stop player stomping on tracker VO 
 		gameLocal.GetLocalPlayer()->systemicVoEnabled = false;
+	}
+	else
+	{
+		gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay_msDelayed("snd_vo_catpod_response", 500);
 	}
 
 	BecomeActive(TH_THINK);
@@ -595,6 +622,8 @@ void idCatpodInterior::DoExitPod()
 		gameLocal.GetLocalPlayer()->systemicVoEnabled = true;
 	}
 
+	
+
 	BecomeInactive(TH_THINK);
 }
 
@@ -633,6 +662,26 @@ void idCatpodInterior::LaunchCatPod()
 		if (ent->IsHidden() || !ent->IsType(idCatpod::Type))
 			continue;
 
+		// SW 10th March 2025: Any items that are still inside the pod should be ejected now
+		static_cast<idCatpod*>(ent)->EjectItems(GetItemsInside());
 		static_cast<idCatpod*>(ent)->StartTakeoff();
 	}
+}
+
+// SW 10th March 2025
+// Returns a list of moveable items inside the pod which will be ejected when the player leaves
+idList<idMoveableItem*> idCatpodInterior::GetItemsInside(void)
+{
+	idEntity* entityArray[64];
+	idList<idMoveableItem*> entityList;
+	int count = gameLocal.EntitiesWithinAbsBoundingbox(this->GetPhysics()->GetAbsBounds().Expand(16), entityArray, 64);
+	for (int i = 0; i < count; i++)
+	{
+		if (entityArray[i]->IsType(idMoveableItem::Type))
+		{
+			entityList.Append(static_cast<idMoveableItem*>(entityArray[i]));
+		}
+	}
+
+	return entityList;
 }

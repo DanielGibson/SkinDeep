@@ -56,8 +56,8 @@ public:
 
 	idWindow*		GetParent ( void ) { return mParent; }
 
-	virtual void	WriteToSaveGame( idFile *savefile );
-	virtual void	ReadFromSaveGame( idFile *savefile );
+	virtual void	WriteToSaveGame( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
+	virtual void	ReadFromSaveGame( idRestoreGame *savefile );
 
 	unsigned int    GetFlags(){ return flags; }
 
@@ -75,7 +75,6 @@ protected:
 	idRectangle		clientRect;			// client area
 	idRectangle		textRect;
 	idVec2			origin;
-	class idFont *	font;               // SM: From BFG
 	float			matScalex;
 	float			matScaley;
 	float			borderSize;
@@ -94,13 +93,14 @@ protected:
 	idWinFloat		textScale;
 	idWinFloat		rotate;
 	idWinVec2		shear;
-	idWinBackground	backGroundName;
 	idWinInt		textAlign;
 	idWinFloat		letterSpacing;
 
+	class idFont *	font;               // SM: From BFG
 	idWinStr		fontMaterialName;	// blendo eric: custom font mat
 	const idMaterial * fontMaterial;	// blendo eric: custom font mat
 
+	idWinBackground	backGroundName;
 	const idMaterial* background;
 
 	idWindow *		mParent;

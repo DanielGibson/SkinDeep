@@ -40,8 +40,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "d3xp/Player.h"
 #include "ui/UserInterfaceLocal.h"
 #include "ui/Window.h"
+#include "d3xp/gamesys/SysCvar.h"
 
-
+#include "d3xp/platformutilties.h"
 
 #if defined(__AROS__)
 #define CDKEY_FILEPATH CDKEY_FILE
@@ -63,6 +64,13 @@ idCVar	idSessionLocal::com_aviDemoHeight( "com_aviDemoHeight", "256", CVAR_SYSTE
 idCVar	idSessionLocal::com_aviDemoTics( "com_aviDemoTics", "2", CVAR_SYSTEM | CVAR_INTEGER, "", 1, 60 );
 idCVar	idSessionLocal::com_wipeSeconds( "com_wipeSeconds", ".3", CVAR_SYSTEM, "" );
 idCVar	idSessionLocal::com_guid( "com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_ROM, "" );
+
+
+// blendo eric
+idCVar	idSessionLocal::com_savegame_sessionid( "com_savegame_sessionid", "", CVAR_SYSTEM | CVAR_ARCHIVE, "last play session id" );
+const int SG_MAX_BACKUPS_PER_FILE = 10;
+idCVar	com_savegame_backups( "com_savegame_backups", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "max amount of backups of each session that can be saved", 0, SG_MAX_BACKUPS_PER_FILE );
+
 // SM added this to fix problem with persistent data being lost on "map" commands
 idCVar  com_clearPersistantOnMap("com_clearPersistantOnMap", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "Whether the persistent player info should be cleared on map commands");
 
@@ -1233,6 +1241,12 @@ idSessionLocal::StartNewGame
 ===============
 */
 void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
+
+#ifdef DEMO
+	//Reset the persistent args when a new game starts, so that the persistent args run correctly in a demo booth setting.
+	gameLocal.persistentLevelInfo.Clear();
+#endif
+
 #ifdef	ID_DEDICATED
 	common->Printf( "Dedicated servers cannot start singleplayer games.\n" );
 	return;
@@ -1287,20 +1301,281 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
 #endif
 }
 
+
+// blendo eric: unicode will be scrubbed from filename, so just use default map name,
+// but it's still possible to translate back on read back to gui so player sees native lang
+idStr idSessionLocal::GetMapNameForSaveFile(const char *mapName) {
+	idStr mapStr = mapName ? mapName : "";
+	if ( mapStr.Length() == 0 || mapStr.Icmp("checkpoint") )
+	{
+		mapStr = sessLocal.GetCurrentMapName();
+		mapStr.Replace("maps/","");
+	}
+
+#if 0 // this would convert to local lang of level name, but foreign languages would get stripped
+	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapStr.c_str(), false );
+	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
+
+	if (mapDef) {
+		mapStr = mapDef->dict.GetString("name", mapStr.c_str());
+		mapStr = common->GetLanguageDict()->GetString(mapStr.c_str());
+	}
+#endif
+
+	idSessionLocal::ScrubSaveGameFileName( mapStr );
+	return mapStr;
+}
+
 /*
 ===============
 idSessionLocal::GetAutoSaveName
 ===============
 */
-idStr idSessionLocal::GetAutoSaveName( const char *mapName ) const {
-	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapName, false );
-	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
-	if ( mapDef ) {
-		mapName = common->GetLanguageDict()->GetString( mapDef->dict.GetString( "name", mapName ) );
+idStr idSessionLocal::GetAutoSaveName( const char *mapName, const char * checkPoint ) const {
+	idStr mapStr = GetMapNameForSaveFile(mapName);
+
+	if (!checkPoint) {
+		checkPoint = "";
 	}
-	
-	return idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_save_autosave"), mapName );
+#if 1 // always use session id (checkpoint suffix kinda superfluous now)
+	idStr sessionId = GenerateSaveGameUniqueId();
+	return idStr::Format("%s%s_%s%s", SG_AUTOSAVE_PREFIX, sessionId.c_str(), mapStr.c_str(), checkPoint);
+#else
+	// For vig_hub, still use a session ID so that we can have multiple hub autosaves
+	if (idStr::FindText(mapStr, "vig_hub") != -1) {
+		idStr sessionId = GenerateSaveGameUniqueId();
+		return idStr::Format("%s%s_%s%s", SG_AUTOSAVE_PREFIX, sessionId.c_str(), mapStr.c_str(), checkPoint);
+	} else {
+		return idStr::Format("%s%s%s", SG_AUTOSAVE_PREFIX, mapStr.c_str(), checkPoint);
+	}
+#endif
 }
+
+/*
+===============
+idSessionLocal::GetQuickSaveName
+===============
+*/
+idStr idSessionLocal::GetQuickSaveName(const char* mapName) const {
+	idStr sessionId = GenerateSaveGameUniqueId();
+
+	idStr mapStr = GetMapNameForSaveFile(mapName);
+
+	return idStr::Format("%s%s_%s", SG_QUICKSAVE_PREFIX, sessionId.c_str(), mapStr.c_str());
+}
+
+/*
+===============
+idSessionLocal::GetSessionSaveName
+===============
+*/
+idStr idSessionLocal::GetSessionSaveName( const char *mapName ) const {
+	idStr sessionId =  GenerateSaveGameUniqueId();
+	idStr mapStr = GetMapNameForSaveFile(mapName);
+	idStr newSessionName = idStr::Format( "%s%s_%s", SG_SESSION_PREFIX, sessionId.c_str(), mapStr.c_str() );
+	return newSessionName;
+}
+
+
+/*
+===============
+idSessionLocal::GenerateSaveGameUniqueId
+===============
+*/
+// generates a new id
+idStr idSessionLocal::GenerateSaveGameUniqueId()
+{
+	// blendo eric: using date time as fixed length "unique" session id (can parse time back if needed)
+	ID_TIME_T aclock = time(nullptr);
+	struct tm* newtime = localtime(&aclock);
+	idStr newID = idStr::Format( "%02d%02d%02d_%02d%02d%02d",
+		newtime->tm_year%100, newtime->tm_mon, newtime->tm_mday,
+		newtime->tm_hour, newtime->tm_min, newtime->tm_sec );
+	return newID;
+}
+
+
+/*
+===============
+idSessionLocal::ExtractSaveGameUniqueId
+===============
+*/
+// parse id from a save game file name
+idStr idSessionLocal::ExtractSaveGameUniqueId( const char* sessionName )
+{
+	if (sessionName == nullptr || strlen(sessionName) <= 0) {
+		return idStr();
+	}
+
+	// parse the id to the correct format, otherwise generate a new one
+	static const idStr RefID = GenerateSaveGameUniqueId(); // a reference session id to compare this one to
+
+	idStr parseID = sessionName;
+
+	// remove prefixes
+	parseID.Replace(SG_QUICKSAVE_PREFIX, "");
+	parseID.Replace(SG_AUTOSAVE_PREFIX, "");
+	parseID.Replace(SG_SESSION_PREFIX,"");
+
+	parseID.CapLength(RefID.Length()); // exclude postfix info
+
+	// session names should be same length and same format
+	if (parseID.Length() != RefID.Length())
+	{
+		return idStr();
+	}
+
+	for (int idx = 0; idx < RefID.Length(); idx++)
+	{
+		if ((idStr::CharIsAlpha(RefID[idx]) != idStr::CharIsAlpha(parseID[idx]))
+			|| (idStr::CharIsNumeric(RefID[idx]) != idStr::CharIsNumeric(parseID[idx])))
+		{ // mismatch,
+			return idStr();
+		}
+	}
+
+	// valid session name
+	return parseID;
+}
+
+/*
+===============
+idSessionLocal::ExtractTimeFromSaveGameUniqueID
+===============
+*/
+ID_TIME_T idSessionLocal::ExtractTimeFromSaveGameUniqueID( const idStr & sessionIdStr )
+{
+	if (sessionIdStr.Length() < 13)
+	{
+		return 0;
+	}
+
+	// blendo eric: no strptime()? plus it doesn't use 0 based months?? just parsing out each one manually
+	// expecting "yymmdd_HHMMSS"
+	idStr timeIdYear = sessionIdStr.Mid(0, 2); // 20xx, not y2k1 compatible, uh oh
+	idStr timeIdMonth = sessionIdStr.Mid(2, 2); // zero based
+	idStr timeIdDay = sessionIdStr.Mid(4, 2); // not zero based
+	idStr timeIdHour = sessionIdStr.Mid(7, 2);
+	idStr timeIdMinute = sessionIdStr.Mid(9, 2);
+	idStr timeIdSecond = sessionIdStr.Mid(11, 2);
+
+	struct tm timeIdVals = {};
+	timeIdVals.tm_year = atoi(timeIdYear) + 2000 - 1900; // convert to 1900 epoch
+	timeIdVals.tm_mon = atoi(timeIdMonth); // zero based
+	timeIdVals.tm_mday = atoi(timeIdDay); // not zero based
+	timeIdVals.tm_hour = atoi(timeIdHour);
+	timeIdVals.tm_min = atoi(timeIdMinute);
+	timeIdVals.tm_sec = atoi(timeIdSecond);
+	timeIdVals.tm_isdst = -1; // generates dst value in mktime
+
+	return mktime(&timeIdVals);
+}
+
+
+/*
+===============
+idSessionLocal::StoreSaveGameSessionName
+
+Stores name to keep track of the active play through
+===============
+*/
+void idSessionLocal::StoreSaveGameSessionName(const char* name)
+{
+	idStr sessionId = ExtractSaveGameUniqueId( name );
+	if (sessionId.IsEmpty())
+	{
+		sessionId = GenerateSaveGameUniqueId();
+	}
+	com_savegame_sessionid.SetString( sessionId );
+}
+
+/*
+===============
+idSessionLocal::SaveGameSession
+===============
+*/
+void idSessionLocal::SaveGameSession(const idCmdArgs& args)
+{
+	idStr sessionName = sessLocal.GetSessionSaveName();
+	sessLocal.SaveGame(sessionName, false);
+}
+
+
+/*
+===============
+SaveGame_f
+===============
+*/
+void idSessionLocal::SaveGameAuto(const idCmdArgs& args)
+{
+	if (args.Argc() > 1)
+	{	// pass along mapname and suffix
+		
+		// SM: Don't autosave the tutorial
+		if (idStr::FindText(args.Argv(1), "tutorial") != -1)
+			return;
+
+		sessLocal.SaveGame( sessLocal.GetAutoSaveName( args.Argv(1), args.Argv(2) ), true);
+	}
+	else
+	{	// autogen
+		sessLocal.SaveGame(sessLocal.GetAutoSaveName(), true);
+	}
+
+	//BC 4-4-2025
+	//This is where the game makes an automatic save when a level begins.
+	//Make a UI notification so player can see that a save is happening.
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (player != nullptr)
+	{
+		player->hud->HandleNamedEvent("onSavegame");
+	}
+}
+
+/*
+===============
+idSessionLocal::LoadGameSession
+
+===============
+*/
+void idSessionLocal::LoadGameSession(const idCmdArgs& args)
+{
+	idFileList* saveFileList = fileSystem->ListFiles("savegames", ".save", false);
+	idStr nameFound;
+	ID_TIME_T latestTime = 0;
+	for (int idx = 0; idx < saveFileList->GetNumFiles(); idx++)
+	{
+		// use file if matches current session
+		if (idStr::FindText(saveFileList->GetFile(idx), com_savegame_sessionid.GetString(),false) >= 0)
+		{
+			nameFound = saveFileList->GetFile(idx);
+			break;
+		}
+
+		// file is latest saved
+		ID_TIME_T timeStamp;
+		fileSystem->ReadFile(idStr("savegames/") + saveFileList->GetFile(idx), NULL, &timeStamp);
+		if (timeStamp > latestTime)
+		{
+			latestTime = timeStamp;
+			nameFound = saveFileList->GetFile(idx);
+		}
+	}
+	fileSystem->FreeFileList(saveFileList);
+
+	if (nameFound.Length() > 0)
+	{
+		if ( !sessLocal.LoadGame( nameFound ) )
+		{
+			gameLocal.Warning("Load Session Failed");
+		}
+	}
+	else
+	{
+		gameLocal.Warning("Load Session Failed, no session is active");
+	}
+}
+
 
 /*
 ===============
@@ -1316,7 +1591,7 @@ void idSessionLocal::MoveToNewMap( const char *mapName ) {
 
 	if ( !mapSpawnData.serverInfo.GetBool("devmap") ) {
 		// Autosave at the beginning of the level
-		SaveGame( GetAutoSaveName( mapName ), true );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW /*CMD_EXEC_APPEND*/, va( "savegameauto %s", mapName ) );
 	}
 
 	SetGUI( NULL, NULL );
@@ -1515,6 +1790,8 @@ void idSessionLocal::UnloadMap() {
 	}
 
 	mapSpawned = false;
+
+	uiManager->SetGroup( "mainmenu", true );
 }
 
 /*
@@ -1607,11 +1884,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	// close console and remove any prints from the notify lines
 	console->Close();
 
-	if ( IsMultiplayer() ) {
-		// make sure the mp GUI isn't up, or when players get back in the
-		// map, mpGame's menu and the gui will be out of sync.
 		SetGUI( NULL, NULL );
-	}
 
 	// mute sound
 	soundSystem->SetMute( true );
@@ -1634,6 +1907,8 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 		CompleteWipe();
 	}
 
+	SetGUI( guiMainMenu, NULL ); // reset active gui, which might be a map specific gui that's going away
+
 	// extract the map name from serverinfo
 	idStr mapString = mapSpawnData.serverInfo.GetString( "si_map" );
 
@@ -1643,6 +1918,8 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// shut down the existing game if it is running
 	UnloadMap();
+
+	idEvent::ClearEventList();
 
 	// don't do the deferred caching if we are reloading the same map
 	if ( fullMapName == currentMapName ) {
@@ -1658,12 +1935,14 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 		renderSystem->BeginLevelLoad();
 		soundSystem->BeginLevelLoad();
 	}
-
+	
 	uiManager->BeginLevelLoad();
 	uiManager->Reload( true );
 
 	// set the loading gui that we will wipe to
 	LoadLoadingGui( mapString );
+
+	uiManager->SetGroup( mapString, false );
 
 	// cause prints to force screen updates as a pacifier,
 	// and draw the loading gui instead of game draws
@@ -1839,7 +2118,7 @@ LoadGame_f
 void LoadGame_f( const idCmdArgs &args ) {
 	console->Close();
 	if ( args.Argc() < 2 || idStr::Icmp(args.Argv(1), "quick" ) == 0 ) {
-		idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
+		idStr saveName = sessLocal.GetQuickSaveName();
 		sessLocal.LoadGame( saveName );
 	} else {
 		sessLocal.LoadGame( args.Argv(1) );
@@ -1853,7 +2132,7 @@ SaveGame_f
 */
 void SaveGame_f( const idCmdArgs &args ) {
 	if ( args.Argc() < 2 || idStr::Icmp( args.Argv(1), "quick" ) == 0 ) {
-		idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
+		idStr saveName = sessLocal.GetQuickSaveName();
 		if ( sessLocal.SaveGame( saveName ) ) {
 			common->Printf( "%s\n", saveName.c_str() );
 		}
@@ -1962,13 +2241,14 @@ idSessionLocal::ScrubSaveGameFileName
 Turns a bad file name into a good one or your money back
 ===============
 */
-void idSessionLocal::ScrubSaveGameFileName( idStr &saveFileName ) const {
+void idSessionLocal::ScrubSaveGameFileName( idStr &saveFileName ) {
 	int i;
 	idStr inFileName;
 
 	inFileName = saveFileName;
 	inFileName.RemoveColors();
 	inFileName.StripFileExtension();
+	inFileName.ToLower(); // just in case for *nix systems
 
 	saveFileName.Clear();
 
@@ -2001,6 +2281,12 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 	int i;
 	idStr gameFile, previewFile, descriptionFile, mapName;
 
+	// Don't autosave in end game except for vig_hub
+	if (gameLocal.IsInEndGame() && autosave && idStr::FindText(saveName, "vig_hub") == -1) {
+		common->Printf("Dreaming a level, don't autosave.\n");
+		return false;
+	}
+
 	if ( !mapSpawned ) {
 		common->Printf( "Not playing a game.\n" );
 		return false;
@@ -2029,18 +2315,101 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 		soundSystem->SetPlayingSoundWorld( NULL );
 	}
 
-	// setup up filenames and paths
-	gameFile = saveName;
-	ScrubSaveGameFileName( gameFile );
+	idStr saveFolderName = "savegames";
 
-	gameFile = "savegames/" + gameFile;
-	gameFile.SetFileExtension( ".save" );
+	// setup up filenames and paths
+	idStr sessionSaveName = saveName;
+	ScrubSaveGameFileName( sessionSaveName );
+
+	idStr gameFileNoPath = sessionSaveName;
+	gameFileNoPath.SetFileExtension( ".save" );
+
+	gameFile = saveFolderName + "/" + gameFileNoPath;
 
 	previewFile = gameFile;
 	previewFile.SetFileExtension( ".tga" );
 
 	descriptionFile = gameFile;
 	descriptionFile.SetFileExtension( ".txt" );
+
+#if 0
+	// blendo eric: backup sessions and quicksaves
+	if( com_savegame_backups.GetInteger() > 0 && 
+		(sessionSaveName.Find(SG_SESSION_PREFIX) == 0 || sessionSaveName.Find(SG_QUICKSAVE_PREFIX) == 0) )
+	{
+		idFileList* saveFileList = fileSystem->ListFiles(saveFolderName.c_str(), ".save", false);
+		idFileList* backupList = fileSystem->ListFiles(saveFolderName.c_str(), SG_BACKUP_EXT, false);
+
+		bool saveExists = false;
+
+		for (int idx = 0; idx < saveFileList->GetNumFiles(); idx++)
+		{
+			if (idStr::Icmp( saveFileList->GetFile(idx), gameFileNoPath ) == 0)
+			{ // save already exists, so find backup
+				saveExists = true;
+				break;
+			}
+		}
+
+		if (saveExists)
+		{
+			static idStr backUpNames[ SG_MAX_BACKUPS_PER_FILE ];
+
+			// get the backup count, and save names of all exists backups
+			int backUpNum = 0;
+			while ( backUpNum < com_savegame_backups.GetInteger() )
+			{
+				backUpNames[backUpNum] = idStr::Format("%s_%02d%s", sessionSaveName.c_str(), backUpNum, SG_BACKUP_EXT);
+
+				bool backUpExists = false;
+				for (int bIdx = 0; bIdx < backupList->GetNumFiles(); bIdx++)
+				{
+					if (idStr::Icmp(backUpNames[backUpNum], backupList->GetFile(bIdx)) == 0)
+					{
+						backUpExists = true;
+						break;
+					}
+				}
+				if (!backUpExists)
+				{
+					break;
+				}
+				backUpNum++;
+			}
+
+			// if at max backups, delete first, and move the rest down one slot
+			if (backUpNum >= com_savegame_backups.GetInteger())
+			{
+				for (int idx = 1; idx < backUpNum; idx++)
+				{
+					idStr backUpCur = backUpNames[idx-1];
+					idStr backUpNext = backUpNames[idx];
+					fileSystem->CopyFile(backUpCur.c_str(), backUpNext.c_str());
+
+					backUpCur.SetFileExtension( ".tga" );
+					backUpNext.SetFileExtension( ".tga" );
+					fileSystem->CopyFile(backUpCur.c_str(), backUpNext.c_str());
+
+					backUpCur.SetFileExtension( ".txt" );
+					backUpNext.SetFileExtension( ".txt" );
+					fileSystem->CopyFile(backUpCur.c_str(), backUpNext.c_str());
+				}
+			}
+
+			int lastBackUpIdx = backUpNum < com_savegame_backups.GetInteger() ?  backUpNum : com_savegame_backups.GetInteger()-1;
+
+			idStr backUpFinal = backUpNames[lastBackUpIdx];
+			fileSystem->CopyFile( gameFile.c_str(), backUpFinal );
+			backUpFinal.SetFileExtension( ".tga" );
+			fileSystem->CopyFile( previewFile.c_str(), backUpFinal );
+			backUpFinal.SetFileExtension( ".txt" );
+			fileSystem->CopyFile( descriptionFile.c_str(), backUpFinal );
+		}
+
+		fileSystem->FreeFileList(saveFileList);
+		fileSystem->FreeFileList(backupList);
+	}
+#endif
 
 	// Open savegame file
 	idFile *fileOut = fileSystem->OpenFileWrite( gameFile );
@@ -2079,13 +2448,14 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 	// close the sava game file
 	fileSystem->CloseFile( fileOut );
 
+	//BC 4-2-2025: removed functionality for saving TGA file, as we're not using this TGA file anywhere.
 	// Write screenshot
-	if ( !autosave ) {
-		renderSystem->CropRenderSize( 320, 240, false );
-		game->Draw( 0 );
-		renderSystem->CaptureRenderToFile( previewFile, true );
-		renderSystem->UnCrop();
-	}
+	//if ( !autosave ) {
+	//	renderSystem->CropRenderSize( 320, 240, false );
+	//	game->Draw( 0 );
+	//	renderSystem->CaptureRenderToFile( previewFile, true );
+	//	renderSystem->UnCrop();
+	//}
 
 	// Write description, which is just a text file with:
 	// Line 1: the unclean save name
@@ -2115,6 +2485,8 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 	fileDesc->Printf( "\"%s\"\n", description.c_str() );
 	fileDesc->Printf( "\"%s\"\n", mapName.c_str());
 
+	fileDesc->Printf( "\"%d\"\n", BUILD_NUMBER );
+
 	//if ( autosave ) {
 	//	idStr sshot = mapSpawnData.serverInfo.GetString( "si_map" );
 	//	sshot.StripPath();
@@ -2143,7 +2515,10 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 
 	fileSystem->CloseFile( fileDesc );
 
-
+	if (common->g_SteamUtilities)
+	{
+		common->g_SteamUtilities->SteamCloudSave(gameFile.c_str(), descriptionFile.c_str());
+	}
 
 	if ( pauseWorld ) {
 		soundSystem->SetPlayingSoundWorld( pauseWorld );
@@ -2152,6 +2527,7 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 
 	syncNextGameFrame = true;
 
+	StoreSaveGameSessionName( sessionSaveName ); // save session name on map save success
 
 	return true;
 #endif
@@ -2180,6 +2556,9 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 
 	loadFile = saveName;
 	ScrubSaveGameFileName( loadFile );
+
+	idStr sessionFileName = loadFile;
+
 	loadFile.SetFileExtension( ".save" );
 
 	in = "savegames/";
@@ -2227,15 +2606,19 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	// check the version, if it doesn't match, cancel the loadgame,
 	// but still load the map with the persistant playerInfo from the header
 	// so that the player doesn't lose too much progress.
-	if ( savegameVersion != SAVEGAME_VERSION &&
-		 !( savegameVersion == 16 && SAVEGAME_VERSION == 17 ) ) {	// handle savegame v16 in v17
-		common->Warning( "Savegame Version mismatch: aborting loadgame and starting level with persistent data" );
-		loadingSaveGame = false;
-		fileSystem->CloseFile( savegameFile );
-		savegameFile = NULL;
+	if ( savegameVersion <= SAVEGAME_VERSION_INVALID ) {
+		common->Warning( "Savegame Version outdated (%d): aborting loadgame and starting level with persistent data", savegameVersion );
+		// SM: We can't early out here because we need game_local to still load up through
+		// the stuff it would load for an autosave
+		
+		// loadingSaveGame = false;
+		// fileSystem->CloseFile( savegameFile );
+		// savegameFile = NULL;
 	}
 
 	common->DPrintf( "loading a v%d savegame\n", savegameVersion );
+
+	StoreSaveGameSessionName(sessionFileName); // save session name on map save load
 
 	if ( saveMap.Length() > 0 ) {
 
@@ -2680,6 +3063,18 @@ void idSessionLocal::Frame() {
 		soundSystem->AsyncUpdate( Sys_Milliseconds() );
 	}
 
+	if (gameLocal.requestPauseMenu)
+	{
+		gameLocal.requestPauseMenu = false;
+
+		idPlayer* player = gameLocal.GetLocalPlayer();
+		bool allowESC = !guiActive || (player && player->IsFullscreenUIActive());
+		if (allowESC && g_pauseOnFocusLost.GetBool())
+		{
+			StartMenu();
+		}
+	}
+
 	// Editors that completely take over the game
 	if ( com_editorActive && ( com_editors & ( EDITOR_RADIANT | EDITOR_GUI ) ) ) {
 		return;
@@ -3036,8 +3431,14 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
 
 #ifndef	ID_DEDICATED
-	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "saves a game" );
-	cmdSystem->AddCommand( "loadGame", LoadGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "loads a game", idCmdSystem::ArgCompletion_SaveGame );
+	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "quick saves a game" );
+	cmdSystem->AddCommand( "loadGame", LoadGame_f, CMD_FL_SYSTEM, "loads a game, quicksave by default", idCmdSystem::ArgCompletion_SaveGame );
+
+
+	cmdSystem->AddCommand( "savegameauto", idSessionLocal::SaveGameAuto, CMD_FL_SYSTEM|CMD_FL_CHEAT, "default behavior for per map auto saves" );
+	// blendo eric
+	cmdSystem->AddCommand( "savegamesession", idSessionLocal::SaveGameSession, CMD_FL_SYSTEM|CMD_FL_CHEAT, "default behavior for saving in a session");
+	cmdSystem->AddCommand( "loadgamesession", idSessionLocal::LoadGameSession, CMD_FL_SYSTEM|CMD_FL_CHEAT, "default behavior for loading a session");
 #endif
 
 	cmdSystem->AddCommand( "takeViewNotes", TakeViewNotes_f, CMD_FL_SYSTEM, "take notes about the current map from the current view" );
@@ -3065,6 +3466,10 @@ void idSessionLocal::Init() {
 	sw = soundSystem->AllocSoundWorld( rw );
 
 	menuSoundWorld = soundSystem->AllocSoundWorld( rw );
+
+
+	uiManager->BeginLevelLoad();
+	uiManager->SetGroup( "mainmenu", true );
 
 	// we have a single instance of the main menu
 	guiMainMenu = uiManager->FindGui( "guis/mainmenu.gui", true, false, true );

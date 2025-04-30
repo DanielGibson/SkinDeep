@@ -26,6 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#if !defined(__BLENDO_SIMD_INLINE__)
+
 #include "sys/platform.h"
 
 #include "idlib/math/Simd_3DNow.h"
@@ -40,7 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 
 /*
 ============
-idSIMD_3DNow::GetName
+idSIMD_3DNow::GetName 
 ============
 */
 const char * idSIMD_3DNow::GetName( void ) const {
@@ -291,3 +293,5 @@ $memcpy_final:
 }
 
 #endif /* _MSC_VER */
+
+#endif

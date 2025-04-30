@@ -13,7 +13,7 @@ public:
 							idJockeyBreakable(void);
 	virtual					~idJockeyBreakable(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -37,7 +37,7 @@ private:
 	idEntity*				frobbutton1;
 
 
-	const idDeclEntityDef	*itemDef;
+	const idDeclEntityDef	*itemDef = nullptr;
 
 
 };

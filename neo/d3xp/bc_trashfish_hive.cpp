@@ -67,10 +67,18 @@ void idTrashfishHive::Spawn(void)
 
 void idTrashfishHive::Save(idSaveGame *savefile) const
 {
+	SaveFileWriteArray( fishes, MAXTRASHFISH, WriteObject ); // idEntityPtr<idEntity> fishes[MAXTRASHFISH]
+	savefile->WriteInt( fishspawnTimer ); // int fishspawnTimer
+	savefile->WriteInt( idleTimer ); // int idleTimer
+	savefile->WriteInt( hiveState ); // int hiveState
 }
 
 void idTrashfishHive::Restore(idRestoreGame *savefile)
 {
+	SaveFileReadArray( fishes, ReadObject ); // idEntityPtr<idEntity> fishes[MAXTRASHFISH]
+	savefile->ReadInt( fishspawnTimer ); // int fishspawnTimer
+	savefile->ReadInt( idleTimer ); // int idleTimer
+	savefile->ReadInt( hiveState ); // int hiveState
 }
 
 void idTrashfishHive::Think(void)

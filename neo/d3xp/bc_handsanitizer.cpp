@@ -19,14 +19,21 @@ END_CLASS
 
 idHandSanitizer::idHandSanitizer(void)
 {
+	faucetEmitter = nullptr;
+
+	sinkIsOn = false;
+	sinkTimer = 0;
+
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
 }
 
 idHandSanitizer::~idHandSanitizer(void)
 {
-	if (faucetEmitter != NULL)
+	if (faucetEmitter != NULL) {
 		faucetEmitter->PostEventMS(&EV_Remove, 0);
+		faucetEmitter = nullptr;
+	}
 
 	if (headlightHandle != -1)
 		gameRenderWorld->FreeLightDef(headlightHandle);
@@ -86,10 +93,27 @@ idVec3 idHandSanitizer::GetFaucetPos()
 
 void idHandSanitizer::Save(idSaveGame *savefile) const
 {
+	savefile->WriteObject( faucetEmitter ); // idFuncEmitter * faucetEmitter
+
+	savefile->WriteBool( sinkIsOn ); // bool sinkIsOn
+	savefile->WriteInt( sinkTimer ); // int sinkTimer
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
 }
 
 void idHandSanitizer::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadObject( CastClassPtrRef(faucetEmitter) ); // idFuncEmitter * faucetEmitter
+
+	savefile->ReadBool( sinkIsOn ); // bool sinkIsOn
+	savefile->ReadInt( sinkTimer ); // int sinkTimer
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
 }
 
 void idHandSanitizer::Think(void)
@@ -108,6 +132,8 @@ void idHandSanitizer::Killed(idEntity *inflictor, idEntity *attacker, int damage
 {
 	if (!fl.takedamage)
 		return;
+
+	gameLocal.AddEventlogDeath(this, 0, inflictor, attacker, "", EL_DESTROYED);
 
 	fl.takedamage = false;
 	StopSound(SND_CHANNEL_ANY, false);

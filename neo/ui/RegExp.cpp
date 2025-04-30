@@ -188,7 +188,7 @@ void idRegister::WriteToDemoFile( idDemoFile *f ) {
 idRegister::WriteToSaveGame
 =================
 */
-void idRegister::WriteToSaveGame( idFile *savefile ) {
+void idRegister::WriteToSaveGame( idSaveGame *savefile ) const {
 	int len;
 
 	savefile->Write( &enabled, sizeof( enabled ) );
@@ -208,7 +208,7 @@ void idRegister::WriteToSaveGame( idFile *savefile ) {
 idRegister::ReadFromSaveGame
 ================
 */
-void idRegister::ReadFromSaveGame( idFile *savefile ) {
+void idRegister::ReadFromSaveGame( idRestoreGame *savefile ) {
 	int len;
 
 	savefile->Read( &enabled, sizeof( enabled ) );
@@ -403,7 +403,7 @@ void idRegisterList::WriteToDemoFile(idDemoFile *f) {
 idRegisterList::WriteToSaveGame
 =====================
 */
-void idRegisterList::WriteToSaveGame( idFile *savefile ) {
+void idRegisterList::WriteToSaveGame( idSaveGame *savefile ) const {
 	int i, num;
 
 	num = regs.Num();
@@ -419,10 +419,12 @@ void idRegisterList::WriteToSaveGame( idFile *savefile ) {
 idRegisterList::ReadFromSaveGame
 ====================
 */
-void idRegisterList::ReadFromSaveGame( idFile *savefile ) {
+void idRegisterList::ReadFromSaveGame( idRestoreGame *savefile ) {
 	int i, num;
 
 	savefile->Read( &num, sizeof( num ) );
+
+
 	for ( i = 0; i < num; i++ ) {
 		regs[i]->ReadFromSaveGame( savefile );
 	}

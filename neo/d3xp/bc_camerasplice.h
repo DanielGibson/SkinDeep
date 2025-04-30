@@ -14,7 +14,7 @@ public:
 							idCameraSplice(void);
 	virtual					~idCameraSplice(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -50,13 +50,13 @@ private:
 
 	int						fanfareState;
 	enum					{ CSF_NONE, CSF_INITIALIZE, CSF_ACTIVE, CSF_DONE };
-	idEntity				*fanfareIcon;
-	idBeam*					beamStart;
-	idBeam*					beamEnd;
+	idEntity				*fanfareIcon = nullptr;
+	idBeam*					beamStart = nullptr;
+	idBeam*					beamEnd = nullptr;
 	int						fanfareTimer;
 
 	enum					{CSB_OVERRIDE, CSB_LEFT, CSB_RIGHT};
-	idEntity*				buttons[CAMERASPLICE_BUTTONCOUNT];
+	idEntity*				buttons[CAMERASPLICE_BUTTONCOUNT] = {};
 
 	idEntityPtr<idEntity>	transcriptNote;
 	idVec3					transcriptStartPos;

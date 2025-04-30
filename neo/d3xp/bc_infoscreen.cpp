@@ -26,6 +26,11 @@ idInfoScreen::idInfoScreen(void)
 {
 	memset(&headlight, 0, sizeof(headlight));
 	headlightHandle = -1;
+
+	idleSmoke = nullptr;
+
+	repairNode.SetOwner(this);
+	repairNode.AddToEnd(gameLocal.repairEntities);
 }
 
 idInfoScreen::~idInfoScreen(void)
@@ -48,10 +53,9 @@ void idInfoScreen::Spawn(void)
 	idleSmoke = NULL;	
 
 	//is it repairable.
-	if (spawnArgs.GetBool("repairable", "0"))
+	if (!spawnArgs.GetBool("repairable", "0"))
 	{
-		repairNode.SetOwner(this);
-		repairNode.AddToEnd(gameLocal.repairEntities);
+		repairNode.Remove(); // blendo eric: inverse (remove if DNE), so that it can regen during saveload
 	}
 
 	if (spawnArgs.GetBool("uniquegui", "1"))
@@ -62,10 +66,25 @@ void idInfoScreen::Spawn(void)
 
 void idInfoScreen::Save(idSaveGame *savefile) const
 {
+	savefile->WriteInt( infoState ); // int infoState
+
+	savefile->WriteObject( idleSmoke ); // idFuncEmitter * idleSmoke
+
+	savefile->WriteRenderLight( headlight ); // renderLight_t headlight
+	savefile->WriteInt( headlightHandle ); // int headlightHandle
 }
 
 void idInfoScreen::Restore(idRestoreGame *savefile)
 {
+	savefile->ReadInt( infoState ); // int infoState
+
+	savefile->ReadObject( CastClassPtrRef(idleSmoke) ); // idFuncEmitter * idleSmoke
+
+	savefile->ReadRenderLight( headlight ); // renderLight_t headlight
+	savefile->ReadInt( headlightHandle ); // int headlightHandle
+	if ( headlightHandle != - 1 ) {
+		gameRenderWorld->UpdateLightDef( headlightHandle, &headlight );
+	}
 }
 
 void idInfoScreen::Think(void)

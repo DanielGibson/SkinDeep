@@ -210,11 +210,9 @@ int Sys_GetProcessorId( void ) {
 	if (SDL_HasSSE2())
 		flags |= CPUID_SSE2;
 
-#ifndef NO_CPUID
-	// there is no SDL_HasSSE3() in SDL 1.2
-	if (HasSSE3())
+	//blendo eric: enable sse3 verification in newer sdl
+	if (SDL_HasSSE3())
 		flags |= CPUID_SSE3;
-#endif
 
 	if (SDL_HasAltiVec())
 		flags |= CPUID_ALTIVEC;

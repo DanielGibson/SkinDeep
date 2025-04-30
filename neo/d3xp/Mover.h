@@ -53,7 +53,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Killed( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
@@ -245,7 +245,7 @@ public:
 
 	void					Spawn();
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual bool			HandleSingleGuiCommand( idEntity *entityGui, idLexer *src );
@@ -319,7 +319,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			PreBind( void );
@@ -412,7 +412,7 @@ protected:
 	void					DoDoorGravityCheck();
 	bool					sparksEnabled;
 	float					sparksZOffset;
-	idList<idEntityFx*>		FXSparks;
+	idList< idEntityPtr<idEntity> >		FXSparks;
 	void					SpawnDoormoveInterestpoint(idEntity *activator);
 };
 
@@ -425,7 +425,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -545,7 +545,7 @@ private:
 
 	void					SpectatorDoorNoTriggerTouch(idPlayer *p);
 
-    idAnimatedEntity*		gateProps[2]; //lockdown gates for when vacuum breach happens.
+	idAnimatedEntity*		gateProps[2] = {}; //lockdown gates for when vacuum breach happens.
 	idEntityPtr<class idDoorBarricade> barricade;
 
 	void					Event_ReleaseBarricade(void);
@@ -567,7 +567,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -604,7 +604,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
@@ -628,7 +628,7 @@ public:
 
 	void					Spawn( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 private:

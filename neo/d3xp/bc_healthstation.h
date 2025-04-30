@@ -11,12 +11,16 @@ public:
 	idProximityAnnouncer() : idProximityAnnouncer(nullptr){}
 	idProximityAnnouncer(idEntity* ent);
 	void					Start();
+
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
+	void					Restore(idRestoreGame *savefile);
+
 	bool					IsProximityNearSomeone();
 	void					Update();
 	void					DoSoundwaves();
 	bool					Ready();
 
-	idEntity*				sensor;
+	idEntity*				sensor = nullptr;
 	int						proximityCheckTimer;
 	bool					canProximityAnnounce;
 	int						coolDownTimer;
@@ -34,7 +38,7 @@ public:
 							idHealthstation(void);
 	virtual					~idHealthstation(void);
 
-	void					Save(idSaveGame *savefile) const;
+	void					Save(idSaveGame *savefile) const; // blendo eric: savegame pass 1
 	void					Restore(idRestoreGame *savefile);
 
 	void					Spawn(void);
@@ -46,6 +50,11 @@ public:
 	void					SetCombatLockdown(bool value);
 
 	virtual void			DoRepairTick(int amount);
+
+	virtual void			Event_PostSpawn(void);
+
+	virtual void			DoHack(); //for the hackgrenade.
+	void					DispenseHealcloud();
 
 private:
 

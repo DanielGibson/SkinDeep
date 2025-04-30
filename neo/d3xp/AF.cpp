@@ -76,16 +76,32 @@ idAF::Save
 ================
 */
 void idAF::Save( idSaveGame *savefile ) const {
-	savefile->WriteObject( self );
-	savefile->WriteString( GetName() );
-	savefile->WriteBool( hasBindConstraints );
-	savefile->WriteVec3( baseOrigin );
-	savefile->WriteMat3( baseAxis );
-	savefile->WriteInt( poseTime );
-	savefile->WriteInt( restStartTime );
-	savefile->WriteBool( isLoaded );
-	savefile->WriteBool( isActive );
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteString( name ); //  idString name
+	savefile->WriteStaticObject( idAF::physicsObj ); //  idPhysics_AF physicsObj
+	savefile->WriteObject( self ); //  idEntity * self
+	savefile->WriteObject( overrideCurrent ); //  idEntity * overrideCurrent
+	savefile->WriteAnimatorPtr( animator ); // idAnimator * animator
+	savefile->WriteInt( modifiedAnim ); //  int modifiedAnim
+	savefile->WriteVec3( baseOrigin ); //  idVec3 baseOrigin
+	savefile->WriteMat3( baseAxis ); //  idMat3 baseAxis
+
+	savefile->WriteInt(jointMods.Num()); //  idList<jointConversion_t> jointMods
+	for (int idx = 0; idx < jointMods.Num(); idx++)
+	{
+		savefile->WriteInt(jointMods[idx].bodyId); //  int bodyId
+		savefile->WriteJoint(jointMods[idx].jointHandle); //  saveJoint_t jointHandle
+		savefile->WriteInt(jointMods[idx].jointMod); //  AFJointModType_t jointMod
+		savefile->WriteVec3(jointMods[idx].jointBodyOrigin); //  idVec3 jointBodyOrigin
+		savefile->WriteMat3(jointMods[idx].jointBodyAxis); //  idMat3 jointBodyAxis
+	}
+
+	SaveFileWriteArray(jointBody, jointBody.Num(), WriteInt); // idList<int> jointBody
+
+	savefile->WriteInt( poseTime ); //  int poseTime
+	savefile->WriteInt( restStartTime ); //  int restStartTime
+	savefile->WriteBool( isLoaded ); //  bool isLoaded
+	savefile->WriteBool( isActive ); //  bool isActive
+	savefile->WriteBool( hasBindConstraints ); //  bool hasBindConstraints
 }
 
 /*
@@ -94,41 +110,60 @@ idAF::Restore
 ================
 */
 void idAF::Restore( idRestoreGame *savefile ) {
-	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
-	savefile->ReadString( name );
-	savefile->ReadBool( hasBindConstraints );
-	savefile->ReadVec3( baseOrigin );
-	savefile->ReadMat3( baseAxis );
-	savefile->ReadInt( poseTime );
-	savefile->ReadInt( restStartTime );
-	savefile->ReadBool( isLoaded );
-	savefile->ReadBool( isActive );
 
-	animator = NULL;
-	modifiedAnim = 0;
+	savefile->ReadString( name ); //  idString name
+	savefile->ReadStaticObject( physicsObj ); //  idPhysics_AF physicsObj // restored below
 
-	if ( self ) {
-		SetAnimator( self->GetAnimator() );
-		Load( self, name );
-		if ( hasBindConstraints ) {
-			AddBindConstraints();
-		}
+	savefile->ReadObject( self ); //  idEntity * self
+	savefile->ReadObject( overrideCurrent ); //  idEntity * overrideCurrent
+	savefile->ReadAnimatorPtr( animator ); // idAnimator * animator
+	savefile->ReadInt( modifiedAnim ); //  int modifiedAnim
+	savefile->ReadVec3( baseOrigin ); //  idVec3 baseOrigin
+	savefile->ReadMat3( baseAxis ); //  idMat3 baseAxis
+
+	int num;
+	savefile->ReadInt( num );
+	jointMods.SetNum( num ); //  idList<jointConversion_t> jointMods
+	for (int idx = 0; idx < num; idx++)
+	{
+		savefile->ReadInt(jointMods[idx].bodyId); //  int bodyId
+		savefile->ReadJoint(jointMods[idx].jointHandle); //  saveJoint_t jointHandle
+		savefile->ReadInt((int&)jointMods[idx].jointMod); //  AFJointModType_t jointMod
+		savefile->ReadVec3(jointMods[idx].jointBodyOrigin); //  idVec3 jointBodyOrigin
+		savefile->ReadMat3(jointMods[idx].jointBodyAxis); //  idMat3 jointBodyAxis
 	}
 
-	savefile->ReadStaticObject( physicsObj );
+	SaveFileReadList(jointBody, ReadInt); // idList<int> jointBody
 
-	if ( self ) {
-		if ( isActive ) {
-			// clear all animations
-			animator->ClearAllAnims( gameLocal.time, 0 );
-			animator->ClearAllJoints();
+	savefile->ReadInt( poseTime ); //  int poseTime
+	savefile->ReadInt( restStartTime ); //  int restStartTime
+	savefile->ReadBool( isLoaded ); //  bool isLoaded
+	savefile->ReadBool( isActive ); //  bool isActive
+	savefile->ReadBool( hasBindConstraints ); //  bool hasBindConstraints
 
-			// switch to articulated figure physics
-			self->RestorePhysics( &physicsObj );
-			physicsObj.EnableClip();
-		}
-		UpdateAnimation();
-	}
+	//animator = NULL;
+	//modifiedAnim = 0;
+
+	//if ( self ) {
+	//	SetAnimator( self->GetAnimator() );
+	//	Load( self, name );
+	//	if ( hasBindConstraints ) {
+	//		AddBindConstraints();
+	//	}
+	//}
+
+	//if ( self ) {
+	//	if ( isActive ) {
+	//		// clear all animations
+	//		animator->ClearAllAnims( gameLocal.time, 0 );
+	//		animator->ClearAllJoints();
+
+	//		// switch to articulated figure physics
+	//		self->RestorePhysics( &physicsObj );
+	//		physicsObj.EnableClip();
+	//	}
+	//	UpdateAnimation();
+	//}
 }
 
 /*

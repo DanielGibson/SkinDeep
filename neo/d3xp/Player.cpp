@@ -184,6 +184,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "sys/platform.h"
 #include "idlib/LangDict.h"
+#include "idlib/geometry/JointTransform.h"
 #include "framework/async/NetworkSystem.h"
 #include "framework/DeclEntityDef.h"
 #include "framework/KeyInput.h"
@@ -376,6 +377,10 @@ const float SNEEZE_GROWRATE_MULTIPLIER = 0.05f; //.3
 const int SNEEZE_RANDOMCHANCE = 6; //random chance 1 out of X that you will increase sneezemeter when standing still.
 const float SNEEZE_PEPPER_RATE = 9.0f;
 
+//physics force to apply to player when sneeze
+const int SNEEZE_PUSHBACKAMOUNT = -256;
+const int SNEEZE_PUSHBACKAMOUNT_SPACE = -1024;
+
 const int	DOWNED_TICKTIME = 400; //when bleeding out, wait this much ms between bleedout DOT damage.
 const float DOWNED_VIEWANGLE_ROLL = 4;
 const float	DOWNED_TICKTIME_MULTIPLIER_LOWHEALTH = 1.5f;		//slow down bleedout rate when meter is low.
@@ -451,7 +456,8 @@ const int SMELLY_PURGERADIUS = 96;
 
 const int TURNINGDELTA_SOUNDTHRESHOLD = 2;
 
-const float VENTPEEK_TURNING_SOUNDTHRESHOLD = 30.0f; // default number of degrees to turn in order to trigger a turning sound
+//BC 4-10-2025: re-tuned VENTPEEK_TURNING_SOUNDTHRESHOLD value (was 30) as its value range seems to have changed, and also to support gamepad usage
+const float VENTPEEK_TURNING_SOUNDTHRESHOLD = 4.0f; // default number of degrees to turn in order to trigger a turning sound
 const int VENTPEEK_TURNING_SOUNDDELAY = 2000; // default wait between making sounds
 
 const int LISTENMODE_HEAD_RADIUS = 11; //make this larger than the lean_head_radius, to prevent state thrashing
@@ -703,9 +709,11 @@ const idEventDef EV_Player_HasItemViaClassname("hasitemviaclass", "s", 'd');
 const idEventDef EV_Player_RemoveItemViaClassname("removeitemviaclass", "s", 'd');
 const idEventDef EV_Player_RemoveItemViaEntity("removeitemviaentity", "e", 'd');
 const idEventDef EV_Player_GetItemViaClassname("getitemviaclass", "s", 'e');
+const idEventDef EV_Player_HasItemViaEntityName("hasitemvianame", "s", 'd');
+const idEventDef EV_Player_HasWeaponInInventory("hasWeaponInInventory", "sd", 'd');
 
 
-const idEventDef EV_Player_DelayedVO_WithInterval("delayedvo_withinterval", "s");
+const idEventDef EV_Player_DelayedVO_WithInterval("delayedvo_withinterval", "sd"); //BC 4-24-2025 added another parameter so that the linecategory is now sent (instead of it defaulting to garbage data).
 const idEventDef EV_Player_DelayedVO_WithInterval_withDelay("playVO_delayInterval", "sd");
 
 const idEventDef EV_Player_GetNextMap("getNextMap", NULL, 's');
@@ -713,7 +721,7 @@ const idEventDef EV_Player_GetMapIndex("getMapIndex", NULL, 'd');
 const idEventDef EV_Player_GetNextMapName("getNextMapName", NULL, 's');
 const idEventDef EV_Player_GetNextMapDesc("getNextMapDesc", NULL, 's');
 const idEventDef EV_Player_GetIsNextmapShip("isNextmapShip", NULL, 'd');
-const idEventDef EV_Player_SaveProgression("saveProgression", "s");
+const idEventDef EV_Player_SaveProgression("saveProgression", "ss");  // blendo eric: if nextMap == "checkPoint", will auto gen, second string is checkpoint name
 
 
 const idEventDef EV_Player_SetFallDamageImmune("setFallDamageImmune", "d");
@@ -752,6 +760,10 @@ const idEventDef EV_Player_DisplayCatBox("displayCatBox", "sss");
 const idEventDef EV_Player_EnableHeartBeat("enableHeartBeat", "d"); // SW 11th Feb 2025: toggles heartbeat audibility
 
 const idEventDef EV_Player_SetCinematicHUD("setCinematicHUD", "d"); //2-7-2025: do we force hud to draw during cinematics (defaults to true)
+
+
+const idEventDef EV_Player_ThrowCurrentWeapon("throwcurrentweapon"); //2-7-2025: do we force hud to draw during cinematics (defaults to true)
+
 
 //BC script calls.
 
@@ -865,6 +877,8 @@ CLASS_DECLARATION( idActor, idPlayer )
 	EVENT(EV_Player_RemoveItemViaClassname, idPlayer::Event_RemoveItemViaClassname)
 	EVENT(EV_Player_RemoveItemViaEntity,	idPlayer::Event_RemoveItemViaEntity)
 	EVENT(EV_Player_GetItemViaClassname,	idPlayer::Event_GetItemViaClassname)
+	EVENT(EV_Player_HasItemViaEntityName,	idPlayer::Event_HasItemViaEntityname) // SW 12th March 2025
+	EVENT(EV_Player_HasWeaponInInventory,	idPlayer::Event_HasWeaponInInventory) // SW 14th April 2025
 
 	EVENT(EV_Player_DelayedVO_WithInterval,	idPlayer::SayVO_WithIntervalDelay)
 	EVENT(EV_Player_DelayedVO_WithInterval_withDelay, idPlayer::SayVO_WithIntervalDelay_msDelayed)
@@ -887,7 +901,7 @@ CLASS_DECLARATION( idActor, idPlayer )
 	EVENT(EV_Player_ForceDuck,				idPlayer::Event_ForceDuck)
 	
 	
-	EVENT(EV_Player_SetObjective,			idPlayer::SetObjectiveText)
+	EVENT(EV_Player_SetObjective,			idPlayer::Event_SetObjectiveText)
 	EVENT(EV_Player_IsEntityLostInSpace,	idPlayer::Event_IsEntityLostInSpace)
 	EVENT(EV_Player_SetVignetteMode,		idPlayer::Event_SetVignetteMode)
 	EVENT(EV_Player_GetVignetteMode,		idPlayer::Event_GetVignetteMode)
@@ -913,6 +927,9 @@ CLASS_DECLARATION( idActor, idPlayer )
 	EVENT(EV_Player_SetCinematicHUD,		idPlayer::Event_SetCinematicHUD)
 	
 	EVENT(EV_Player_EnableHeartBeat,		idPlayer::Event_EnableHeartBeat)
+
+	EVENT(EV_Player_ThrowCurrentWeapon,		idPlayer::ThrowCurrentWeapon)
+		
 
 END_CLASS
 
@@ -1312,97 +1329,82 @@ idInventory::Save
 ==============
 */
 void idInventory::Save( idSaveGame *savefile ) const {
-	int i;
 
-	savefile->WriteInt( maxHealth );
-	//savefile->WriteInt( weapons );
-	savefile->WriteInt( powerups );
-	savefile->WriteInt( armor );
-	savefile->WriteInt( maxarmor );
-	savefile->WriteInt( ammoPredictTime );
-	savefile->WriteInt( deplete_armor );
-	savefile->WriteFloat( deplete_rate );
-	savefile->WriteInt( deplete_ammount );
-	savefile->WriteInt( nextArmorDepleteTime );
+	savefile->WriteInt( maxHealth ); //  int maxHealth
+	savefile->WriteInt( powerups ); //  int powerups
+	savefile->WriteInt( armor ); //  int armor
+	savefile->WriteInt( maxarmor ); //  int maxarmor
 
-	for( i = 0; i < AMMO_NUMTYPES; i++ ) {
-		savefile->WriteInt( ammo[ i ] );
-	}
-	for( i = 0; i < MAX_POWERUPS; i++ ) {
-		savefile->WriteInt( powerupEndTime[ i ] );
-	}
+	SaveFileWriteArray( ammo, AMMO_NUMTYPES ,WriteInt ); // int ammo[ AMMO_NUMTYPES ]
+	SaveFileWriteArray( powerupEndTime, MAX_POWERUPS ,WriteInt ); // int powerupEndTime[ MAX_POWERUPS ]
 
-	savefile->WriteInt( items.Num() );
-	for( i = 0; i < items.Num(); i++ ) {
-		savefile->WriteDict( items[ i ] );
+	savefile->WriteInt( mushrooms ); //  int mushrooms
+	savefile->WriteInt( bloodbags ); //  int bloodbags
+	savefile->WriteInt( catkeys ); //  int catkeys
+	savefile->WriteInt( maintbooks ); //  int maintbooks
+
+	savefile->WriteInt( AMMO_NUMTYPES ); // RechargeAmmo_t rechargeAmmo[ AMMO_NUMTYPES ];
+	for(int idx = 0;idx < AMMO_NUMTYPES; idx++) {
+		savefile->WriteInt(rechargeAmmo[idx].ammo);
+		savefile->WriteInt(rechargeAmmo[idx].rechargeTime);
+		savefile->WriteString(rechargeAmmo[idx].ammoName);
 	}
 
-	savefile->WriteInt( pdasViewed[0] );
-	savefile->WriteInt( pdasViewed[1] );
-	savefile->WriteInt( pdasViewed[2] );
-	savefile->WriteInt( pdasViewed[3] );
+	savefile->WriteInt( ammoPredictTime ); //  int ammoPredictTime
 
-	savefile->WriteInt( selPDA );
-	savefile->WriteInt( selVideo );
-	savefile->WriteInt( selEMail );
-	savefile->WriteInt( selAudio );
-	savefile->WriteBool( pdaOpened );
-	savefile->WriteBool( turkeyScore );
+	savefile->WriteInt( deplete_armor ); //  int deplete_armor
+	savefile->WriteFloat( deplete_rate ); //  float deplete_rate
+	savefile->WriteInt( deplete_ammount ); //  int deplete_ammount
+	savefile->WriteInt( nextArmorDepleteTime ); //  int nextArmorDepleteTime
 
-	savefile->WriteInt( pdas.Num() );
-	for( i = 0; i < pdas.Num(); i++ ) {
-		savefile->WriteString( pdas[ i ] );
+	SaveFileWriteArray( powerupEndTime, 4 ,WriteInt ); // int pdasViewed[ 4 ]
+
+	savefile->WriteInt( selPDA ); //  int selPDA
+	savefile->WriteInt( selEMail ); //  int selEMail
+	savefile->WriteInt( selVideo ); //  int selVideo
+	savefile->WriteInt( selAudio ); //  int selAudio
+	savefile->WriteBool( pdaOpened ); //  bool pdaOpened
+	savefile->WriteBool( turkeyScore ); //  bool turkeyScore
+
+	SaveFileWriteArray(items, items.Num(), WriteDict); //  idList<idDict *> items
+
+	SaveFileWriteArray(pdas, pdas.Num(), WriteString);; //  idStrList pdas
+	SaveFileWriteArray(pdaSecurity, pdaSecurity.Num(), WriteString);; //  idStrList pdaSecurity
+	SaveFileWriteArray(videos, videos.Num(), WriteString);; //  idStrList videos
+	SaveFileWriteArray(emails, emails.Num(), WriteString);; //  idStrList emails
+	SaveFileWriteArray(emailsRead, emailsRead.Num(), WriteString);; //  idStrList emailsRead
+	SaveFileWriteArray(emailsReplied, emailsReplied.Num(), WriteString);; //  idStrList emailsReplied
+
+	savefile->WriteBool( ammoPulse ); //  bool ammoPulse
+	savefile->WriteBool( weaponPulse ); //  bool weaponPulse
+	savefile->WriteBool( armorPulse ); //  bool armorPulse
+	savefile->WriteInt( lastGiveTime ); //  int lastGiveTime
+
+	savefile->WriteInt( levelTriggers.Num() ); //  idList<idLevelTriggerInfo> levelTriggers
+	for(int idx = 0;idx < levelTriggers.Num(); idx++) {
+		savefile->WriteString(levelTriggers[idx].levelName);
+		savefile->WriteString(levelTriggers[idx].triggerName);
 	}
 
-	savefile->WriteInt( pdaSecurity.Num() );
-	for( i=0; i < pdaSecurity.Num(); i++ ) {
-		savefile->WriteString( pdaSecurity[ i ] );
+	savefile->WriteInt( objectiveNames.Num() ); //  idList<idObjectiveInfo> objectiveNames
+	for( int idx = 0; idx < objectiveNames.Num(); idx++ ) {
+		savefile->WriteString( objectiveNames[idx].screenshot );
+		savefile->WriteString( objectiveNames[idx].text );
+		savefile->WriteString( objectiveNames[idx].title );
 	}
 
-	savefile->WriteInt( videos.Num() );
-	for( i = 0; i < videos.Num(); i++ ) {
-		savefile->WriteString( videos[ i ] );
+	savefile->WriteInt( MAX_HOTBARSLOTS ); // HotbarSlot_t hotbarSlots[MAX_HOTBARSLOTS]
+	for ( int idx = 0; idx < MAX_HOTBARSLOTS; ++idx ) {
+		savefile->WriteInt( hotbarSlots[idx].weaponType );
+		savefile->WriteInt( hotbarSlots[idx].clip );
+		savefile->WriteInt( hotbarSlots[idx].health );
+		savefile->WriteBool( hotbarSlots[idx].chambered );
+		savefile->WriteObject( hotbarSlots[idx].carryPtr );
 	}
 
-	savefile->WriteInt( emails.Num() );
-	for ( i = 0; i < emails.Num(); i++ ) {
-		savefile->WriteString( emails[ i ] );
-	}
+	savefile->WriteInt( hotbarUnlockedSlots ); //  int hotbarUnlockedSlots
 
-	savefile->WriteInt( objectiveNames.Num() );
-	for( i = 0; i < objectiveNames.Num(); i++ ) {
-		savefile->WriteString( objectiveNames[i].screenshot );
-		savefile->WriteString( objectiveNames[i].text );
-		savefile->WriteString( objectiveNames[i].title );
-	}
-
-	savefile->WriteInt( levelTriggers.Num() );
-	for ( i = 0; i < levelTriggers.Num(); i++ ) {
-		savefile->WriteString( levelTriggers[i].levelName );
-		savefile->WriteString( levelTriggers[i].triggerName );
-	}
-
-	savefile->WriteBool( ammoPulse );
-	savefile->WriteBool( weaponPulse );
-	savefile->WriteBool( armorPulse );
-
-	savefile->WriteInt( lastGiveTime );
-
-#ifdef _D3XP
-	for(i = 0; i < AMMO_NUMTYPES; i++) {
-		savefile->WriteInt(rechargeAmmo[i].ammo);
-		savefile->WriteInt(rechargeAmmo[i].rechargeTime);
-		savefile->WriteString(rechargeAmmo[i].ammoName);
-	}
-#endif
-
-	for ( i = 0; i < MAX_HOTBARSLOTS; ++i ) {
-		savefile->WriteInt( hotbarSlots[i].weaponType );
-		savefile->WriteInt( hotbarSlots[i].clip );
-		savefile->WriteInt( hotbarSlots[i].health );
-		savefile->WriteBool( hotbarSlots[i].chambered );
-		savefile->WriteInt( hotbarSlots[i].carryPtr.GetSpawnId() );
-	}
+	savefile->WriteInt( hotbarCurrentlySelected ); //  int hotbarCurrentlySelected
 }
 
 /*
@@ -1411,126 +1413,88 @@ idInventory::Restore
 ==============
 */
 void idInventory::Restore( idRestoreGame *savefile ) {
-	int i, num;
 
-	savefile->ReadInt( maxHealth );
-	//savefile->ReadInt( weapons );
-	savefile->ReadInt( powerups );
-	savefile->ReadInt( armor );
-	savefile->ReadInt( maxarmor );
-	savefile->ReadInt( ammoPredictTime );
-	savefile->ReadInt( deplete_armor );
-	savefile->ReadFloat( deplete_rate );
-	savefile->ReadInt( deplete_ammount );
-	savefile->ReadInt( nextArmorDepleteTime );
+	savefile->ReadInt( maxHealth ); //  int maxHealth
+	savefile->ReadInt( powerups ); //  int powerups
+	savefile->ReadInt( armor ); //  int armor
+	savefile->ReadInt( maxarmor ); //  int maxarmor
 
-	for( i = 0; i < AMMO_NUMTYPES; i++ ) {
-		savefile->ReadInt( ammo[ i ] );
-	}
-// 	for( i = 0; i < MAX_WEAPONS; i++ ) {
-// 		savefile->ReadInt( clip[ i ] );
-// 	}
-	for( i = 0; i < MAX_POWERUPS; i++ ) {
-		savefile->ReadInt( powerupEndTime[ i ] );
-	}
+	SaveFileReadArray( ammo, ReadInt ); // int ammo[ AMMO_NUMTYPES ]
+	SaveFileReadArray( powerupEndTime, ReadInt ); // int powerupEndTime[ MAX_POWERUPS ]
 
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		idDict *itemdict = new idDict;
+	savefile->ReadInt( mushrooms ); //  int mushrooms
+	savefile->ReadInt( bloodbags ); //  int bloodbags
+	savefile->ReadInt( catkeys ); //  int catkeys
+	savefile->ReadInt( maintbooks ); //  int maintbooks
 
-		savefile->ReadDict( itemdict );
-		items.Append( itemdict );
-	}
-
-	// pdas
-	savefile->ReadInt( pdasViewed[0] );
-	savefile->ReadInt( pdasViewed[1] );
-	savefile->ReadInt( pdasViewed[2] );
-	savefile->ReadInt( pdasViewed[3] );
-
-	savefile->ReadInt( selPDA );
-	savefile->ReadInt( selVideo );
-	savefile->ReadInt( selEMail );
-	savefile->ReadInt( selAudio );
-	savefile->ReadBool( pdaOpened );
-	savefile->ReadBool( turkeyScore );
-
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		idStr strPda;
-		savefile->ReadString( strPda );
-		pdas.Append( strPda );
-	}
-
-	// pda security clearances
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
-		idStr invName;
-		savefile->ReadString( invName );
-		pdaSecurity.Append( invName );
-	}
-
-	// videos
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		idStr strVideo;
-		savefile->ReadString( strVideo );
-		videos.Append( strVideo );
-	}
-
-	// email
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		idStr strEmail;
-		savefile->ReadString( strEmail );
-		emails.Append( strEmail );
-	}
-
-	savefile->ReadInt( num );
-	for( i = 0; i < num; i++ ) {
-		idObjectiveInfo obj;
-
-		savefile->ReadString( obj.screenshot );
-		savefile->ReadString( obj.text );
-		savefile->ReadString( obj.title );
-
-		objectiveNames.Append( obj );
-	}
-
-	savefile->ReadInt( num );
-	for ( i = 0; i < num; i++ ) {
-		idLevelTriggerInfo lti;
-		savefile->ReadString( lti.levelName );
-		savefile->ReadString( lti.triggerName );
-		levelTriggers.Append( lti );
-	}
-
-	savefile->ReadBool( ammoPulse );
-	savefile->ReadBool( weaponPulse );
-	savefile->ReadBool( armorPulse );
-
-	savefile->ReadInt( lastGiveTime );
-
-#ifdef _D3XP
-	for(i = 0; i < AMMO_NUMTYPES; i++) {
-		savefile->ReadInt(rechargeAmmo[i].ammo);
-		savefile->ReadInt(rechargeAmmo[i].rechargeTime);
-
-		idStr name;
+	idStr name;
+	int num;
+	savefile->ReadInt( num ); // RechargeAmmo_t rechargeAmmo[ AMMO_NUMTYPES ];
+	for(int idx = 0;idx < num; idx++) {
+		savefile->ReadInt(rechargeAmmo[idx].ammo);
+		savefile->ReadInt(rechargeAmmo[idx].rechargeTime);
 		savefile->ReadString(name);
-		strcpy(rechargeAmmo[i].ammoName, name);
+		strcpy(rechargeAmmo[idx].ammoName, name);
 	}
-#endif
 
-	for ( i = 0; i < MAX_HOTBARSLOTS; ++i ) {
-		savefile->ReadInt( hotbarSlots[i].weaponType );
-		savefile->ReadInt( hotbarSlots[i].clip );
-		savefile->ReadInt( hotbarSlots[i].health );
-		savefile->ReadBool( hotbarSlots[i].chambered );
-		int spawnId;
-		savefile->ReadInt( spawnId );
-		hotbarSlots[i].carryPtr.SetSpawnId( spawnId );
+	savefile->ReadInt( ammoPredictTime ); //  int ammoPredictTime
+
+	savefile->ReadInt( deplete_armor ); //  int deplete_armor
+	savefile->ReadFloat( deplete_rate ); //  float deplete_rate
+	savefile->ReadInt( deplete_ammount ); //  int deplete_ammount
+	savefile->ReadInt( nextArmorDepleteTime ); //  int nextArmorDepleteTime
+
+	SaveFileReadArray( powerupEndTime , ReadInt ); // int pdasViewed[ 4 ]
+
+	savefile->ReadInt( selPDA ); //  int selPDA
+	savefile->ReadInt( selEMail ); //  int selEMail
+	savefile->ReadInt( selVideo ); //  int selVideo
+	savefile->ReadInt( selAudio ); //  int selAudio
+	savefile->ReadBool( pdaOpened ); //  bool pdaOpened
+	savefile->ReadBool( turkeyScore ); //  bool turkeyScore
+
+	SaveFileReadList( items, ReadDict ); //  idList<idDict *> items
+
+	SaveFileReadList( pdas, ReadString ); //  idStrList pdas
+	SaveFileReadList( pdaSecurity, ReadString ); //  idStrList pdaSecurity
+	SaveFileReadList( videos, ReadString ); //  idStrList videos
+	SaveFileReadList( emails, ReadString ); //  idStrList emails
+	SaveFileReadList( emailsRead, ReadString ); //  idStrList emailsRead
+	SaveFileReadList( emailsReplied,  ReadString ); //  idStrList emailsReplied
+
+	savefile->ReadBool( ammoPulse ); //  bool ammoPulse
+	savefile->ReadBool( weaponPulse ); //  bool weaponPulse
+	savefile->ReadBool( armorPulse ); //  bool armorPulse
+	savefile->ReadInt( lastGiveTime ); //  int lastGiveTime
+
+	savefile->ReadInt( num ); //  idList<idLevelTriggerInfo> levelTriggers
+	levelTriggers.SetNum( num );
+	for(int idx = 0;idx < num; idx++) {
+		savefile->ReadString(levelTriggers[idx].levelName);
+		savefile->ReadString(levelTriggers[idx].triggerName);
 	}
+
+	savefile->ReadInt( num ); //  idList<idObjectiveInfo> objectiveNames
+	objectiveNames.SetNum( num );
+	for( int idx = 0; idx < objectiveNames.Num(); idx++ ) {
+		savefile->ReadString( objectiveNames[idx].screenshot );
+		savefile->ReadString( objectiveNames[idx].text );
+		savefile->ReadString( objectiveNames[idx].title );
+	}
+
+	savefile->ReadInt( num ); // HotbarSlot_t hotbarSlots[MAX_HOTBARSLOTS]
+	for ( int idx = 0; idx < num; ++idx ) {
+		savefile->ReadInt( hotbarSlots[idx].weaponType );
+		savefile->ReadInt( hotbarSlots[idx].clip );
+		savefile->ReadInt( hotbarSlots[idx].health );
+		savefile->ReadBool( hotbarSlots[idx].chambered );
+		savefile->ReadObject( hotbarSlots[idx].carryPtr );
+	}
+
+	savefile->ReadInt( hotbarUnlockedSlots ); //  int hotbarUnlockedSlots
+
+	savefile->ReadInt( hotbarCurrentlySelected ); //  int hotbarCurrentlySelected
+
 }
 
 /*
@@ -1557,7 +1521,7 @@ idInventory::AmmoPickupNameForIndex
 ==============
 */
 const char *idInventory::AmmoPickupNameForIndex( ammo_t ammonum ) const {
-	return idWeapon::GetAmmoPickupNameForNum( ammonum );
+	return common->GetLanguageDict()->GetString( idWeapon::GetAmmoPickupNameForNum( ammonum ) ); //BC 3-24-2025: add loc support for ammo names.
 }
 
 /*
@@ -1749,7 +1713,7 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 
 			if (ent != NULL)
 			{
-				idStr armorStr = idStr::Format("+%d armor", amountOfArmorToAdd);
+				idStr armorStr = idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_armoradd"), amountOfArmorToAdd);
 				owner->SetFlytextEvent(ent->GetPhysics()->GetOrigin(), armorStr.c_str(), idDeviceContext::ALIGN_CENTER);
 			}
 		}
@@ -1776,20 +1740,17 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
         //BC ok, because of the hotbar system we need to jiggle how this works a bit.
         //So, if the player does NOT have the weapon, then do as normal...
 		i = WeaponIndexForAmmoClass(spawnArgs, statname + 7); //get weapon index.
-        //int hasWeapon = GetHotbarslotViaWeaponIndex(i);
 	
 		if (i != -1)
 		{
-			int slot = GetHotbarslotViaWeaponIndex( i );
-            if (slot != -1 && hotbarSlots[slot].clip <= 0)
+            if ( ent->spawnArgs.GetBool("loadnewweapon", "0"))
             {
-                //Player has ZERO ammo of this... so do the normal thing here
+				// SW 27th March 2025: we just picked this weapon up. feed the inclip_ ammo into its clip (or whatever your preferred terminology is for the thingy that queues up the bullets)
+				int slot = GetHotbarslotViaWeaponIndex(i);
 				hotbarSlots[slot].clip = atoi(value);
             }
             else
             {
-                //ammo[i] += atoi(value);
-				
 				//This is what handles giving the player ammo from a weapon that is picked up from the ground.
 				//Basically, the ammo that is inside the weapon's magazine.
 
@@ -1816,17 +1777,26 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 		i = WeaponIndexForAmmoClass(spawnArgs, statname + 10); //get weapon index.
 		if (i != -1)
 		{
-			if (ent != NULL && owner != NULL)
+			if (ent->spawnArgs.GetBool("loadnewweapon", "0"))
 			{
-				int weaponIndex = GetWeaponIndex(owner, ent->spawnArgs.GetBool("isweapon") ? ent->spawnArgs.GetString("inv_weapon") : ent->spawnArgs.GetString("weapon"));
-				int ammoRequired = 0;
-				ammo_t ammo_i = AmmoIndexForWeaponClass(spawnArgs.GetString(va("def_weapon%d", weaponIndex)), &ammoRequired);
-				idStr ammoName = idWeapon::GetAmmoPickupNameForNum(ammo_i);
-				idStr ammopickupStr = idStr::Format("+%s %s", value, ammoName.c_str());
-				owner->SetFlytextEvent(ent->GetPhysics()->GetOrigin(), ammopickupStr.c_str(), idDeviceContext::ALIGN_CENTER);
+				// SW 27th March 2025: we just picked this weapon up. chamber it if necessary
+				int slot = GetHotbarslotViaWeaponIndex(i);
+				hotbarSlots[slot].chambered = atoi(value) > 0 ? true : false; // The number of chambered rounds shouldn't go higher than one, unless you want to void your warranty
 			}
+			else
+			{
+				if (ent != NULL && owner != NULL)
+				{
+					int weaponIndex = GetWeaponIndex(owner, ent->spawnArgs.GetBool("isweapon") ? ent->spawnArgs.GetString("inv_weapon") : ent->spawnArgs.GetString("weapon"));
+					int ammoRequired = 0;
+					ammo_t ammo_i = AmmoIndexForWeaponClass(spawnArgs.GetString(va("def_weapon%d", weaponIndex)), &ammoRequired);
+					idStr ammoName = idWeapon::GetAmmoPickupNameForNum(ammo_i);
+					idStr ammopickupStr = idStr::Format("+%s %s", value, ammoName.c_str());
+					owner->SetFlytextEvent(ent->GetPhysics()->GetOrigin() + idVec3(0, 0, 8), ammopickupStr.c_str(), idDeviceContext::ALIGN_CENTER);
+				}
 
-			return GiveAmmo(owner, statname + 10, value);			
+				return GiveAmmo(owner, statname + 10, value);
+			}
 		}
 	}
 	else if ( !idStr::Icmp( statname, "invulnerability" ) )
@@ -2290,7 +2260,7 @@ void idInventory::ResetHotbarSlot( int hotbarSlot )
 {
 	hotbarSlots[hotbarSlot].weaponType = 0; // set to unarmed
 	hotbarSlots[hotbarSlot].clip = -1; // set to -1 so that the gun knows to have a full clip the first time we get it and at the start of the level
-	hotbarSlots[hotbarSlot].chambered = true;
+	hotbarSlots[hotbarSlot].chambered = false; // SW 27th March 2025: stops weapon from always having a chambered round upon pickup
 	hotbarSlots[hotbarSlot].health = 0;
 	idEntity * droppedEnt = hotbarSlots[hotbarSlot].carryPtr.GetEntity();
 	hotbarSlots[hotbarSlot].carryPtr = NULL;
@@ -2308,6 +2278,7 @@ idPlayer::idPlayer
 */
 idPlayer::idPlayer()
 {
+
 	memset( &usercmd, 0, sizeof( usercmd ) );
 
 	noclip					= false;
@@ -2504,6 +2475,8 @@ idPlayer::idPlayer()
 
 	isTelefragged			= false;
 
+	playerIcon				= idPlayerIcon();
+
 	isLagged				= false;
 	isChatting				= false;
 
@@ -2658,6 +2631,16 @@ idPlayer::idPlayer()
 	savingthrowState = SAVINGTHROW_AVAILABLE;
 	grenadeButtonTimer = 0;
 	grenadeThrowState = GRENADETHROW_IDLE;
+
+
+	memset(throwBeamOrigin, 0, sizeof(idBeam*));
+	memset(throwBeamTarget, 0, sizeof(idBeam*));
+
+	throwdisc = nullptr;
+	throwPredictionModel = nullptr;
+
+	throwarcCollision = {};
+
 	shouldDrawThrowArc = false;
 	lastThrowArcState = false;
 	throwWeaponPhysicsObj = NULL;
@@ -2812,6 +2795,11 @@ idPlayer::idPlayer()
 
 	jockeyState = JCK_INACTIVE;
 
+	jockeyJointIdlePos = vec3_origin;
+	jockeyJointIdleRot = idQuat();
+	jockeyJointModRot = idQuat();
+	jockeyJointModPos = vec3_origin;
+
 	spectateTimer = 0;
 	spectateState = SPC_NONE;
 
@@ -2852,7 +2840,6 @@ idPlayer::idPlayer()
 
 	didInitialSpawn = false;
 
-	lastPlayerLookTrigger = nullptr;
 
 
 
@@ -2862,8 +2849,6 @@ idPlayer::idPlayer()
 	lastAvailableJockeyAttacktype = -1;
 
 	knockeddownLastSpeed = 0;
-
-	lastPlayerLookTrigger = nullptr;
 
 	zoominspectEntityPtr = NULL;
 
@@ -2906,7 +2891,6 @@ idPlayer::idPlayer()
 	memorypalaceState = MEMP_NONE;
 	memorypalaceTimer = 0;
 	memorypalacePlayerPos = vec3_zero;
-	memoryLight = NULL;
 	memorypalaceForwardView = vec3_zero;
 
 	playerTouchedByCenterLight = false;
@@ -2941,7 +2925,7 @@ idPlayer::idPlayer()
 
 	defibButtonState = false;
 
-	lastLocboxtriggerState = false;
+	lastLocboxTriggered = NULL;
 
 	//BC reset variables end
 	//idplayer::idplayer end
@@ -2954,6 +2938,12 @@ idPlayer::idPlayer()
 	forceSpatterAmount = 0;
 
 	fallenRollTimer = 0.0f;
+
+	vacuumSplineMover = NULL;
+
+	defibCamera = 0;
+	defibMover = 0;
+	defibCameraTarget = 0;
 }
 
 /*
@@ -2964,6 +2954,7 @@ set up conditions for animation
 ==============
 */
 void idPlayer::LinkScriptVariables( void ) {
+
 	AI_FORWARD.LinkTo(			scriptObject, "AI_FORWARD" );
 	AI_BACKWARD.LinkTo(			scriptObject, "AI_BACKWARD" );
 	AI_STRAFE_LEFT.LinkTo(		scriptObject, "AI_STRAFE_LEFT" );
@@ -2971,31 +2962,30 @@ void idPlayer::LinkScriptVariables( void ) {
 	AI_ATTACK_HELD.LinkTo(		scriptObject, "AI_ATTACK_HELD" );
 	AI_WEAPON_FIRED.LinkTo(		scriptObject, "AI_WEAPON_FIRED" );
 	AI_JUMP.LinkTo(				scriptObject, "AI_JUMP" );
-	AI_DEAD.LinkTo(				scriptObject, "AI_DEAD" );
 	AI_CROUCH.LinkTo(			scriptObject, "AI_CROUCH" );
 	AI_ONGROUND.LinkTo(			scriptObject, "AI_ONGROUND" );
 	AI_ONLADDER.LinkTo(			scriptObject, "AI_ONLADDER" );
-	AI_HARDLANDING.LinkTo(		scriptObject, "AI_HARDLANDING" );
-	AI_SOFTLANDING.LinkTo(		scriptObject, "AI_SOFTLANDING" );
+	AI_DEAD.LinkTo(				scriptObject, "AI_DEAD" );
 	AI_RUN.LinkTo(				scriptObject, "AI_RUN" );
 	AI_PAIN.LinkTo(				scriptObject, "AI_PAIN" );
+	AI_HARDLANDING.LinkTo(		scriptObject, "AI_HARDLANDING" );
+	AI_SOFTLANDING.LinkTo(		scriptObject, "AI_SOFTLANDING" );
 	AI_RELOAD.LinkTo(			scriptObject, "AI_RELOAD" );
 	AI_TELEPORT.LinkTo(			scriptObject, "AI_TELEPORT" );
 	AI_TURN_LEFT.LinkTo(		scriptObject, "AI_TURN_LEFT" );
 	AI_TURN_RIGHT.LinkTo(		scriptObject, "AI_TURN_RIGHT" );
-
 	AI_HEAL_GLASSWOUND.LinkTo(	scriptObject, "AI_HEAL_GLASSWOUND");
 	AI_HEAL_BURNING.LinkTo(		scriptObject, "AI_HEAL_BURNING");
 	AI_HEAL_BLEEDOUT.LinkTo(	scriptObject, "AI_HEAL_BLEEDOUT");
-	AI_HEAL_BULLETPLUCK.LinkTo(scriptObject, "AI_HEAL_BULLETPLUCK");
-	AI_HEAL_SHRAPNEL.LinkTo(scriptObject, "AI_HEAL_SHRAPNEL");
-	AI_HEAL_HEALWOUND.LinkTo(scriptObject, "AI_HEAL_HEALWOUND");
 	AI_ACRO_CEILINGHIDE.LinkTo( scriptObject, "AI_ACRO_CEILINGHIDE");
 	AI_ACRO_SPLITS.LinkTo(		scriptObject, "AI_ACRO_SPLITS");
 	AI_ACRO_SPLITS_DOWN.LinkTo(	scriptObject, "AI_ACRO_SPLITS_DOWN");
 	AI_FALLEN.LinkTo(			scriptObject, "AI_FALLEN");
 	AI_FALLEN_GETUP.LinkTo(		scriptObject, "AI_FALLEN_GETUP");
 	AI_FALLEN_ROLL.LinkTo(		scriptObject, "AI_FALLEN_ROLL");
+	AI_HEAL_BULLETPLUCK.LinkTo(scriptObject, "AI_HEAL_BULLETPLUCK");
+	AI_HEAL_SHRAPNEL.LinkTo(scriptObject, "AI_HEAL_SHRAPNEL");
+	AI_HEAL_HEALWOUND.LinkTo(scriptObject, "AI_HEAL_HEALWOUND");
 	AI_HEAL_SPEARPLUCK.LinkTo(scriptObject, "AI_HEAL_SPEARPLUCK");
 	AI_JOCKEYRIDE.LinkTo(scriptObject, "AI_JOCKEYRIDE");
 }
@@ -3051,7 +3041,7 @@ void idPlayer::Init( void ) {
 	weapon_pda				= SlotForWeapon( "weapon_pda" );
 	weapon_fists			= SlotForWeapon( "weapon_fists" );
 
-	showWeaponViewModel		= GetUserInfo()->GetBool( "ui_showGun" );
+	showWeaponViewModel		= true; //SM: don't use cvar "ui_showGun"
 
 
 	lastDmgTime				= 0;
@@ -3448,6 +3438,7 @@ void idPlayer::Init( void ) {
 			kv_def = metaDef->dict.MatchPrefix("def_", kv_def);
 		}
 
+		metaEnt->BecomeActive( TH_THINK );
 		gameLocal.metaEnt = metaEnt;
 	}
 
@@ -3737,56 +3728,6 @@ void idPlayer::Spawn( void ) {
 		hud->HandleNamedEvent( "itemPickup" );
 	}
 
-	if ( GetPDA() ) {
-		// Add any emails from the inventory
-		for ( int i = 0; i < inventory.emails.Num(); i++ ) {
-			idStrList splits = inventory.emails[i].Split(';');
-			if (splits.Num() == 2) {
-				if (splits[0] == "default") {
-					GiveEmail(splits[1]);
-				} else {
-					GiveEmailViaTalker(splits[0], splits[1], false);
-				}
-			}
-		}
-
-		// Read emails
-		for (int i = 0; i < inventory.emailsRead.Num(); i++) {
-			idStrList splits = inventory.emailsRead[i].Split(';');
-			if (splits.Num() == 2) {
-				if (splits[0] == "default") {
-					GetPDA()->AddEmailRead(splits[1]);
-				}
-				else {
-					const idDeclPDA* pda = GetPDAViaTalker(splits[0]);
-					if (pda)
-					{
-						pda->AddEmailRead(splits[1]);
-					}
-				}
-			}
-		}
-
-		// Replied emails
-		for (int i = 0; i < inventory.emailsReplied.Num(); i++) {
-			idStrList splits = inventory.emailsReplied[i].Split(';');
-			if (splits.Num() == 2) {
-				if (splits[0] == "default") {
-					GetPDA()->AddEmailReplied(splits[1]);
-				}
-				else {
-					const idDeclPDA* pda = GetPDAViaTalker(splits[0]);
-					if (pda)
-					{
-						pda->AddEmailReplied(splits[1]);
-					}
-				}
-			}
-		}
-
-		GetPDA()->SetSecurity( common->GetLanguageDict()->GetString( "#str_loc_unknown_00104" ) ); //BC general email access, this might be safe to delete
-	}
-
 	if ( gameLocal.world->spawnArgs.GetBool( "no_Weapons" ) ) {
 		hiddenWeapon = true;
 		if ( weapon.GetEntity() ) {
@@ -3962,17 +3903,6 @@ void idPlayer::Spawn( void ) {
 		armstatsModel->Event_SetGuiParm("mapimage", mapName.c_str());
 	}
 
-	//Special spectrum light for memory palace.
-	idDict lightArgs;
-	lightArgs.Clear();
-	lightArgs.SetVector("origin", firstPersonViewOrigin);
-	lightArgs.Set("texture", "lights/memorylight");
-	lightArgs.SetInt("noshadows", 1);
-	lightArgs.Set("_color", ".4 .4 .4 1");
-	lightArgs.SetFloat("light", 64);
-	lightArgs.SetBool("start_off", true);
-	memoryLight = (idLight *)gameLocal.SpawnEntityType(idLight::Type, &lightArgs);
-
 	damageTaken = 0;
 	enemiesPounced = 0;
 	brutalslams = 0;
@@ -3982,7 +3912,8 @@ void idPlayer::Spawn( void ) {
 	iteminspectActive = false;
 	iteminspectFOV = 90;
 
-	
+
+	RestorePDAEmails(true);
 	SetArmstatsFuseboxNeedUpdate(); //update the fusebox display on wrist map
 
 	AI_FALLEN = false;
@@ -3994,6 +3925,8 @@ void idPlayer::Spawn( void ) {
 	DisplayLocbox("");
 
 	DisplayCatBox("", "", "");
+
+	hud->SetStateString("speedtimer", "");
 
 	//BC spawn end
 }
@@ -4060,222 +3993,353 @@ idPlayer::Save
 ===========
 */
 void idPlayer::Save( idSaveGame *savefile ) const {
-	int i;
 
-	savefile->WriteUsercmd( usercmd );
-	playerView.Save( savefile );
+	savefile->WriteUsercmd( usercmd ); //  usercmd_t usercmd
 
-	savefile->WriteBool( noclip );
-	savefile->WriteBool( godmode );
+	playerView.Save( savefile ); // class idPlayerView playerView;
 
-	// don't save spawnAnglesSet, since we'll have to reset them after loading the savegame
-	savefile->WriteAngles( spawnAngles );
-	savefile->WriteAngles( viewAngles );
-	savefile->WriteAngles( cmdAngles );
+	savefile->WriteBool( noclip ); //  bool noclip
+	savefile->WriteBool( godmode ); //  bool godmode
 
-	savefile->WriteInt( buttonMask );
-	savefile->WriteInt( oldButtons );
-	savefile->WriteInt( oldFlags );
+	savefile->WriteBool( spawnAnglesSet ); //  bool spawnAnglesSet
+	savefile->WriteAngles( spawnAngles ); //  idAngles spawnAngles
+	savefile->WriteAngles( viewAngles ); //  idAngles viewAngles
+	savefile->WriteAngles( cmdAngles ); //  idAngles cmdAngles
 
-	savefile->WriteInt( lastHitTime );
-	savefile->WriteInt( lastSndHitTime );
-	savefile->WriteInt( lastSavingThrowTime );
+	savefile->WriteInt( buttonMask ); //  int buttonMask
+	savefile->WriteInt( oldButtons ); //  int oldButtons
+	savefile->WriteInt( oldFlags ); //  int oldFlags
 
-	// idBoolFields don't need to be saved, just re-linked in Restore
+	savefile->WriteInt( lastHitTime ); //  int lastHitTime
+	savefile->WriteInt( lastSndHitTime ); //  int lastSndHitTime
+	savefile->WriteInt( lastSavingThrowTime ); //  int lastSavingThrowTime
 
-	inventory.Save( savefile );
-	weapon.Save( savefile );
+	//LinkScriptVariables(); // hooks up following
+		//  idScriptBool AI_FORWARD
+		//  idScriptBool AI_BACKWARD
+		//  idScriptBool AI_STRAFE_LEFT
+		//  idScriptBool AI_STRAFE_RIGHT
+		//  idScriptBool AI_ATTACK_HELD
+		//  idScriptBool AI_WEAPON_FIRED
+		//  idScriptBool AI_JUMP
+		//  idScriptBool AI_CROUCH
+		//  idScriptBool AI_ONGROUND
+		//  idScriptBool AI_ONLADDER
+		//  idScriptBool AI_DEAD
+		//  idScriptBool AI_RUN
+		//  idScriptBool AI_PAIN
+		//  idScriptBool AI_HARDLANDING
+		//  idScriptBool AI_SOFTLANDING
+		//  idScriptBool AI_RELOAD
+		//  idScriptBool AI_TELEPORT
+		//  idScriptBool AI_TURN_LEFT
+		//  idScriptBool AI_TURN_RIGHT
+		//  idScriptBool AI_HEAL_GLASSWOUND
+		//  idScriptBool AI_HEAL_BURNING
+		//  idScriptBool AI_HEAL_BLEEDOUT
+		//  idScriptBool AI_ACRO_CEILINGHIDE
+		//  idScriptBool AI_ACRO_SPLITS
+		//  idScriptBool AI_ACRO_SPLITS_DOWN
+		//  idScriptBool AI_FALLEN
+		//  idScriptBool AI_FALLEN_GETUP
+		//  idScriptBool AI_FALLEN_ROLL
+		//  idScriptBool AI_HEAL_BULLETPLUCK
+		//  idScriptBool AI_HEAL_SHRAPNEL
+		//  idScriptBool AI_HEAL_HEALWOUND
+		//  idScriptBool AI_HEAL_SPEARPLUCK
+		//  idScriptBool AI_JOCKEYRIDE
 
-	savefile->WriteUserInterface( hud, false );
-	savefile->WriteUserInterface( objectiveSystem, false );
-	savefile->WriteBool( objectiveSystemOpen );
+	inventory.Save( savefile ); //  idInventory inventory
 
-	savefile->WriteInt( weapon_soulcube );
-	savefile->WriteInt( weapon_pda );
-	savefile->WriteInt( weapon_fists );
-#ifdef _D3XP
+	savefile->WriteCheckSizeMarker();
 
-	savefile->WriteInt( hudPowerup );
-	savefile->WriteInt( lastHudPowerup );
-	savefile->WriteInt( hudPowerupDuration );
+	weapon.Save( savefile ); //  idEntityPtr<idWeapon> weapon
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteUserInterface( hud, false, true ); //  idUserInterface * hud
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteUserInterface( objectiveSystem, false, true ); //  idUserInterface * objectiveSystem
+	savefile->WriteBool( objectiveSystemOpen ); //  bool objectiveSystemOpen
+
+	savefile->WriteInt( weapon_soulcube ); //  int weapon_soulcube
+	savefile->WriteInt( weapon_pda ); //  int weapon_pda
+	savefile->WriteInt( weapon_fists ); //  int weapon_fists
+
+	savefile->WriteInt( heartRate ); //  int heartRate
+
+	heartInfo.Save(savefile); //  idInterpolate<float> heartInfo
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteInt( lastHeartAdjust ); //  int lastHeartAdjust
+	savefile->WriteInt( lastHeartBeat ); //  int lastHeartBeat
+	savefile->WriteInt( lastDmgTime ); //  int lastDmgTime
+	savefile->WriteInt( deathClearContentsTime ); //  int deathClearContentsTime
+	savefile->WriteBool( doingDeathSkin ); //  bool doingDeathSkin
+	savefile->WriteInt( lastArmorPulse ); //  int lastArmorPulse
+	savefile->WriteFloat( stamina ); //  float stamina
+	savefile->WriteFloat( healthPool ); //  float healthPool
+	savefile->WriteInt( nextHealthPulse ); //  int nextHealthPulse
+	savefile->WriteBool( healthPulse ); //  bool healthPulse
+	savefile->WriteBool( healthTake ); //  bool healthTake
+	savefile->WriteInt( nextHealthTake ); //  int nextHealthTake
 
 
-#endif
+	savefile->WriteBool( hiddenWeapon ); //  bool hiddenWeapon
+	soulCubeProjectile.Save( savefile ); //  idEntityPtr<idProjectile> soulCubeProjectile
 
-	savefile->WriteInt( heartRate );
+	SaveFileWriteArray(colorBarTable, COLOR_BAR_TABLE_MAX, WriteVec3); // static idVec3 colorBarTable[ COLOR_BAR_TABLE_MAX ];
 
-	savefile->WriteFloat( heartInfo.GetStartTime() );
-	savefile->WriteFloat( heartInfo.GetDuration() );
-	savefile->WriteFloat( heartInfo.GetStartValue() );
-	savefile->WriteFloat( heartInfo.GetEndValue() );
+	savefile->WriteCheckSizeMarker();
 
-	savefile->WriteInt( lastHeartAdjust );
-	savefile->WriteInt( lastHeartBeat );
-	savefile->WriteInt( lastDmgTime );
-	savefile->WriteInt( deathClearContentsTime );
-	savefile->WriteBool( doingDeathSkin );
-	savefile->WriteInt( lastArmorPulse );
-	savefile->WriteFloat( stamina );
-	savefile->WriteFloat( healthPool );
-	savefile->WriteInt( nextHealthPulse );
-	savefile->WriteBool( healthPulse );
-	savefile->WriteInt( nextHealthTake );
-	savefile->WriteBool( healthTake );
+	savefile->WriteInt( spectator ); //  int spectator
+	savefile->WriteVec3( colorBar ); //  idVec3 colorBar
+	savefile->WriteInt( colorBarIndex ); //  int colorBarIndex
+	savefile->WriteBool( scoreBoardOpen ); //  bool scoreBoardOpen
+	savefile->WriteBool( forceScoreBoard ); //  bool forceScoreBoard
+	savefile->WriteBool( forceRespawn ); //  bool forceRespawn
+	savefile->WriteBool( spectating ); //  bool spectating
+	savefile->WriteInt( lastSpectateTeleport ); //  int lastSpectateTeleport
+	savefile->WriteBool( lastHitToggle ); //  bool lastHitToggle
+	savefile->WriteBool( forcedReady ); //  bool forcedReady
+	savefile->WriteBool( wantSpectate ); //  bool wantSpectate
+	savefile->WriteBool( weaponGone ); //  bool weaponGone
+	savefile->WriteBool( useInitialSpawns ); //  bool useInitialSpawns
+	savefile->WriteInt( latchedTeam ); //  int latchedTeam
+	savefile->WriteInt( tourneyRank ); //  int tourneyRank
+	savefile->WriteInt( tourneyLine ); //  int tourneyLine
+	savefile->WriteInt( spawnedTime ); //  int spawnedTime
 
-	savefile->WriteBool( hiddenWeapon );
-	soulCubeProjectile.Save( savefile );
+	savefile->WriteBool( carryingFlag ); //  bool carryingFlag
 
-	savefile->WriteInt( spectator );
-	savefile->WriteVec3( colorBar );
-	savefile->WriteInt( colorBarIndex );
-	savefile->WriteBool( scoreBoardOpen );
-	savefile->WriteBool( forceScoreBoard );
-	savefile->WriteBool( forceRespawn );
-	savefile->WriteBool( spectating );
-	savefile->WriteInt( lastSpectateTeleport );
-	savefile->WriteBool( lastHitToggle );
-	savefile->WriteBool( forcedReady );
-	savefile->WriteBool( wantSpectate );
-	savefile->WriteBool( weaponGone );
-	savefile->WriteBool( useInitialSpawns );
-	savefile->WriteInt( latchedTeam );
-	savefile->WriteInt( tourneyRank );
-	savefile->WriteInt( tourneyLine );
 
-	teleportEntity.Save( savefile );
-	savefile->WriteInt( teleportKiller );
+	savefile->WriteObject( teleportEntity ); //  idEntityPtr<idEntity> teleportEntity
+	savefile->WriteInt( teleportKiller ); //  int teleportKiller
+	savefile->WriteBool( lastManOver ); //  bool lastManOver
+	savefile->WriteBool( lastManPlayAgain ); //  bool lastManPlayAgain
+	savefile->WriteBool( lastManPresent ); //  bool lastManPresent
+	savefile->WriteBool( isLagged ); //  bool isLagged
+	savefile->WriteBool( isChatting ); //  bool isChatting
+	savefile->WriteInt( minRespawnTime ); //  int minRespawnTime
+	savefile->WriteInt( maxRespawnTime ); //  int maxRespawnTime
+	savefile->WriteVec3( firstPersonViewOrigin ); //  idVec3 firstPersonViewOrigin
+	savefile->WriteMat3( firstPersonViewAxis ); //  idMat3 firstPersonViewAxis
 
-	savefile->WriteInt( minRespawnTime );
-	savefile->WriteInt( maxRespawnTime );
+	//  idDragEntity dragEntity // don't bother saving dragEntity since it's a dev tool
 
-	savefile->WriteVec3( firstPersonViewOrigin );
-	savefile->WriteMat3( firstPersonViewAxis );
+	savefile->WriteObject( mountedObject ); //  idFuncMountedObject	* mountedObject
+	enviroSuitLight.Save( savefile ); //  idEntityPtr<idLight> enviroSuitLight
 
-	// don't bother saving dragEntity since it's a dev tool
 
-	savefile->WriteJoint( hipJoint );
-	savefile->WriteJoint( chestJoint );
-	savefile->WriteJoint( headJoint );
+	savefile->WriteFloat( new_g_damageScale ); //  float new_g_damageScale
 
-	savefile->WriteStaticObject( physicsObj );
+	savefile->WriteBool( bloomEnabled ); //  bool bloomEnabled
+	savefile->WriteFloat( bloomSpeed ); //  float bloomSpeed
+	savefile->WriteFloat( bloomIntensity ); //  float bloomIntensity
 
-	savefile->WriteInt( aasLocation.Num() );
-	for( i = 0; i < aasLocation.Num(); i++ ) {
+	savefile->WriteBool( airless ); //  bool airless
+
+
+	savefile->WriteInt( currentWeaponSlot ); //  int currentWeaponSlot
+
+
+	savefile->WriteVec3( autoaimPos ); //  idVec3 autoaimPos
+
+
+	savefile->WriteBool( inDownedState ); //  bool inDownedState
+
+
+	savefile->WriteInt( fallenRollTimer ); //  int fallenRollTimer
+
+
+	mountedMech.Save( savefile ); //  idEntityPtr<class idMech> mountedMech
+	savefile->WriteObject( mechCockpit ); //  idAnimated * mechCockpit
+
+	savefile->WriteObject( autoaimEnt ); //  idEntityPtr<idEntity> autoaimEnt
+
+
+	savefile->WriteCheckSizeMarker();
+
+
+	//  idBodyDragger bodyDragger // blendo eric: gameedit only?
+	//  idRuler ruler // blendo eric: gameedit only?
+
+	savefile->WriteBool( inConfinedState ); //  bool inConfinedState
+	savefile->WriteBool( confinedStealthActive ); //  bool confinedStealthActive
+	savefile->WriteBool( lastConfinedState ); //  bool lastConfinedState
+	savefile->WriteBool( confinedAngleLock ); //  bool confinedAngleLock
+	savefile->WriteInt( confinedType ); //  int confinedType
+
+
+	savefile->WriteObject( peekObject ); //  idEntityPtr<idEntity> peekObject
+
+
+	// const char* reverbLocation // blendo eric: regened
+
+
+	savefile->WriteBool( listenmodeActive ); //  bool listenmodeActive
+	savefile->WriteVec3( listenmodePos ); //  idVec3 listenmodePos
+	savefile->WriteInt( listenmodeVisualizerTime ); //  int listenmodeVisualizerTime
+
+
+	savefile->WriteUserInterface( eventlogMenu, false, true  ); //  idUserInterface * eventlogMenu
+	savefile->WriteUserInterface( spectatorMenu, false, false ); //  idUserInterface * spectatorMenu
+
+	savefile->WriteUserInterface( levelselectMenu, false, true ); //  idUserInterface* levelselectMenu
+
+	//savefile->WriteBool(levelselectGuiList != nullptr); // regened
+	//if (levelselectGuiList) {
+	//	levelselectGuiList->Save(savefile); //  idListGUI* levelselectGuiList
+	//}
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteUserInterface( emailFullscreenMenu, false, true); //  idUserInterface* emailFullscreenMenu
+	savefile->WriteInt( emailFullscreenState ); //  int emailFullscreenState
+
+	savefile->WriteInt( emailFullscreenTimer ); //  int emailFullscreenTimer
+	savefile->WriteObject( emailFullscreenEnt ); //  idEntityPtr<idEntity> emailFullscreenEnt
+	savefile->WriteAngles( emailFullscreenOriginalPlayerViewangle ); //  idAngles emailFullscreenOriginalPlayerViewangle
+	savefile->WriteBool( emailInSubMenu ); //  bool emailInSubMenu
+
+
+	meleeTarget.Save( savefile ); //  idEntityPtr<idAI> meleeTarget
+
+
+	savefile->WriteBool( cond_gascloud ); //  bool cond_gascloud
+
+	SaveFileWriteArray(lostInSpaceEntityDefNums, lostInSpaceEntityDefNums.Num(), WriteInt); //  idList<int> lostInSpaceEntityDefNums
+
+	savefile->WriteCheckSizeMarker();
+
+
+	savefile->WriteBool( wasCaughtEnteringCargoHide ); //  bool wasCaughtEnteringCargoHide
+
+
+	savefile->WriteBool( playerTouchedByCenterLight ); //  bool playerTouchedByCenterLight
+
+
+	savefile->WriteBool( isInVignette ); //  bool isInVignette
+
+
+	savefile->WriteBool( escapedFullScreenMenu ); //  bool escapedFullScreenMenu
+
+	savefile->WriteBool( isTitleFlyMode ); //  bool isTitleFlyMode
+	savefile->WriteBool( doForceSpatter ); //  bool doForceSpatter
+	savefile->WriteFloat( forceSpatterAmount ); //  float forceSpatterAmount
+
+	SaveFileWriteArray(tapesCollected, tapesCollected.Num(), WriteInt);  //  idList<int> tapesCollected
+
+	savefile->WriteJoint( hipJoint ); //  saveJoint_t hipJoint
+	savefile->WriteJoint( chestJoint ); //  saveJoint_t chestJoint
+	savefile->WriteJoint( headJoint ); //  saveJoint_t headJoint
+
+	savefile->WriteStaticObject( idPlayer::physicsObj ); // idPhysics_Player physicsObj
+	bool restorePhysics = &physicsObj == GetPhysics();
+	savefile->WriteBool( restorePhysics );
+
+	savefile->WriteInt( aasLocation.Num() );  // idList<aasLocation_t>	aasLocation
+	for(int i = 0; i < aasLocation.Num(); i++ ) {
 		savefile->WriteInt( aasLocation[ i ].areaNum );
 		savefile->WriteVec3( aasLocation[ i ].pos );
 	}
 
-	savefile->WriteInt( bobFoot );
-	savefile->WriteFloat( bobFrac );
-	savefile->WriteFloat( bobfracsin );
-	savefile->WriteInt( bobCycle );
-	savefile->WriteFloat( xyspeed );
-	savefile->WriteInt( stepUpTime );
-	savefile->WriteFloat( stepUpDelta );
-	savefile->WriteFloat( stepUpCorrection );
-	savefile->WriteFloat( idealLegsYaw );
-	savefile->WriteFloat( legsYaw );
-	savefile->WriteBool( legsForward );
-	savefile->WriteFloat( oldViewYaw );
-	savefile->WriteAngles( viewBobAngles );
-	savefile->WriteVec3( viewBob );
-	savefile->WriteInt( landChange );
-	savefile->WriteInt( landTime );
+	savefile->WriteCheckSizeMarker();
 
-	savefile->WriteInt( currentWeaponSlot );
-	savefile->WriteInt( idealWeaponSlot );
-	savefile->WriteInt( previousWeaponSlot );
-	savefile->WriteInt( weaponSwitchTime );
-	savefile->WriteBool( weaponEnabled );
-	savefile->WriteBool( showWeaponViewModel );
+	savefile->WriteInt( bobFoot ); //  int bobFoot
+	savefile->WriteFloat( bobFrac ); //  float bobFrac
+	savefile->WriteFloat( bobfracsin ); //  float bobfracsin
+	savefile->WriteInt( bobCycle ); //  int bobCycle
+	savefile->WriteFloat( xyspeed ); //  float xyspeed
+	savefile->WriteInt( stepUpTime ); //  int stepUpTime
+	savefile->WriteFloat( stepUpDelta ); //  float stepUpDelta
+	savefile->WriteFloat( stepUpCorrection ); //  float stepUpCorrection
+	savefile->WriteFloat( idealLegsYaw ); //  float idealLegsYaw
+	savefile->WriteFloat( legsYaw ); //  float legsYaw
+	savefile->WriteBool( legsForward ); //  bool legsForward
+	savefile->WriteFloat( oldViewYaw ); //  float oldViewYaw
+	savefile->WriteAngles( viewBobAngles ); //  idAngles viewBobAngles
+	savefile->WriteVec3( viewBob ); //  idVec3 viewBob
+	savefile->WriteInt( landChange ); //  int landChange
+	savefile->WriteInt( landTime ); //  int landTime
 
-	savefile->WriteSkin( skin );
-	savefile->WriteSkin( powerUpSkin );
-	savefile->WriteString( baseSkinName );
 
-	savefile->WriteInt( numProjectilesFired );
-	savefile->WriteInt( numProjectileHits );
+	savefile->WriteInt( idealWeaponSlot ); //  int idealWeaponSlot
+	savefile->WriteInt( previousWeaponSlot ); //  int previousWeaponSlot
+	savefile->WriteInt( weaponSwitchTime ); //  int weaponSwitchTime
+	savefile->WriteBool( weaponEnabled ); //  bool weaponEnabled
+	savefile->WriteBool( showWeaponViewModel ); //  bool showWeaponViewModel
 
-	savefile->WriteBool( airless );
-	savefile->WriteFloat( airTics );
-	savefile->WriteInt( lastAirDamage );
+	savefile->WriteSkin( skin ); // const  idDeclSkin * skin
+	savefile->WriteSkin( powerUpSkin ); // const  idDeclSkin * powerUpSkin
+	savefile->WriteString( baseSkinName ); //  idString baseSkinName
 
-	savefile->WriteBool( gibDeath );
-	savefile->WriteBool( gibsLaunched );
-	savefile->WriteVec3( gibsDir );
+	savefile->WriteInt( numProjectilesFired ); //  int numProjectilesFired
+	savefile->WriteInt( numProjectileHits ); //  int numProjectileHits
 
-	savefile->WriteFloat( zoomFov.GetStartTime() );
-	savefile->WriteFloat( zoomFov.GetDuration() );
-	savefile->WriteFloat( zoomFov.GetStartValue() );
-	savefile->WriteFloat( zoomFov.GetEndValue() );
 
-	savefile->WriteFloat( centerView.GetStartTime() );
-	savefile->WriteFloat( centerView.GetDuration() );
-	savefile->WriteFloat( centerView.GetStartValue() );
-	savefile->WriteFloat( centerView.GetEndValue() );
+	savefile->WriteFloat( airTics ); //  float airTics
+	savefile->WriteInt( lastAirDamage ); //  int lastAirDamage
 
-	savefile->WriteBool( fxFov );
+	savefile->WriteBool( gibDeath ); //  bool gibDeath
+	savefile->WriteBool( gibsLaunched ); //  bool gibsLaunched
+	savefile->WriteVec3( gibsDir ); //  idVec3 gibsDir
 
-	savefile->WriteFloat( influenceFov );
-	savefile->WriteInt( influenceActive );
-	savefile->WriteFloat( influenceRadius );
-	savefile->WriteObject( influenceEntity );
-	savefile->WriteMaterial( influenceMaterial );
-	savefile->WriteSkin( influenceSkin );
+	zoomFov.Save(savefile); //  idInterpolate<float> zoomFov
+	centerView.Save(savefile); //  idInterpolate<float> centerView
 
-	savefile->WriteObject( privateCameraView );
+	savefile->WriteBool( fxFov ); //  bool fxFov
 
-	for( i = 0; i < NUM_LOGGED_VIEW_ANGLES; i++ ) {
-		savefile->WriteAngles( loggedViewAngles[ i ] );
-	}
-	for( i = 0; i < NUM_LOGGED_ACCELS; i++ ) {
+	savefile->WriteFloat( influenceFov ); //  float influenceFov
+	savefile->WriteInt( influenceActive ); //  int influenceActive
+	savefile->WriteObject( influenceEntity ); //  idEntity * influenceEntity
+	savefile->WriteMaterial( influenceMaterial ); // const  idMaterial * influenceMaterial
+	savefile->WriteFloat( influenceRadius ); //  float influenceRadius
+	savefile->WriteSkin( influenceSkin ); // const  idDeclSkin * influenceSkin
+
+	savefile->WriteObject( privateCameraView ); //  idCamera * privateCameraView
+
+	SaveFileWriteArray(loggedViewAngles, NUM_LOGGED_VIEW_ANGLES, WriteAngles); //  idAngles loggedViewAngles[NUM_LOGGED_VIEW_ANGLES];
+
+	savefile->WriteInt(NUM_LOGGED_ACCELS); // future proofing
+	for( int i = 0; i < NUM_LOGGED_ACCELS; i++ ) { // loggedAccel_t loggedAccel[NUM_LOGGED_ACCELS];
 		savefile->WriteInt( loggedAccel[ i ].time );
 		savefile->WriteVec3( loggedAccel[ i ].dir );
 	}
-	savefile->WriteInt( currentLoggedAccel );
 
-	savefile->WriteObject( focusGUIent );
-	// can't save focusUI
-	savefile->WriteObject( focusCharacter );
-	savefile->WriteInt( talkCursor );
-	savefile->WriteInt( focusTime );
-	savefile->WriteObject( focusVehicle );
-	savefile->WriteUserInterface( cursor, false );
+	savefile->WriteCheckSizeMarker();
 
-	savefile->WriteInt( oldMouseX );
-	savefile->WriteInt( oldMouseY );
+	savefile->WriteInt( currentLoggedAccel ); //  int currentLoggedAccel
+	savefile->WriteObject( focusGUIent ); //  idEntity * focusGUIent
+	//savefile->WriteUserInterface( focusUI ); //  idUserInterface * focusUI // don't bother saving can't save focusUI ???
+	savefile->WriteObject( focusCharacter ); //  idAI * focusCharacter
+	savefile->WriteInt( talkCursor ); //  int talkCursor
+	savefile->WriteInt( focusTime ); //  int focusTime
+	savefile->WriteObject( focusVehicle ); //  idAFEntity_Vehicle * focusVehicle
+	savefile->WriteUserInterface( cursor, false, true ); //  idUserInterface * cursor
+	savefile->WriteInt( oldMouseX ); //  int oldMouseX
+	savefile->WriteInt( oldMouseY ); //  int oldMouseY
 
-	savefile->WriteString( pdaAudio );
-	savefile->WriteString( pdaVideo );
-	savefile->WriteString( pdaVideoWave );
+	savefile->WriteString( pdaAudio ); //  idString pdaAudio
+	savefile->WriteString( pdaVideo ); //  idString pdaVideo
+	savefile->WriteString( pdaVideoWave ); //  idString pdaVideoWave
 
-	savefile->WriteBool( tipUp );
-	savefile->WriteBool( objectiveUp );
+	savefile->WriteBool( tipUp ); //  bool tipUp
+	savefile->WriteBool( objectiveUp ); //  bool objectiveUp
 
-	savefile->WriteInt( lastDamageDef );
-	savefile->WriteVec3( lastDamageDir );
-	savefile->WriteInt( lastDamageLocation );
-	savefile->WriteInt( smoothedFrame );
-	savefile->WriteBool( smoothedOriginUpdated );
-	savefile->WriteVec3( smoothedOrigin );
-	savefile->WriteAngles( smoothedAngles );
+	savefile->WriteInt( lastDamageDef ); //  int lastDamageDef
+	savefile->WriteVec3( lastDamageDir ); //  idVec3 lastDamageDir
+	savefile->WriteInt( lastDamageLocation ); //  int lastDamageLocation
+	savefile->WriteInt( smoothedFrame ); //  int smoothedFrame
+	savefile->WriteBool( smoothedOriginUpdated ); //  bool smoothedOriginUpdated
+	savefile->WriteVec3( smoothedOrigin ); //  idVec3 smoothedOrigin
+	savefile->WriteAngles( smoothedAngles ); //  idAngles smoothedAngles
 
-	savefile->WriteBool( ready );
-	savefile->WriteBool( respawning );
-	savefile->WriteBool( leader );
-	savefile->WriteInt( lastSpectateChange );
-	savefile->WriteInt( lastTeleFX );
-
-	savefile->WriteFloat( pm_stamina.GetFloat() );
-
-	if ( hud ) {
-		hud->SetStateString( "message", common->GetLanguageDict()->GetString( "#str_02916" ) );
-		hud->HandleNamedEvent( "Message" );
-	}
-
-#ifdef _D3XP
 	savefile->WriteInt(weaponToggles.Num());
-	for(i = 0; i < weaponToggles.Num(); i++) {
+	for(int i = 0; i < weaponToggles.Num(); i++) { //  idHashTable<WeaponToggle_t> weaponToggles
 		WeaponToggle_t* weaponToggle = weaponToggles.GetIndex(i);
 		savefile->WriteString(weaponToggle->name);
 		savefile->WriteInt(weaponToggle->toggleList.Num());
@@ -4283,21 +4347,582 @@ void idPlayer::Save( idSaveGame *savefile ) const {
 			savefile->WriteInt(weaponToggle->toggleList[j]);
 		}
 	}
-	savefile->WriteObject( mountedObject );
-	enviroSuitLight.Save( savefile );
-	
-	
-	
-	savefile->WriteFloat( new_g_damageScale );
 
-	savefile->WriteBool( bloomEnabled );
-	savefile->WriteFloat( bloomSpeed );
-	savefile->WriteFloat( bloomIntensity );
+	savefile->WriteCheckSizeMarker();
 
-#endif
+	savefile->WriteInt( hudPowerup ); //  int hudPowerup
+	savefile->WriteInt( lastHudPowerup ); //  int lastHudPowerup
+	savefile->WriteInt( hudPowerupDuration ); //  int hudPowerupDuration
 
-	savefile->WriteBool( toggleCrouch );
-	savefile->WriteInt( teleportCrouchTime );
+	savefile->WriteBool( ready ); //  bool ready
+	savefile->WriteBool( respawning ); //  bool respawning
+	savefile->WriteBool( leader ); //  bool leader
+	savefile->WriteInt( lastSpectateChange ); //  int lastSpectateChange
+	savefile->WriteInt( lastTeleFX ); //  int lastTeleFX
+	savefile->WriteUInt( lastSnapshotSequence ); //unsigned int lastSnapshotSequence
+	savefile->WriteBool( weaponCatchup ); //  bool weaponCatchup
+	savefile->WriteInt( MPAim ); //  int MPAim
+	savefile->WriteInt( lastMPAim ); //  int lastMPAim
+	savefile->WriteInt( lastMPAimTime ); //  int lastMPAimTime
+	savefile->WriteInt( MPAimFadeTime ); //  int MPAimFadeTime
+	savefile->WriteBool( MPAimHighlight ); //  bool MPAimHighlight
+	savefile->WriteBool( isTelefragged ); //  bool isTelefragged
+
+	// idPlayerIcon playerIcon // blendo eric: for multiplayer only?
+	//savefile->WriteInt( playerIcon.iconType );
+	//savefile->WriteRenderEntity( playerIcon.renderEnt );
+	//savefile->WriteInt( playerIcon.iconHandle );
+
+	savefile->WriteBool( selfSmooth ); //  bool selfSmooth
+
+
+	savefile->WriteInt( voIntervalTable.Num() ); //  idHashTable<int> voIntervalTable
+	for (int idx = 0; idx < voIntervalTable.Num(); idx++) {
+		idStr outKey;
+		int outVal;
+		voIntervalTable.GetIndex(idx, &outKey, &outVal);
+		savefile->WriteString( outKey );
+		savefile->WriteInt( outVal );
+	}
+
+	savefile->WriteCheckSizeMarker();
+
+	savefile->WriteUserInterface( contextMenu, false, true  ); //  idUserInterface * contextMenu
+	savefile->WriteBool( contextMenuActive ); //  bool contextMenuActive
+	savefile->WriteFloat( contextMenuSoundSpeed ); //  float contextMenuSoundSpeed
+	savefile->WriteInt( soundSlowmoHandle ); //  int soundSlowmoHandle
+	savefile->WriteBool( soundSlowmoActive ); //  bool soundSlowmoActive
+
+
+	savefile->WriteInt( nextContextMenuAvailableTime ); //  int nextContextMenuAvailableTime
+	savefile->WriteInt( nextContextMenuCloseTime ); //  int nextContextMenuCloseTime
+	savefile->WriteInt( contextMenuForbiddenAlertTimer ); //  int contextMenuForbiddenAlertTimer
+	savefile->WriteInt( contextMenuState ); //  int contextMenuState
+	savefile->WriteInt( contextmenuStartTime ); //  int contextmenuStartTime
+	savefile->WriteVec3( viewposTargetOffset ); //  idVec3 viewposTargetOffset
+	savefile->WriteVec3( viewposOffset ); //  idVec3 viewposOffset
+	savefile->WriteInt( viewposState ); //  int viewposState
+	savefile->WriteInt( viewposStarttime ); //  int viewposStarttime
+	savefile->WriteVec3( viewposAbsStart ); //  idVec3 viewposAbsStart
+	savefile->WriteVec3( viewposAbsTarget ); //  idVec3 viewposAbsTarget
+	savefile->WriteBool( viewposAbsActive ); //  bool viewposAbsActive
+	savefile->WriteInt( viewposAbsTimer ); //  int viewposAbsTimer
+	savefile->WriteInt( viewposAbsDuration ); //  int viewposAbsDuration
+	savefile->WriteFloat( viewyawStartAngle ); //  float viewyawStartAngle
+	savefile->WriteFloat( viewyawTargetAngle ); //  float viewyawTargetAngle
+	savefile->WriteFloat( viewyawStarttime ); //  float viewyawStarttime
+	savefile->WriteInt( viewyawState ); //  int viewyawState
+	savefile->WriteInt( viewyawMovetime ); //  int viewyawMovetime
+	savefile->WriteFloat( viewpitchStartAngle ); //  float viewpitchStartAngle
+	savefile->WriteFloat( viewpitchTargetAngle ); //  float viewpitchTargetAngle
+	savefile->WriteFloat( viewpitchStarttime ); //  float viewpitchStarttime
+	savefile->WriteInt( viewpitchState ); //  int viewpitchState
+	savefile->WriteFloat( viewrollStartAngle ); //  float viewrollStartAngle
+	savefile->WriteFloat( viewrollTargetAngle ); //  float viewrollTargetAngle
+	savefile->WriteFloat( viewrollStarttime ); //  float viewrollStarttime
+	savefile->WriteInt( viewrollState ); //  int viewrollState
+	savefile->WriteInt( viewrollMovetime ); //  int viewrollMovetime
+	savefile->WriteInt( leanState ); //  int leanState
+	savefile->WriteFloat( leanAmountX ); //  float leanAmountX
+	savefile->WriteFloat( leanAmountY ); //  float leanAmountY
+	savefile->WriteFloat( lastLeanMouseX ); //  float lastLeanMouseX
+	savefile->WriteFloat( lastLeanMouseY ); //  float lastLeanMouseY
+	savefile->WriteFloat( lastLeanTime ); //  float lastLeanTime
+	savefile->WriteFloat( lastLeanRoll ); //  float lastLeanRoll
+	savefile->WriteVec3( lastLeanOffset ); //  idVec3 lastLeanOffset
+
+	savefile->WriteInt( staminaChargeDelayTimer ); //  int staminaChargeDelayTimer
+	savefile->WriteInt( staminaHideTimer ); //  int staminaHideTimer
+	savefile->WriteInt( staminaHideDelayMode ); //  int staminaHideDelayMode
+
+	savefile->WriteInt( confinedstateTimer ); //  int confinedstateTimer
+	savefile->WriteFloat( confinedAngle ); //  float confinedAngle
+
+
+	savefile->WriteInt( confinedDustTimer ); //  int confinedDustTimer
+
+	savefile->WriteBool( viewYawLocked ); //  bool viewYawLocked
+	savefile->WriteFloat( viewYawLockAngle ); //  float viewYawLockAngle
+	savefile->WriteFloat( viewYawLockArcsize ); //  float viewYawLockArcsize
+	savefile->WriteBool( viewPitchLocked ); //  bool viewPitchLocked
+	savefile->WriteFloat( viewPitchLockAngle ); //  float viewPitchLockAngle
+	savefile->WriteFloat( viewPitchLockArcsize ); //  float viewPitchLockArcsize
+
+	savefile->WriteBool( bodyAngleLocked ); //  bool bodyAngleLocked
+
+
+	savefile->WriteObject( carryableItem ); //  idEntityPtr<idEntity> carryableItem
+	savefile->WriteInt( lastLeanState ); //  int lastLeanState
+	savefile->WriteInt( leanCarryableTimer ); //  int leanCarryableTimer
+
+
+	savefile->WriteObject( frobEnt ); //  idEntity * frobEnt
+	savefile->WriteInt( frobState ); //  int frobState
+	savefile->WriteInt( lastFrobNumber ); //  int lastFrobNumber
+	savefile->WriteVec3( frobHitpos ); //  idVec3 frobHitpos
+	savefile->WriteInt( frobFlashTimer ); //  int frobFlashTimer
+	savefile->WriteFloat( frobHoldTimer ); //  float frobHoldTimer
+
+
+	savefile->WriteVec2( autoaimDefaultPosition ); //  idVec2 autoaimDefaultPosition
+	savefile->WriteFloat( autoaimDotTimer ); //  float autoaimDotTimer
+	savefile->WriteInt( lastAutoaimEntNum ); //  int lastAutoaimEntNum
+	savefile->WriteInt( autoaimDotState ); //  int autoaimDotState
+	savefile->WriteInt( lastAutoaimDotState ); //  int lastAutoaimDotState
+
+	savefile->WriteVec2( autoaimDotPosition ); //  idVec2 autoaimDotPosition
+	savefile->WriteVec2( autoaimDotStartPos ); //  idVec2 autoaimDotStartPos
+	savefile->WriteVec2( autoaimDotEndPos ); //  idVec2 autoaimDotEndPos
+
+	SaveFileWriteArray(damageArrowPosition, DAMAGEARROW_COUNT, WriteVec3); //  idVec3 damageArrowPosition[DAMAGEARROW_COUNT]
+	SaveFileWriteArray(damageArrowTimers, DAMAGEARROW_COUNT, WriteInt); // int damageArrowTimers[DAMAGEARROW_COUNT]
+
+	savefile->WriteInt( deathTimer ); //  int deathTimer
+
+	savefile->WriteInt( rackslideButtonTimer ); //  int rackslideButtonTimer
+	savefile->WriteInt( reloadButtonTimer ); //  int reloadButtonTimer
+
+	savefile->WriteInt( healthrechargeTimer ); //  int healthrechargeTimer
+	savefile->WriteInt( healthDeclineTimer ); //  int healthDeclineTimer
+	savefile->WriteBool( readyForHealthrechargeSound ); //  bool readyForHealthrechargeSound
+
+	savefile->WriteInt( lastHealthValue ); //  int lastHealthValue
+	savefile->WriteInt( lastHealthTimer ); //  int lastHealthTimer
+	savefile->WriteInt( lastHealthState ); //  int lastHealthState
+	savefile->WriteFloat( lastHealthDisplayvalue ); //  float lastHealthDisplayvalue
+
+
+	savefile->WriteInt( cond_burnwound ); //  int cond_burnwound
+	savefile->WriteInt( burningTimer ); //  int burningTimer
+	savefile->WriteInt( burningDOTTimer ); //  int burningDOTTimer
+	savefile->WriteInt( lastBurnwoundTime ); //  int lastBurnwoundTime
+
+
+	savefile->WriteInt( lastChemDamageTime ); //  int lastChemDamageTime
+	savefile->WriteInt( playerInChemTimer ); //  int playerInChemTimer
+
+	savefile->WriteInt( cond_glasswound ); //  int cond_glasswound
+	savefile->WriteInt( glasswoundMoveTimer ); //  int glasswoundMoveTimer
+	savefile->WriteInt( glasswoundFoot ); //  int glasswoundFoot
+	savefile->WriteInt( lastGlasswoundTime ); //  int lastGlasswoundTime
+
+	savefile->WriteInt( cond_spearwound ); //  int cond_spearwound
+
+	savefile->WriteInt( cond_bulletwound ); //  int cond_bulletwound
+	savefile->WriteInt( lastBulletwoundTimer ); //  int lastBulletwoundTimer
+
+	savefile->WriteInt( cond_shrapnel ); //  int cond_shrapnel
+
+	savefile->WriteInt( cond_smelly ); //  int cond_smelly
+	savefile->WriteInt( smellyTimer ); //  int smellyTimer
+	savefile->WriteVec3( lastSmellPosition ); //  idVec3 lastSmellPosition
+
+
+	savefile->WriteInt( sneezeValue ); //  int sneezeValue
+	savefile->WriteVec3( lastPlayerPosition ); //  idVec3 lastPlayerPosition
+	savefile->WriteInt( nextSneezeTimer ); //  int nextSneezeTimer
+	savefile->WriteInt( sneezeState ); //  int sneezeState
+	savefile->WriteInt( sneezeUpdateTimer ); //  int sneezeUpdateTimer
+	savefile->WriteInt( sneezeVOTimer ); //  int sneezeVOTimer
+
+
+	savefile->WriteInt( healthFadeTimer ); //  int healthFadeTimer
+	savefile->WriteBool( healthFadeMaxedBool ); //  bool healthFadeMaxedBool
+	savefile->WriteBool( healthbarIsFaded ); //  bool healthbarIsFaded
+
+
+	savefile->WriteInt( healthDamageFlashTimer ); //  int healthDamageFlashTimer
+
+
+	savefile->WriteInt( healState ); //  int healState
+	savefile->WriteInt( healbarTotalTime ); //  int healbarTotalTime
+	savefile->WriteInt( healbarStartTime ); //  int healbarStartTime
+
+
+	savefile->WriteInt( footBloodDecalCount ); //  int footBloodDecalCount
+
+
+	savefile->WriteInt( lastAcroState ); //  int lastAcroState
+
+	// const  idDict * spitDef // blendo eric: can be regened?
+	// const  idDict * bloodspitDef // blendo eric: can be regened?
+
+	// spitDef = gameLocal.FindEntityDefDict(spawnArgs.GetString("def_spit", "projectile_spit"), false);
+	// bloodspitDef = gameLocal.FindEntityDefDict(spawnArgs.GetString("def_bloodspit", "projectile_bloodspit"), false);
+
+	savefile->WriteInt( downedTickTimer ); //  int downedTickTimer
+	savefile->WriteInt( downedDecalTimer ); //  int downedDecalTimer
+	savefile->WriteVec3( lastDownedPlayerPosition ); //  idVec3 lastDownedPlayerPosition
+
+	SaveFileWriteArray(noiseEventPos, NOISEEVENT_COUNT, WriteVec3); // idVec3 noiseEventPos[NOISEEVENT_COUNT]
+	SaveFileWriteArray(noiseEventTimer, NOISEEVENT_COUNT, WriteInt); // int noiseEventTimer[NOISEEVENT_COUNT];
+	SaveFileWriteArray(noiseEventType, NOISEEVENT_COUNT, WriteInt); // int noiseEventTimer[NOISEEVENT_COUNT];
+
+	savefile->WriteInt( deafenState ); //  int deafenState
+	savefile->WriteInt( deafenTimer ); //  int deafenTimer
+
+	savefile->WriteVec3( lastAttackDir ); //  idVec3 lastAttackDir
+
+
+	savefile->WriteInt( lastTargetHeartRate ); //  int lastTargetHeartRate
+
+	savefile->WriteInt( lastHeartVolumeAdjust ); //  int lastHeartVolumeAdjust
+	savefile->WriteFloat( heartVolume ); //  float heartVolume
+	savefile->WriteBool( heartbeatEnabled ); //  bool heartbeatEnabled
+
+	savefile->WriteInt( savingthrowState ); //  int savingthrowState
+
+	savefile->WriteInt( grenadeButtonTimer ); //  int grenadeButtonTimer
+	savefile->WriteInt( grenadeThrowState ); //  int grenadeThrowState
+	savefile->WriteBool( shouldDrawThrowArc ); //  bool shouldDrawThrowArc
+	savefile->WriteBool( lastThrowArcState ); //  bool lastThrowArcState
+
+	SaveFileWriteArray(throwBeamOrigin, THROWARC_BEAMCOUNT, WriteObject); // idBeam* throwBeamOrigin[THROWARC_BEAMCOUNT]
+	SaveFileWriteArray(throwBeamTarget, THROWARC_BEAMCOUNT, WriteObject); // idBeam* throwBeamTarget[THROWARC_BEAMCOUNT]
+
+	savefile->WriteObject( throwdisc ); //  idEntity* throwdisc
+	
+	//  idODE* throwPredictionIntegrator // eric blendo: setup in constructor, regened later
+
+	//  idPhysics_RigidBody* throwWeaponPhysicsObj // blendo eric: this is an alloc'd object, but not spawned, so won't be saved
+
+	savefile->WriteObject( throwPredictionModel ); //  idEntity* throwPredictionModel
+	savefile->WriteTrace( throwarcCollision ); //  trace_t throwarcCollision
+
+
+	savefile->WriteObject( placerEnt );
+	savefile->WriteObject( placerEntLine );
+	savefile->WriteObject( placerEntArrow );
+	savefile->WriteBool( placerClearance ); //  bool placerClearance
+	savefile->WriteInt( placerEntityNumber ); //  int placerEntityNumber
+	savefile->WriteInt( placerEntityCollisionID ); //  int placerEntityCollisionID
+
+	savefile->WriteInt( buttonpromptType ); //  int buttonpromptType
+	savefile->WriteInt( buttonpromptTimer ); //  int buttonpromptTimer
+
+
+	savefile->WriteInt( viewpitchTransitionTime ); //  int viewpitchTransitionTime
+
+	savefile->WriteBool( defibAvailable ); //  bool defibAvailable
+	savefile->WriteInt( defibState ); //  int defibState
+	savefile->WriteInt( defibTimer ); //  int defibTimer
+	savefile->WriteObject( defibCamera ); //  idEntity * defibCamera
+	savefile->WriteObject( defibMover ); //  idEntity * defibMover
+	savefile->WriteObject( defibCameraTarget ); //  idEntity * defibCameraTarget
+	savefile->WriteBool( defibFadeDone ); //  bool defibFadeDone
+	savefile->WriteFloat( defibYaw ); //  float defibYaw
+	savefile->WriteBool( defibParticleDone ); //  bool defibParticleDone
+	savefile->WriteInt( defibParticleTimer ); //  int defibParticleTimer
+	savefile->WriteInt( defibButtonTimer ); //  int defibButtonTimer
+	savefile->WriteInt( defibButtonCount ); //  int defibButtonCount
+	savefile->WriteBool( defibButtonState ); //  bool defibButtonState
+
+	savefile->WriteUserInterface( videoMenu, false, true ); //  idUserInterface * videoMenu
+	savefile->WriteUserInterface( cameraGuiMenu, false, false ); //  idUserInterface* cameraGuiMenu
+
+	savefile->WriteInt( lastBaffleState ); //  int lastBaffleState
+
+	savefile->WriteFloat( currentYawDelta ); //  float currentYawDelta
+
+	savefile->WriteInt( bloodbagState ); //  int bloodbagState
+	savefile->WriteObject( bloodbagMesh ); //  idAnimated * bloodbagMesh
+	savefile->WriteInt( bloodbagTimer ); //  int bloodbagTimer
+	savefile->WriteInt( bloodbagMaxTime ); //  int bloodbagMaxTime
+	savefile->WriteInt( bloodbagHealth ); //  int bloodbagHealth
+	savefile->WriteParticle( bloodbagParticles ); // const  idDeclParticle * bloodbagParticles
+	savefile->WriteInt( bloodbagParticleFlytime ); //  int bloodbagParticleFlytime
+	savefile->WriteJoint( bloodbagJoint ); //  saveJoint_t bloodbagJoint
+	savefile->WriteObject( bloodbagEmitter ); // idFuncEmitter *bloodbagEmitter
+	savefile->WriteInt( bloodbagDamageTimer ); //  int bloodbagDamageTimer
+	savefile->WriteInt( bloodbagHealthFXState ); //  int bloodbagHealthFXState
+
+	savefile->WriteFloat( luminance ); //  float luminance
+	savefile->WriteInt( lastLuminanceUpdate ); //  int lastLuminanceUpdate
+	lightProbe.Save( savefile ); //  idEntityPtr<idStaticEntity> lightProbe
+
+	savefile->WriteInt( lastLuminanceState ); //  int lastLuminanceState
+	savefile->WriteInt( luminanceState ); //  int luminanceState
+
+
+	savefile->WriteInt( mechTransitionState ); //  int mechTransitionState
+
+	savefile->WriteInt( mechTransitionTimer ); //  int mechTransitionTimer
+	savefile->WriteVec3( mechplayerStartPos ); //  idVec3 mechplayerStartPos
+	savefile->WriteBool( mechStartupstate ); //  bool mechStartupstate
+	savefile->WriteInt( mechStartupTimer ); //  int mechStartupTimer
+
+
+	savefile->WriteInt( mechSpeedTimer ); //  int mechSpeedTimer
+
+
+	savefile->WriteInt( beaconUITimer ); //  int beaconUITimer
+	savefile->WriteString( beaconCode ); //  idString beaconCode
+	savefile->WriteInt( codeStartTime ); //  int codeStartTime
+	savefile->WriteBool( isEnteringCode ); //  bool isEnteringCode
+	savefile->WriteBool( signalLock ); //  bool signalLock
+	savefile->WriteInt( lastSignalLockUpdate ); //  int lastSignalLockUpdate
+	savefile->WriteVec3( lastBeaconPosition ); //  idVec3 lastBeaconPosition
+	savefile->WriteBool( beaconFlashState ); //  bool beaconFlashState
+	savefile->WriteInt( beaconFlashTimer ); //  int beaconFlashTimer
+	savefile->WriteBool( beaconUIBlink ); //  bool beaconUIBlink
+	savefile->WriteInt( beaconUIBlinkTimer ); //  int beaconUIBlinkTimer
+	savefile->WriteInt( beaconLingerTimer ); //  int beaconLingerTimer
+	savefile->WriteInt( beaconLastStrength ); //  int beaconLastStrength
+	savefile->WriteBool( beaconLastVertArrows ); //  bool beaconLastVertArrows
+
+
+	savefile->WriteInt( nextAttackTime ); //  int nextAttackTime
+
+
+	savefile->WriteInt( confinedlimitsoundTimer ); //  int confinedlimitsoundTimer
+	savefile->WriteInt( confinedRustlesoundTimer ); //  int confinedRustlesoundTimer
+	savefile->WriteVec3( confinedRustlesoundLastPos ); //  idVec3 confinedRustlesoundLastPos
+
+	savefile->WriteBool( playingSuspicionSound ); //  bool playingSuspicionSound
+
+	savefile->WriteInt( ventpeekRustleTimer ); //  int ventpeekRustleTimer
+
+	savefile->WriteObject( smellyInterestpoint ); //  idEntityPtr<idEntity> smellyInterestpoint
+
+
+	savefile->WriteBool( lastListenmodeActive ); //  bool lastListenmodeActive
+	savefile->WriteBool( listenProbemodeActive ); //  bool listenProbemodeActive
+	savefile->WriteInt( listenProbeTimer ); //  int listenProbeTimer
+
+	savefile->WriteInt( lastLocationEntityNum ); //  int lastLocationEntityNum
+
+	savefile->WriteBool( didInitialSpawn ); //  bool didInitialSpawn
+
+
+	savefile->WriteInt( spaceparticleTimer ); //  int spaceparticleTimer
+	savefile->WriteBool( forceSpaceParticles ); //  bool forceSpaceParticles
+
+	savefile->WriteInt( lastSelectedHotbarslot ); //  int lastSelectedHotbarslot
+
+
+	savefile->WriteBool( eventlogMenuActive ); //  bool eventlogMenuActive
+
+	savefile->WriteBool( levelselectMenuActive ); //  bool levelselectMenuActive
+
+	savefile->WriteBool( carryableBashActive ); //  bool carryableBashActive
+	savefile->WriteInt( carryableBashTimer ); //  int carryableBashTimer
+
+	savefile->WriteBool( zoommodeActive ); //  bool zoommodeActive
+	savefile->WriteInt( zoombuttonTimer ); //  int zoombuttonTimer
+	savefile->WriteBool( zoomWaitingForInitialRelease ); //  bool zoomWaitingForInitialRelease
+	savefile->WriteBool( zoomManualInspect ); //  bool zoomManualInspect
+
+	savefile->WriteInt( impactslowmoTimer ); //  int impactslowmoTimer
+	savefile->WriteBool( impactslowmoActive ); //  bool impactslowmoActive
+
+
+	savefile->WriteBool( lastRulerState ); //  bool lastRulerState
+
+	savefile->WriteObject( trashchuteFocus ); //  idEntityPtr<idEntity> trashchuteFocus
+
+	savefile->WriteInt( weaponselectPauseTimer ); //  int weaponselectPauseTimer
+	savefile->WriteBool( isWeaponselectPaused ); //  bool isWeaponselectPaused
+
+	savefile->WriteBool( healthcloudActive ); //  bool healthcloudActive
+	savefile->WriteInt( healthcloudTimer ); //  int healthcloudTimer
+
+	savefile->WriteInt( mushroomDisplayTimer ); //  int mushroomDisplayTimer
+
+	savefile->WriteInt( zoomCurrentFOV ); //  int zoomCurrentFOV
+
+	savefile->WriteBool( scriptedBlur ); //  bool scriptedBlur
+
+	SaveFileWriteArray( (int&)flytext, FLYTEXT_COUNT, WriteInt ); // flyTextEvent_t flytext[FLYTEXT_COUNT];
+
+	savefile->WriteBool( armstatsActive ); //  bool armstatsActive
+	savefile->WriteObject( armstatsModel ); //  idAnimatedEntity* armstatsModel
+
+	savefile->WriteInt( armstatsState ); //  int armstatsState
+	savefile->WriteInt( armstatsTimer ); //  int armstatsTimer
+
+	savefile->WriteInt( armstatMode ); //  int armstatMode
+
+	savefile->WriteBool( oxygenmeterIsFaded ); //  bool oxygenmeterIsFaded
+	savefile->WriteInt( oxygenmeterFadeTimer ); //  int oxygenmeterFadeTimer
+
+	savefile->WriteInt( oxygenFreezeTimer ); //  int oxygenFreezeTimer
+	savefile->WriteBool( cameraspliceActive ); //  bool cameraspliceActive
+	savefile->WriteInt( cameraspliceChannel ); //  int cameraspliceChannel
+	savefile->WriteInt( nextCameraspliceChannelTime ); //  int nextCameraspliceChannelTime
+	savefile->WriteBool( inputReadyForTakedown ); //  bool inputReadyForTakedown
+	savefile->WriteInt( jockeyState ); //  int jockeyState
+
+	savefile->WriteObject( jockeyArrow ); //  idEntity * jockeyArrow
+	savefile->WriteVec3( jockeyJointIdlePos ); //  idVec3 jockeyJointIdlePos
+	savefile->WriteQuat( jockeyJointIdleRot ); //  idQuat jockeyJointIdleRot
+	savefile->WriteVec3( jockeyJointModPos ); //  idVec3 jockeyJointModPos
+	savefile->WriteQuat( jockeyJointModRot ); //  idQuat jockeyJointModRot
+
+	savefile->WriteInt( jockeyTimer ); //  int jockeyTimer
+	savefile->WriteInt( lastAvailableJockeyAttacktype ); //  int lastAvailableJockeyAttacktype
+
+
+	savefile->WriteInt( spectateTimer ); //  int spectateTimer
+	savefile->WriteInt( spectateState ); //  int spectateState
+
+	savefile->WriteInt( eliminationCounter ); //  int eliminationCounter
+
+	savefile->WriteBool( toggleCrouch ); //  bool toggleCrouch
+	savefile->WriteInt( teleportCrouchTime ); //  int teleportCrouchTime
+
+
+	savefile->WriteObject( tele_ui_entity ); //  idEntity* tele_ui_entity
+	savefile->WriteObject( tele_ui_disc ); //  idEntity* tele_ui_disc
+
+	savefile->WriteInt( gascloud_timer ); //  int gascloud_timer
+	savefile->WriteInt( gascloud_coughtimer ); //  int gascloud_coughtimer
+
+
+	savefile->WriteInt( isFrozen ); //  int isFrozen
+
+
+	savefile->WriteFloat( fovLerpStart ); //  float fovLerpStart
+	savefile->WriteFloat( fovLerpEnd ); //  float fovLerpEnd
+	savefile->WriteFloat( fovLerpCurrent ); //  float fovLerpCurrent
+	savefile->WriteInt( fovLerpTimer ); //  int fovLerpTimer
+	savefile->WriteInt( fovLerpStartTime ); //  int fovLerpStartTime
+	savefile->WriteInt( fovLerpState ); //  int fovLerpState
+
+	savefile->WriteBool( playerCanFrob ); //  bool playerCanFrob
+
+	savefile->WriteInt( inspectLerpTimer ); //  int inspectLerpTimer
+	savefile->WriteInt( inspectLerpState ); //  int inspectLerpState
+
+
+	savefile->WriteInt( coins ); //  int coins
+
+	savefile->WriteInt( exitLevelHoldTimer ); //  int exitLevelHoldTimer
+	savefile->WriteBool( exitLevelButtonAvailable ); //  bool exitLevelButtonAvailable
+
+	savefile->WriteBool( postgameLoadButtonAvailable ); //  bool postgameLoadButtonAvailable
+
+
+	savefile->WriteInt( knockeddownLastSpeed ); //  int knockeddownLastSpeed
+
+
+	savefile->WriteObject( lastPlayerLookTrigger ); //  idEntityPtr<idEntity> lastPlayerLookTrigger
+
+
+	savefile->WriteInt( currentlyActiveEmailInbox ); //  int currentlyActiveEmailInbox
+	savefile->WriteInt( activeEmailInboxTimer ); //  int activeEmailInboxTimer
+	savefile->WriteBool( emailInboxCheckActive ); //  bool emailInboxCheckActive
+	savefile->WriteString( emailReplyFunc1 ); //  idString emailReplyFunc1
+	savefile->WriteString( emailReplyFunc2 ); //  idString emailReplyFunc2
+
+	savefile->WriteObject( zoominspectEntityPtr ); //  idEntityPtr<idEntity> zoominspectEntityPtr
+	savefile->WriteBool( zoominspect_LabelmodeActive ); //  bool zoominspect_LabelmodeActive
+	savefile->WriteVec3( zoominspect_LabelmodePosition ); //  idVec3 zoominspect_LabelmodePosition
+	savefile->WriteAngles( zoominspect_LabelmodeAngle ); //  idAngles zoominspect_LabelmodeAngle
+	savefile->WriteInt( zoominspect_previousEntNum ); //  int zoominspect_previousEntNum
+	savefile->WriteBool( zoominspect_lerpDone ); //  bool zoominspect_lerpDone
+
+
+	savefile->WriteInt( zoominspect_lerptimer ); //  int zoominspect_lerptimer
+	savefile->WriteVec3( zoominspect_lerpStartPos ); //  idVec3 zoominspect_lerpStartPos
+	savefile->WriteAngles( zoominspect_lerpStartAngle ); //  idAngles zoominspect_lerpStartAngle
+
+	SaveFileWriteArray(woundArray, WOUNDCOUNT_MAX, WriteBool) // bool woundArray[WOUNDCOUNT_MAX];
+
+	savefile->WriteBool( throwarcDropMode ); //  bool throwarcDropMode
+	savefile->WriteBool( lastThrowarcDropMode ); //  bool lastThrowarcDropMode
+
+	savefile->WriteInt( vo_chamberchecktimer ); //  int vo_chamberchecktimer
+	savefile->WriteBool( hasSaidChambercheckVO ); //  bool hasSaidChambercheckVO
+
+	savefile->WriteInt( vo_reloadchecktimer ); //  int vo_reloadchecktimer
+	savefile->WriteBool( hasSaidReloadcheckVO ); //  bool hasSaidReloadcheckVO
+
+
+	savefile->WriteInt( pickpocketPipCount ); //  int pickpocketPipCount
+	savefile->WriteInt( pickpocketPipTimer ); //  int pickpocketPipTimer
+	savefile->WriteBool( pickpocketGoodRange ); //  bool pickpocketGoodRange
+	savefile->WriteBool( lastPickpocketGoodRange ); //  bool lastPickpocketGoodRange
+
+	savefile->WriteInt( pickpocketState ); //  int pickpocketState
+	savefile->WriteObject( pickpocketEnt ); //  idEntityPtr<idEntity> pickpocketEnt
+
+	savefile->WriteInt( statsPickpocketAttempts ); //  int statsPickpocketAttempts
+	savefile->WriteInt( statsPickpocketSuccesses ); //  int statsPickpocketSuccesses
+
+
+	savefile->WriteInt( armstatDoorlockUpdateTimer ); //  int armstatDoorlockUpdateTimer
+	savefile->WriteBool( armstatDoorlockNeedsUpdate ); //  bool armstatDoorlockNeedsUpdate
+
+	savefile->WriteInt( armstatFuseboxUpdateTimer ); //  int armstatFuseboxUpdateTimer
+	savefile->WriteBool( armstatFuseboxNeedsUpdate ); //  bool armstatFuseboxNeedsUpdate
+
+
+	savefile->WriteInt( cryoexitEntNum ); //  int cryoexitEntNum
+
+
+	savefile->WriteInt( memorypalaceState ); //  int memorypalaceState
+	savefile->WriteInt( memorypalaceTimer ); //  int memorypalaceTimer
+	savefile->WriteVec3( memorypalacePlayerPos ); //  idVec3 memorypalacePlayerPos
+	savefile->WriteVec3( memorypalaceForwardView ); //  idVec3 memorypalaceForwardView
+
+	savefile->WriteBool( ingresspointsDrawActive ); //  bool ingresspointsDrawActive
+
+	savefile->WriteInt( staminaThrowTimer ); //  int staminaThrowTimer
+
+	savefile->WriteInt( damageTaken ); //  int damageTaken
+	savefile->WriteInt( enemiesPounced ); //  int enemiesPounced
+	savefile->WriteInt( brutalslams ); //  int brutalslams
+	savefile->WriteInt( enemyrespawns ); //  int enemyrespawns
+
+	savefile->WriteBool( iteminspectActive ); //  bool iteminspectActive
+	savefile->WriteInt( iteminspectFOV ); //  int iteminspectFOV
+
+
+	savefile->WriteInt( levelProgressIndex ); //  int levelProgressIndex
+
+
+	savefile->WriteBool( isFallDamageImmune ); //  bool isFallDamageImmune
+
+
+	savefile->WriteBool( spectateUIActive ); //  bool spectateUIActive
+	savefile->WriteBool( spectateStatsActive ); //  bool spectateStatsActive
+
+	savefile->WriteObject( spectateTimelineEnt ); //  idEntity* spectateTimelineEnt
+
+
+	savefile->WriteObject( ninaOrgansModel ); //  idAnimatedEntity* ninaOrgansModel
+	savefile->WriteVec3( ninaOrgansPosStart ); //  idVec3 ninaOrgansPosStart
+	savefile->WriteVec3( ninaOrgansPosEnd ); //  idVec3 ninaOrgansPosEnd
+	savefile->WriteInt( ninaOrgansTimer ); //  int ninaOrgansTimer
+
+
+	savefile->WriteBool( roqVideoStateActive ); //  bool roqVideoStateActive
+
+
+	savefile->WriteInt( particlestreamTimer ); //  int particlestreamTimer
+	savefile->WriteVec3( particleStreamDestination ); //  idVec3 particleStreamDestination
+	savefile->WriteObject( particleStreamEnt ); //  idEntity* particleStreamEnt
+
+
+	savefile->WriteBool( showPlayerBody_Scripted ); //  bool showPlayerBody_Scripted
+
+
+	savefile->WriteObject( lastLocboxTriggered ); //  idEntityPtr<idEntity>	lastLocboxTriggered;
+
+
+	savefile->WriteBool( drawCinematicHUD ); //  bool drawCinematicHUD
+
+	savefile->WriteObject( vacuumSplineMover ); //  idMover* vacuumSplineMover
+
+	// set the pm_ cvars
+	savefile->WriteFloat( pm_stamina.GetFloat() );
+	savefile->WriteInt( pm_modelView.GetFloat() );
+
+
+	//if ( hud ) {
+	//	hud->SetStateString( "message", common->GetLanguageDict()->GetString( "#str_02916" ) );
+	//	hud->HandleNamedEvent( "Message" );
+	//}
 }
 
 /*
@@ -4306,260 +4931,369 @@ idPlayer::Restore
 ===========
 */
 void idPlayer::Restore( idRestoreGame *savefile ) {
-	int	  i;
 	int	  num;
-	float set;
+	float fnum;
 
-	savefile->ReadUsercmd( usercmd );
-	playerView.Restore( savefile );
+	savefile->ReadUsercmd( usercmd ); //  usercmd_t usercmd
 
-	savefile->ReadBool( noclip );
-	savefile->ReadBool( godmode );
+	playerView.Restore( savefile ); // class idPlayerView playerView;
 
-	savefile->ReadAngles( spawnAngles );
-	savefile->ReadAngles( viewAngles );
-	savefile->ReadAngles( cmdAngles );
+	savefile->ReadBool( noclip ); //  bool noclip
+	savefile->ReadBool( godmode ); //  bool godmode
+
+	savefile->ReadBool( spawnAnglesSet ); //  bool spawnAnglesSet
+	savefile->ReadAngles( spawnAngles ); //  idAngles spawnAngles
+	savefile->ReadAngles( viewAngles ); //  idAngles viewAngles
+	savefile->ReadAngles( cmdAngles ); //  idAngles cmdAngles
 
 	memset( usercmd.angles, 0, sizeof( usercmd.angles ) );
 	SetViewAngles( viewAngles );
 	spawnAnglesSet = true;
 
-	savefile->ReadInt( buttonMask );
-	savefile->ReadInt( oldButtons );
-	savefile->ReadInt( oldFlags );
+	savefile->ReadInt( buttonMask ); //  int buttonMask
+	savefile->ReadInt( oldButtons ); //  int oldButtons
+	savefile->ReadInt( oldFlags ); //  int oldFlags
 
 	usercmd.flags = 0;
 	oldFlags = 0;
 
-	savefile->ReadInt( lastHitTime );
-	savefile->ReadInt( lastSndHitTime );
-	savefile->ReadInt( lastSavingThrowTime );
+	savefile->ReadInt( lastHitTime ); //  int lastHitTime
+	savefile->ReadInt( lastSndHitTime ); //  int lastSndHitTime
+	savefile->ReadInt( lastSavingThrowTime ); //  int lastSavingThrowTime
 
-	// Re-link idBoolFields to the scriptObject, values will be restored in scriptObject's restore
-	LinkScriptVariables();
+	LinkScriptVariables(); // hooks up following
+	//  idScriptBool AI_FORWARD
+	//  idScriptBool AI_BACKWARD
+	//  idScriptBool AI_STRAFE_LEFT
+	//  idScriptBool AI_STRAFE_RIGHT
+	//  idScriptBool AI_ATTACK_HELD
+	//  idScriptBool AI_WEAPON_FIRED
+	//  idScriptBool AI_JUMP
+	//  idScriptBool AI_CROUCH
+	//  idScriptBool AI_ONGROUND
+	//  idScriptBool AI_ONLADDER
+	//  idScriptBool AI_DEAD
+	//  idScriptBool AI_RUN
+	//  idScriptBool AI_PAIN
+	//  idScriptBool AI_HARDLANDING
+	//  idScriptBool AI_SOFTLANDING
+	//  idScriptBool AI_RELOAD
+	//  idScriptBool AI_TELEPORT
+	//  idScriptBool AI_TURN_LEFT
+	//  idScriptBool AI_TURN_RIGHT
+	//  idScriptBool AI_HEAL_GLASSWOUND
+	//  idScriptBool AI_HEAL_BURNING
+	//  idScriptBool AI_HEAL_BLEEDOUT
+	//  idScriptBool AI_ACRO_CEILINGHIDE
+	//  idScriptBool AI_ACRO_SPLITS
+	//  idScriptBool AI_ACRO_SPLITS_DOWN
+	//  idScriptBool AI_FALLEN
+	//  idScriptBool AI_FALLEN_GETUP
+	//  idScriptBool AI_FALLEN_ROLL
+	//  idScriptBool AI_HEAL_BULLETPLUCK
+	//  idScriptBool AI_HEAL_SHRAPNEL
+	//  idScriptBool AI_HEAL_HEALWOUND
+	//  idScriptBool AI_HEAL_SPEARPLUCK
+	//  idScriptBool AI_JOCKEYRIDE
 
-	inventory.Restore( savefile );
-	weapon.Restore( savefile );
+	inventory.Restore( savefile ); //  idInventory inventory
 
-	for ( i = 0; i < inventory.emails.Num(); i++ ) {
-		GetPDA()->AddEmail( inventory.emails[i] );
+	savefile->ReadCheckSizeMarker();
+
+	weapon.Restore( savefile ); //  idEntityPtr<idWeapon> weapon
+
+	savefile->ReadCheckSizeMarker();
+
+	RestorePDAEmails(true);
+
+	savefile->ReadUserInterface( hud ); //  idUserInterface * hud
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadUserInterface( objectiveSystem ); //  idUserInterface * objectiveSystem
+	savefile->ReadBool( objectiveSystemOpen ); //  bool objectiveSystemOpen
+
+	savefile->ReadInt( weapon_soulcube ); //  int weapon_soulcube
+	savefile->ReadInt( weapon_pda ); //  int weapon_pda
+	savefile->ReadInt( weapon_fists ); //  int weapon_fists
+
+	savefile->ReadInt( heartRate ); //  int heartRate
+
+	heartInfo.Restore(savefile); //  idInterpolate<float> heartInfo
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( lastHeartAdjust ); //  int lastHeartAdjust
+	savefile->ReadInt( lastHeartBeat ); //  int lastHeartBeat
+	savefile->ReadInt( lastDmgTime ); //  int lastDmgTime
+	savefile->ReadInt( deathClearContentsTime ); //  int deathClearContentsTime
+	savefile->ReadBool( doingDeathSkin ); //  bool doingDeathSkin
+	savefile->ReadInt( lastArmorPulse ); //  int lastArmorPulse
+	savefile->ReadFloat( stamina ); //  float stamina
+	savefile->ReadFloat( healthPool ); //  float healthPool
+	savefile->ReadInt( nextHealthPulse ); //  int nextHealthPulse
+	savefile->ReadBool( healthPulse ); //  bool healthPulse
+	savefile->ReadBool( healthTake ); //  bool healthTake
+	savefile->ReadInt( nextHealthTake ); //  int nextHealthTake
+
+
+	savefile->ReadBool( hiddenWeapon ); //  bool hiddenWeapon
+	soulCubeProjectile.Restore( savefile ); //  idEntityPtr<idProjectile> soulCubeProjectile
+
+	SaveFileReadArray(colorBarTable, ReadVec3); // static idVec3 colorBarTable[ COLOR_BAR_TABLE_MAX ];
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( spectator ); //  int spectator
+	savefile->ReadVec3( colorBar ); //  idVec3 colorBar
+	savefile->ReadInt( colorBarIndex ); //  int colorBarIndex
+	savefile->ReadBool( scoreBoardOpen ); //  bool scoreBoardOpen
+	savefile->ReadBool( forceScoreBoard ); //  bool forceScoreBoard
+	savefile->ReadBool( forceRespawn ); //  bool forceRespawn
+	savefile->ReadBool( spectating ); //  bool spectating
+	savefile->ReadInt( lastSpectateTeleport ); //  int lastSpectateTeleport
+	savefile->ReadBool( lastHitToggle ); //  bool lastHitToggle
+	savefile->ReadBool( forcedReady ); //  bool forcedReady
+	savefile->ReadBool( wantSpectate ); //  bool wantSpectate
+	savefile->ReadBool( weaponGone ); //  bool weaponGone
+	savefile->ReadBool( useInitialSpawns ); //  bool useInitialSpawns
+	savefile->ReadInt( latchedTeam ); //  int latchedTeam
+	savefile->ReadInt( tourneyRank ); //  int tourneyRank
+	savefile->ReadInt( tourneyLine ); //  int tourneyLine
+	savefile->ReadInt( spawnedTime ); //  int spawnedTime
+
+	savefile->ReadBool( carryingFlag ); //  bool carryingFlag
+
+
+	savefile->ReadObject( teleportEntity ); //  idEntityPtr<idEntity> teleportEntity
+	savefile->ReadInt( teleportKiller ); //  int teleportKiller
+	savefile->ReadBool( lastManOver ); //  bool lastManOver
+	savefile->ReadBool( lastManPlayAgain ); //  bool lastManPlayAgain
+	savefile->ReadBool( lastManPresent ); //  bool lastManPresent
+	savefile->ReadBool( isLagged ); //  bool isLagged
+	savefile->ReadBool( isChatting ); //  bool isChatting
+	savefile->ReadInt( minRespawnTime ); //  int minRespawnTime
+	savefile->ReadInt( maxRespawnTime ); //  int maxRespawnTime
+	savefile->ReadVec3( firstPersonViewOrigin ); //  idVec3 firstPersonViewOrigin
+	savefile->ReadMat3( firstPersonViewAxis ); //  idMat3 firstPersonViewAxis
+
+	dragEntity.Clear(); //  idDragEntity dragEntity // don't bother saving dragEntity since it's a dev tool
+
+
+	savefile->ReadObject( CastClassPtrRef(mountedObject) ); //  idFuncMountedObject	* mountedObject
+	enviroSuitLight.Restore( savefile ); //  idEntityPtr<idLight> enviroSuitLight
+
+
+	savefile->ReadFloat( new_g_damageScale ); //  float new_g_damageScale
+
+	savefile->ReadBool( bloomEnabled ); //  bool bloomEnabled
+	savefile->ReadFloat( bloomSpeed ); //  float bloomSpeed
+	savefile->ReadFloat( bloomIntensity ); //  float bloomIntensity
+
+	savefile->ReadBool( airless ); //  bool airless
+
+
+	savefile->ReadInt( currentWeaponSlot ); //  int currentWeaponSlot
+
+
+	savefile->ReadVec3( autoaimPos ); //  idVec3 autoaimPos
+
+
+	savefile->ReadBool( inDownedState ); //  bool inDownedState
+
+
+	savefile->ReadInt( fallenRollTimer ); //  int fallenRollTimer
+
+	mountedMech.Restore( savefile ); //  idEntityPtr<class idMech> mountedMech
+	savefile->ReadObject( CastClassPtrRef(mechCockpit) ); //  idAnimated * mechCockpit
+
+	savefile->ReadObject( autoaimEnt ); //  idEntityPtr<idEntity> autoaimEnt
+
+
+	savefile->ReadCheckSizeMarker();
+
+	//  idBodyDragger bodyDragger // blendo eric: gameedit only?
+	//  idRuler ruler // blendo eric: gameedit only?
+
+	savefile->ReadBool( inConfinedState ); //  bool inConfinedState
+	savefile->ReadBool( confinedStealthActive ); //  bool confinedStealthActive
+	savefile->ReadBool( lastConfinedState ); //  bool lastConfinedState
+	savefile->ReadBool( confinedAngleLock ); //  bool confinedAngleLock
+	savefile->ReadInt( confinedType ); //  int confinedType
+
+
+	savefile->ReadObject( peekObject ); //  idEntityPtr<idEntity> peekObject
+
+
+	reverbLocation = "default";  // const char * reverbLocation // blendo eric: regened
+
+	savefile->ReadBool( listenmodeActive ); //  bool listenmodeActive
+	savefile->ReadVec3( listenmodePos ); //  idVec3 listenmodePos
+	savefile->ReadInt( listenmodeVisualizerTime ); //  int listenmodeVisualizerTime
+
+
+	savefile->ReadUserInterface( eventlogMenu ); //  idUserInterface * eventlogMenu
+	savefile->ReadUserInterface( spectatorMenu ); //  idUserInterface * spectatorMenu
+
+	savefile->ReadUserInterface( levelselectMenu ); //  idUserInterface* levelselectMenu
+
+	// levelselectGuiList->Restore(savefile); //  idListGUI* levelselectGuiList
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadUserInterface( emailFullscreenMenu ); //  idUserInterface* emailFullscreenMenu
+	savefile->ReadInt( emailFullscreenState ); //  int emailFullscreenState
+
+	savefile->ReadInt( emailFullscreenTimer ); //  int emailFullscreenTimer
+	savefile->ReadObject( emailFullscreenEnt ); //  idEntityPtr<idEntity> emailFullscreenEnt
+	savefile->ReadAngles( emailFullscreenOriginalPlayerViewangle ); //  idAngles emailFullscreenOriginalPlayerViewangle
+	savefile->ReadBool( emailInSubMenu ); //  bool emailInSubMenu
+
+
+	meleeTarget.Restore( savefile ); //  idEntityPtr<idAI> meleeTarget
+
+
+	savefile->ReadBool( cond_gascloud ); //  bool cond_gascloud
+
+	SaveFileReadList(lostInSpaceEntityDefNums, ReadInt); //  idList<int> lostInSpaceEntityDefNums
+
+	savefile->ReadCheckSizeMarker();
+
+
+	savefile->ReadBool( wasCaughtEnteringCargoHide ); //  bool wasCaughtEnteringCargoHide
+
+
+	savefile->ReadBool( playerTouchedByCenterLight ); //  bool playerTouchedByCenterLight
+
+
+	savefile->ReadBool( isInVignette ); //  bool isInVignette
+
+
+	savefile->ReadBool( escapedFullScreenMenu ); //  bool escapedFullScreenMenu
+
+	savefile->ReadBool( isTitleFlyMode ); //  bool isTitleFlyMode
+	savefile->ReadBool( doForceSpatter ); //  bool doForceSpatter
+	savefile->ReadFloat( forceSpatterAmount ); //  float forceSpatterAmount
+
+	SaveFileReadList(tapesCollected, ReadInt);  //  idList<int> tapesCollected
+
+	savefile->ReadJoint( hipJoint ); //  saveJoint_t hipJoint
+	savefile->ReadJoint( chestJoint ); //  saveJoint_t chestJoint
+	savefile->ReadJoint( headJoint ); //  saveJoint_t headJoint
+
+	savefile->ReadStaticObject( physicsObj ); // idPhysics_Player physicsObj
+	bool restorePhys;
+	savefile->ReadBool( restorePhys );
+	if (restorePhys)
+	{
+		RestorePhysics( &physicsObj );
 	}
 
-	savefile->ReadUserInterface( hud );
-	savefile->ReadUserInterface( objectiveSystem );
-	savefile->ReadBool( objectiveSystemOpen );
-
-	savefile->ReadInt( weapon_soulcube );
-	savefile->ReadInt( weapon_pda );
-	savefile->ReadInt( weapon_fists );
-#ifdef _D3XP
-
-	savefile->ReadInt( hudPowerup );
-	savefile->ReadInt( lastHudPowerup );
-	savefile->ReadInt( hudPowerupDuration );
-
-
-#endif
-
-	savefile->ReadInt( heartRate );
-
-	savefile->ReadFloat( set );
-	heartInfo.SetStartTime( set );
-	savefile->ReadFloat( set );
-	heartInfo.SetDuration( set );
-	savefile->ReadFloat( set );
-	heartInfo.SetStartValue( set );
-	savefile->ReadFloat( set );
-	heartInfo.SetEndValue( set );
-
-	savefile->ReadInt( lastHeartAdjust );
-	savefile->ReadInt( lastHeartBeat );
-	savefile->ReadInt( lastDmgTime );
-	savefile->ReadInt( deathClearContentsTime );
-	savefile->ReadBool( doingDeathSkin );
-	savefile->ReadInt( lastArmorPulse );
-	savefile->ReadFloat( stamina );
-	savefile->ReadFloat( healthPool );
-	savefile->ReadInt( nextHealthPulse );
-	savefile->ReadBool( healthPulse );
-	savefile->ReadInt( nextHealthTake );
-	savefile->ReadBool( healthTake );
-
-	savefile->ReadBool( hiddenWeapon );
-	soulCubeProjectile.Restore( savefile );
-
-	savefile->ReadInt( spectator );
-	savefile->ReadVec3( colorBar );
-	savefile->ReadInt( colorBarIndex );
-	savefile->ReadBool( scoreBoardOpen );
-	savefile->ReadBool( forceScoreBoard );
-	savefile->ReadBool( forceRespawn );
-	savefile->ReadBool( spectating );
-	savefile->ReadInt( lastSpectateTeleport );
-	savefile->ReadBool( lastHitToggle );
-	savefile->ReadBool( forcedReady );
-	savefile->ReadBool( wantSpectate );
-	savefile->ReadBool( weaponGone );
-	savefile->ReadBool( useInitialSpawns );
-	savefile->ReadInt( latchedTeam );
-	savefile->ReadInt( tourneyRank );
-	savefile->ReadInt( tourneyLine );
-
-	teleportEntity.Restore( savefile );
-	savefile->ReadInt( teleportKiller );
-
-	savefile->ReadInt( minRespawnTime );
-	savefile->ReadInt( maxRespawnTime );
-
-	savefile->ReadVec3( firstPersonViewOrigin );
-	savefile->ReadMat3( firstPersonViewAxis );
-
-	// don't bother saving dragEntity since it's a dev tool
-	dragEntity.Clear();
-
-	savefile->ReadJoint( hipJoint );
-	savefile->ReadJoint( chestJoint );
-	savefile->ReadJoint( headJoint );
-
-	savefile->ReadStaticObject( physicsObj );
-	RestorePhysics( &physicsObj );
-
-	savefile->ReadInt( num );
-	aasLocation.SetGranularity( 1 );
+	savefile->ReadInt( num );  // idList<aasLocation_t>	aasLocation
 	aasLocation.SetNum( num );
-	for( i = 0; i < num; i++ ) {
+	aasLocation.SetGranularity(1);
+	for(int i = 0; i < num; i++ ) {
 		savefile->ReadInt( aasLocation[ i ].areaNum );
 		savefile->ReadVec3( aasLocation[ i ].pos );
 	}
 
-	savefile->ReadInt( bobFoot );
-	savefile->ReadFloat( bobFrac );
-	savefile->ReadFloat( bobfracsin );
-	savefile->ReadInt( bobCycle );
-	savefile->ReadFloat( xyspeed );
-	savefile->ReadInt( stepUpTime );
-	savefile->ReadFloat( stepUpDelta );
-	savefile->ReadFloat( stepUpCorrection );
-	savefile->ReadFloat( idealLegsYaw );
-	savefile->ReadFloat( legsYaw );
-	savefile->ReadBool( legsForward );
-	savefile->ReadFloat( oldViewYaw );
-	savefile->ReadAngles( viewBobAngles );
-	savefile->ReadVec3( viewBob );
-	savefile->ReadInt( landChange );
-	savefile->ReadInt( landTime );
+	savefile->ReadCheckSizeMarker();
 
-	savefile->ReadInt( currentWeaponSlot );
-	savefile->ReadInt( idealWeaponSlot );
-	savefile->ReadInt( previousWeaponSlot );
-	savefile->ReadInt( weaponSwitchTime );
-	savefile->ReadBool( weaponEnabled );
-	savefile->ReadBool( showWeaponViewModel );
+	savefile->ReadInt( bobFoot ); //  int bobFoot
+	savefile->ReadFloat( bobFrac ); //  float bobFrac
+	savefile->ReadFloat( bobfracsin ); //  float bobfracsin
+	savefile->ReadInt( bobCycle ); //  int bobCycle
+	savefile->ReadFloat( xyspeed ); //  float xyspeed
+	savefile->ReadInt( stepUpTime ); //  int stepUpTime
+	savefile->ReadFloat( stepUpDelta ); //  float stepUpDelta
+	savefile->ReadFloat( stepUpCorrection ); //  float stepUpCorrection
+	savefile->ReadFloat( idealLegsYaw ); //  float idealLegsYaw
+	savefile->ReadFloat( legsYaw ); //  float legsYaw
+	savefile->ReadBool( legsForward ); //  bool legsForward
+	savefile->ReadFloat( oldViewYaw ); //  float oldViewYaw
+	savefile->ReadAngles( viewBobAngles ); //  idAngles viewBobAngles
+	savefile->ReadVec3( viewBob ); //  idVec3 viewBob
+	savefile->ReadInt( landChange ); //  int landChange
+	savefile->ReadInt( landTime ); //  int landTime
 
-	savefile->ReadSkin( skin );
-	savefile->ReadSkin( powerUpSkin );
-	savefile->ReadString( baseSkinName );
 
-	savefile->ReadInt( numProjectilesFired );
-	savefile->ReadInt( numProjectileHits );
+	savefile->ReadInt( idealWeaponSlot ); //  int idealWeaponSlot
+	savefile->ReadInt( previousWeaponSlot ); //  int previousWeaponSlot
+	savefile->ReadInt( weaponSwitchTime ); //  int weaponSwitchTime
+	savefile->ReadBool( weaponEnabled ); //  bool weaponEnabled
+	savefile->ReadBool( showWeaponViewModel ); //  bool showWeaponViewModel
 
-	savefile->ReadBool( airless );
-	savefile->ReadFloat( airTics );
-	savefile->ReadInt( lastAirDamage );
+	savefile->ReadSkin( skin ); // const  idDeclSkin * skin
+	savefile->ReadSkin( powerUpSkin ); // const  idDeclSkin * powerUpSkin
+	savefile->ReadString( baseSkinName ); //  idString baseSkinName
 
-	savefile->ReadBool( gibDeath );
-	savefile->ReadBool( gibsLaunched );
-	savefile->ReadVec3( gibsDir );
+	savefile->ReadInt( numProjectilesFired ); //  int numProjectilesFired
+	savefile->ReadInt( numProjectileHits ); //  int numProjectileHits
 
-	savefile->ReadFloat( set );
-	zoomFov.SetStartTime( set );
-	savefile->ReadFloat( set );
-	zoomFov.SetDuration( set );
-	savefile->ReadFloat( set );
-	zoomFov.SetStartValue( set );
-	savefile->ReadFloat( set );
-	zoomFov.SetEndValue( set );
 
-	savefile->ReadFloat( set );
-	centerView.SetStartTime( set );
-	savefile->ReadFloat( set );
-	centerView.SetDuration( set );
-	savefile->ReadFloat( set );
-	centerView.SetStartValue( set );
-	savefile->ReadFloat( set );
-	centerView.SetEndValue( set );
+	savefile->ReadFloat( airTics ); //  float airTics
+	savefile->ReadInt( lastAirDamage ); //  int lastAirDamage
 
-	savefile->ReadBool( fxFov );
+	savefile->ReadBool( gibDeath ); //  bool gibDeath
+	savefile->ReadBool( gibsLaunched ); //  bool gibsLaunched
+	savefile->ReadVec3( gibsDir ); //  idVec3 gibsDir
 
-	savefile->ReadFloat( influenceFov );
-	savefile->ReadInt( influenceActive );
-	savefile->ReadFloat( influenceRadius );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( influenceEntity ) );
-	savefile->ReadMaterial( influenceMaterial );
-	savefile->ReadSkin( influenceSkin );
+	zoomFov.Restore(savefile); //  idInterpolate<float> zoomFov
+	centerView.Restore(savefile); //  idInterpolate<float> centerView
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( privateCameraView ) );
+	savefile->ReadBool( fxFov ); //  bool fxFov
 
-	for( i = 0; i < NUM_LOGGED_VIEW_ANGLES; i++ ) {
-		savefile->ReadAngles( loggedViewAngles[ i ] );
-	}
-	for( i = 0; i < NUM_LOGGED_ACCELS; i++ ) {
+	savefile->ReadFloat( influenceFov ); //  float influenceFov
+	savefile->ReadInt( influenceActive ); //  int influenceActive
+	savefile->ReadObject( influenceEntity ); //  idEntity * influenceEntity
+	savefile->ReadMaterial( influenceMaterial ); // const  idMaterial * influenceMaterial
+	savefile->ReadFloat( influenceRadius ); //  float influenceRadius
+	savefile->ReadSkin( influenceSkin ); // const  idDeclSkin * influenceSkin
+
+	savefile->ReadObject( reinterpret_cast<idClass*&>(privateCameraView) ); //  idCamera * privateCameraView
+
+	SaveFileReadArray(loggedViewAngles, ReadAngles); //  idAngles loggedViewAngles[NUM_LOGGED_VIEW_ANGLES];
+
+	savefile->ReadInt(num);
+	for( int i = 0; i < num; i++ ) { // loggedAccel_t loggedAccel[NUM_LOGGED_ACCELS];
 		savefile->ReadInt( loggedAccel[ i ].time );
 		savefile->ReadVec3( loggedAccel[ i ].dir );
 	}
-	savefile->ReadInt( currentLoggedAccel );
 
-	savefile->ReadObject( reinterpret_cast<idClass *&>( focusGUIent ) );
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( currentLoggedAccel ); //  int currentLoggedAccel
+	savefile->ReadObject( focusGUIent ); //  idEntity * focusGUIent
+	//savefile->ReadUserInterface( focusUI ); //  idUserInterface * focusUI 
+	// don't bother saving
 	// can't save focusUI
-	focusUI = NULL;
-	savefile->ReadObject( reinterpret_cast<idClass *&>( focusCharacter ) );
-	savefile->ReadInt( talkCursor );
-	savefile->ReadInt( focusTime );
-	savefile->ReadObject( reinterpret_cast<idClass *&>( focusVehicle ) );
-	savefile->ReadUserInterface( cursor );
+	//focusUI = NULL;
+	savefile->ReadObject( reinterpret_cast<idClass*&>(focusCharacter) ); //  idAI * focusCharacter
+	savefile->ReadInt( talkCursor ); //  int talkCursor
+	savefile->ReadInt( focusTime ); //  int focusTime
+	savefile->ReadObject( reinterpret_cast<idClass*&>(focusVehicle) ); //  idAFEntity_Vehicle * focusVehicle
+	savefile->ReadUserInterface( cursor ); //  idUserInterface * cursor
+	savefile->ReadInt( oldMouseX ); //  int oldMouseX
+	savefile->ReadInt( oldMouseY ); //  int oldMouseY
 
-	savefile->ReadInt( oldMouseX );
-	savefile->ReadInt( oldMouseY );
+	savefile->ReadString( pdaAudio ); //  idString pdaAudio
+	savefile->ReadString( pdaVideo ); //  idString pdaVideo
+	savefile->ReadString( pdaVideoWave ); //  idString pdaVideoWave
 
-	savefile->ReadString( pdaAudio );
-	savefile->ReadString( pdaVideo );
-	savefile->ReadString( pdaVideoWave );
+	savefile->ReadBool( tipUp ); //  bool tipUp
+	savefile->ReadBool( objectiveUp ); //  bool objectiveUp
 
-	savefile->ReadBool( tipUp );
-	savefile->ReadBool( objectiveUp );
+	savefile->ReadInt( lastDamageDef ); //  int lastDamageDef
+	savefile->ReadVec3( lastDamageDir ); //  idVec3 lastDamageDir
+	savefile->ReadInt( lastDamageLocation ); //  int lastDamageLocation
+	savefile->ReadInt( smoothedFrame ); //  int smoothedFrame
+	savefile->ReadBool( smoothedOriginUpdated ); //  bool smoothedOriginUpdated
+	savefile->ReadVec3( smoothedOrigin ); //  idVec3 smoothedOrigin
+	savefile->ReadAngles( smoothedAngles ); //  idAngles smoothedAngles
 
-	savefile->ReadInt( lastDamageDef );
-	savefile->ReadVec3( lastDamageDir );
-	savefile->ReadInt( lastDamageLocation );
-	savefile->ReadInt( smoothedFrame );
-	savefile->ReadBool( smoothedOriginUpdated );
-	savefile->ReadVec3( smoothedOrigin );
-	savefile->ReadAngles( smoothedAngles );
-
-	savefile->ReadBool( ready );
-	savefile->ReadBool( respawning );
-	savefile->ReadBool( leader );
-	savefile->ReadInt( lastSpectateChange );
-	savefile->ReadInt( lastTeleFX );
-
-	// set the pm_ cvars
-	const idKeyValue	*kv;
-	kv = spawnArgs.MatchPrefix( "pm_", NULL );
-	while( kv ) {
-		cvarSystem->SetCVarString( kv->GetKey(), kv->GetValue() );
-		kv = spawnArgs.MatchPrefix( "pm_", kv );
-	}
-
-	savefile->ReadFloat( set );
-	pm_stamina.SetFloat( set );
-
-	// create combat collision hull for exact collision detection
-	SetCombatModel();
-
-#ifdef _D3XP
 	int weaponToggleCount;
-	savefile->ReadInt(weaponToggleCount);
-	for(i = 0; i < weaponToggleCount; i++) {
+	savefile->ReadInt(weaponToggleCount); //  idHashTable<WeaponToggle_t> weaponToggles
+	for(int i = 0; i < weaponToggleCount; i++) {
 		WeaponToggle_t newToggle;
 		memset(&newToggle, 0, sizeof(newToggle));
 
@@ -4576,20 +5310,590 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 		}
 		weaponToggles.Set(newToggle.name, newToggle);
 	}
-	savefile->ReadObject(reinterpret_cast<idClass *&>(mountedObject));
-	enviroSuitLight.Restore( savefile );
-	
-	
-	
-	savefile->ReadFloat( new_g_damageScale );
 
-	savefile->ReadBool( bloomEnabled );
-	savefile->ReadFloat( bloomSpeed );
-	savefile->ReadFloat( bloomIntensity );
-#endif
 
-	savefile->ReadBool( toggleCrouch );
-	savefile->ReadInt( teleportCrouchTime );
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadInt( hudPowerup ); //  int hudPowerup
+	savefile->ReadInt( lastHudPowerup ); //  int lastHudPowerup
+	savefile->ReadInt( hudPowerupDuration ); //  int hudPowerupDuration
+
+	savefile->ReadBool( ready ); //  bool ready
+	savefile->ReadBool( respawning ); //  bool respawning
+	savefile->ReadBool( leader ); //  bool leader
+	savefile->ReadInt( lastSpectateChange ); //  int lastSpectateChange
+	savefile->ReadInt( lastTeleFX ); //  int lastTeleFX
+	savefile->ReadUInt( lastSnapshotSequence ); //unsigned int lastSnapshotSequence
+	savefile->ReadBool( weaponCatchup ); //  bool weaponCatchup
+	savefile->ReadInt( MPAim ); //  int MPAim
+	savefile->ReadInt( lastMPAim ); //  int lastMPAim
+	savefile->ReadInt( lastMPAimTime ); //  int lastMPAimTime
+	savefile->ReadInt( MPAimFadeTime ); //  int MPAimFadeTime
+	savefile->ReadBool( MPAimHighlight ); //  bool MPAimHighlight
+	savefile->ReadBool( isTelefragged ); //  bool isTelefragged
+
+	// idPlayerIcon playerIcon  // blendo eric: for multiplayer only?
+	//savefile->ReadInt( reinterpret_cast<int&>(playerIcon.iconType) );
+	//savefile->ReadRenderEntity( playerIcon.renderEnt );
+	//savefile->ReadInt( playerIcon.iconHandle );
+
+	savefile->ReadBool( selfSmooth ); //  bool selfSmooth
+
+	savefile->ReadInt( num ); //  idHashTable<int> voIntervalTable
+	for (int idx = 0; idx < num; idx++) {
+		idStr outKey;
+		int outVal;
+		savefile->ReadString( outKey );
+		savefile->ReadInt( outVal );
+		voIntervalTable.Set( outKey, outVal);
+	}
+
+	savefile->ReadCheckSizeMarker();
+
+	savefile->ReadUserInterface( contextMenu ); //  idUserInterface * contextMenu
+	savefile->ReadBool( contextMenuActive ); //  bool contextMenuActive
+	savefile->ReadFloat( contextMenuSoundSpeed ); //  float contextMenuSoundSpeed
+	savefile->ReadInt( soundSlowmoHandle ); //  int soundSlowmoHandle
+	savefile->ReadBool( soundSlowmoActive ); //  bool soundSlowmoActive
+
+
+	savefile->ReadInt( nextContextMenuAvailableTime ); //  int nextContextMenuAvailableTime
+	savefile->ReadInt( nextContextMenuCloseTime ); //  int nextContextMenuCloseTime
+	savefile->ReadInt( contextMenuForbiddenAlertTimer ); //  int contextMenuForbiddenAlertTimer
+	savefile->ReadInt( contextMenuState ); //  int contextMenuState
+	savefile->ReadInt( contextmenuStartTime ); //  int contextmenuStartTime
+	savefile->ReadVec3( viewposTargetOffset ); //  idVec3 viewposTargetOffset
+	savefile->ReadVec3( viewposOffset ); //  idVec3 viewposOffset
+	savefile->ReadInt( viewposState ); //  int viewposState
+	savefile->ReadInt( viewposStarttime ); //  int viewposStarttime
+	savefile->ReadVec3( viewposAbsStart ); //  idVec3 viewposAbsStart
+	savefile->ReadVec3( viewposAbsTarget ); //  idVec3 viewposAbsTarget
+	savefile->ReadBool( viewposAbsActive ); //  bool viewposAbsActive
+	savefile->ReadInt( viewposAbsTimer ); //  int viewposAbsTimer
+	savefile->ReadInt( viewposAbsDuration ); //  int viewposAbsDuration
+	savefile->ReadFloat( viewyawStartAngle ); //  float viewyawStartAngle
+	savefile->ReadFloat( viewyawTargetAngle ); //  float viewyawTargetAngle
+	savefile->ReadFloat( viewyawStarttime ); //  float viewyawStarttime
+	savefile->ReadInt( viewyawState ); //  int viewyawState
+	savefile->ReadInt( viewyawMovetime ); //  int viewyawMovetime
+	savefile->ReadFloat( viewpitchStartAngle ); //  float viewpitchStartAngle
+	savefile->ReadFloat( viewpitchTargetAngle ); //  float viewpitchTargetAngle
+	savefile->ReadFloat( viewpitchStarttime ); //  float viewpitchStarttime
+	savefile->ReadInt( viewpitchState ); //  int viewpitchState
+	savefile->ReadFloat( viewrollStartAngle ); //  float viewrollStartAngle
+	savefile->ReadFloat( viewrollTargetAngle ); //  float viewrollTargetAngle
+	savefile->ReadFloat( viewrollStarttime ); //  float viewrollStarttime
+	savefile->ReadInt( viewrollState ); //  int viewrollState
+	savefile->ReadInt( viewrollMovetime ); //  int viewrollMovetime
+	savefile->ReadInt( leanState ); //  int leanState
+	savefile->ReadFloat( leanAmountX ); //  float leanAmountX
+	savefile->ReadFloat( leanAmountY ); //  float leanAmountY
+	savefile->ReadFloat( lastLeanMouseX ); //  float lastLeanMouseX
+	savefile->ReadFloat( lastLeanMouseY ); //  float lastLeanMouseY
+	savefile->ReadFloat( lastLeanTime ); //  float lastLeanTime
+	savefile->ReadFloat( lastLeanRoll ); //  float lastLeanRoll
+	savefile->ReadVec3( lastLeanOffset ); //  idVec3 lastLeanOffset
+
+	savefile->ReadInt( staminaChargeDelayTimer ); //  int staminaChargeDelayTimer
+	savefile->ReadInt( staminaHideTimer ); //  int staminaHideTimer
+	savefile->ReadInt( staminaHideDelayMode ); //  int staminaHideDelayMode
+
+	savefile->ReadInt( confinedstateTimer ); //  int confinedstateTimer
+	savefile->ReadFloat( confinedAngle ); //  float confinedAngle
+
+
+	savefile->ReadInt( confinedDustTimer ); //  int confinedDustTimer
+
+	savefile->ReadBool( viewYawLocked ); //  bool viewYawLocked
+	savefile->ReadFloat( viewYawLockAngle ); //  float viewYawLockAngle
+	savefile->ReadFloat( viewYawLockArcsize ); //  float viewYawLockArcsize
+	savefile->ReadBool( viewPitchLocked ); //  bool viewPitchLocked
+	savefile->ReadFloat( viewPitchLockAngle ); //  float viewPitchLockAngle
+	savefile->ReadFloat( viewPitchLockArcsize ); //  float viewPitchLockArcsize
+
+	savefile->ReadBool( bodyAngleLocked ); //  bool bodyAngleLocked
+
+
+	savefile->ReadObject( carryableItem ); //  idEntityPtr<idEntity> carryableItem
+	savefile->ReadInt( lastLeanState ); //  int lastLeanState
+	savefile->ReadInt( leanCarryableTimer ); //  int leanCarryableTimer
+
+
+	savefile->ReadObject( frobEnt ); //  idEntity * frobEnt
+	savefile->ReadInt( frobState ); //  int frobState
+	savefile->ReadInt( lastFrobNumber ); //  int lastFrobNumber
+	savefile->ReadVec3( frobHitpos ); //  idVec3 frobHitpos
+	savefile->ReadInt( frobFlashTimer ); //  int frobFlashTimer
+	savefile->ReadFloat( frobHoldTimer ); //  float frobHoldTimer
+
+
+	savefile->ReadVec2( autoaimDefaultPosition ); //  idVec2 autoaimDefaultPosition
+	savefile->ReadFloat( autoaimDotTimer ); //  float autoaimDotTimer
+	savefile->ReadInt( lastAutoaimEntNum ); //  int lastAutoaimEntNum
+	savefile->ReadInt( autoaimDotState ); //  int autoaimDotState
+	savefile->ReadInt( lastAutoaimDotState ); //  int lastAutoaimDotState
+
+	savefile->ReadVec2( autoaimDotPosition ); //  idVec2 autoaimDotPosition
+	savefile->ReadVec2( autoaimDotStartPos ); //  idVec2 autoaimDotStartPos
+	savefile->ReadVec2( autoaimDotEndPos ); //  idVec2 autoaimDotEndPos
+
+	SaveFileReadArray(damageArrowPosition, ReadVec3); //  idVec3 damageArrowPosition[DAMAGEARROW_COUNT]
+	SaveFileReadArray(damageArrowTimers, ReadInt); // int damageArrowTimers[DAMAGEARROW_COUNT]
+
+	savefile->ReadInt( deathTimer ); //  int deathTimer
+
+	savefile->ReadInt( rackslideButtonTimer ); //  int rackslideButtonTimer
+	savefile->ReadInt( reloadButtonTimer ); //  int reloadButtonTimer
+
+	savefile->ReadInt( healthrechargeTimer ); //  int healthrechargeTimer
+	savefile->ReadInt( healthDeclineTimer ); //  int healthDeclineTimer
+	savefile->ReadBool( readyForHealthrechargeSound ); //  bool readyForHealthrechargeSound
+
+	savefile->ReadInt( lastHealthValue ); //  int lastHealthValue
+	savefile->ReadInt( lastHealthTimer ); //  int lastHealthTimer
+	savefile->ReadInt( lastHealthState ); //  int lastHealthState
+	savefile->ReadFloat( lastHealthDisplayvalue ); //  float lastHealthDisplayvalue
+
+
+	savefile->ReadInt( cond_burnwound ); //  int cond_burnwound
+	savefile->ReadInt( burningTimer ); //  int burningTimer
+	savefile->ReadInt( burningDOTTimer ); //  int burningDOTTimer
+	savefile->ReadInt( lastBurnwoundTime ); //  int lastBurnwoundTime
+
+
+	savefile->ReadInt( lastChemDamageTime ); //  int lastChemDamageTime
+	savefile->ReadInt( playerInChemTimer ); //  int playerInChemTimer
+
+	savefile->ReadInt( cond_glasswound ); //  int cond_glasswound
+	savefile->ReadInt( glasswoundMoveTimer ); //  int glasswoundMoveTimer
+	savefile->ReadInt( glasswoundFoot ); //  int glasswoundFoot
+	savefile->ReadInt( lastGlasswoundTime ); //  int lastGlasswoundTime
+
+	savefile->ReadInt( cond_spearwound ); //  int cond_spearwound
+
+	savefile->ReadInt( cond_bulletwound ); //  int cond_bulletwound
+	savefile->ReadInt( lastBulletwoundTimer ); //  int lastBulletwoundTimer
+
+	savefile->ReadInt( cond_shrapnel ); //  int cond_shrapnel
+
+	savefile->ReadInt( cond_smelly ); //  int cond_smelly
+	savefile->ReadInt( smellyTimer ); //  int smellyTimer
+	savefile->ReadVec3( lastSmellPosition ); //  idVec3 lastSmellPosition
+
+
+	savefile->ReadInt( sneezeValue ); //  int sneezeValue
+	savefile->ReadVec3( lastPlayerPosition ); //  idVec3 lastPlayerPosition
+	savefile->ReadInt( nextSneezeTimer ); //  int nextSneezeTimer
+	savefile->ReadInt( sneezeState ); //  int sneezeState
+	savefile->ReadInt( sneezeUpdateTimer ); //  int sneezeUpdateTimer
+	savefile->ReadInt( sneezeVOTimer ); //  int sneezeVOTimer
+
+
+	savefile->ReadInt( healthFadeTimer ); //  int healthFadeTimer
+	savefile->ReadBool( healthFadeMaxedBool ); //  bool healthFadeMaxedBool
+	savefile->ReadBool( healthbarIsFaded ); //  bool healthbarIsFaded
+
+
+	savefile->ReadInt( healthDamageFlashTimer ); //  int healthDamageFlashTimer
+
+
+	savefile->ReadInt( healState ); //  int healState
+	savefile->ReadInt( healbarTotalTime ); //  int healbarTotalTime
+	savefile->ReadInt( healbarStartTime ); //  int healbarStartTime
+
+
+	savefile->ReadInt( footBloodDecalCount ); //  int footBloodDecalCount
+
+
+	savefile->ReadInt( lastAcroState ); //  int lastAcroState
+
+	// const  idDict * spitDef // blendo eric: can be regened?
+	// const  idDict * bloodspitDef // blendo eric: can be regened?
+
+	spitDef = gameLocal.FindEntityDefDict(spawnArgs.GetString("def_spit", "projectile_spit"), false);
+	bloodspitDef = gameLocal.FindEntityDefDict(spawnArgs.GetString("def_bloodspit", "projectile_bloodspit"), false);
+
+	savefile->ReadInt( downedTickTimer ); //  int downedTickTimer
+	savefile->ReadInt( downedDecalTimer ); //  int downedDecalTimer
+	savefile->ReadVec3( lastDownedPlayerPosition ); //  idVec3 lastDownedPlayerPosition
+
+	SaveFileReadArray(noiseEventPos, ReadVec3); // idVec3 noiseEventPos[NOISEEVENT_COUNT]
+	SaveFileReadArray(noiseEventTimer, ReadInt); // int noiseEventTimer[NOISEEVENT_COUNT];
+	SaveFileReadArray(noiseEventType, ReadInt); // int noiseEventTimer[NOISEEVENT_COUNT];
+
+	savefile->ReadInt( deafenState ); //  int deafenState
+	savefile->ReadInt( deafenTimer ); //  int deafenTimer
+
+	savefile->ReadVec3( lastAttackDir ); //  idVec3 lastAttackDir
+
+
+	savefile->ReadInt( lastTargetHeartRate ); //  int lastTargetHeartRate
+
+	savefile->ReadInt( lastHeartVolumeAdjust ); //  int lastHeartVolumeAdjust
+	savefile->ReadFloat( heartVolume ); //  float heartVolume
+	savefile->ReadBool( heartbeatEnabled ); //  bool heartbeatEnabled
+
+	savefile->ReadInt( savingthrowState ); //  int savingthrowState
+
+	savefile->ReadInt( grenadeButtonTimer ); //  int grenadeButtonTimer
+	savefile->ReadInt( grenadeThrowState ); //  int grenadeThrowState
+	savefile->ReadBool( shouldDrawThrowArc ); //  bool shouldDrawThrowArc
+	savefile->ReadBool( lastThrowArcState ); //  bool lastThrowArcState
+
+	SaveFileReadArray((idClass*&)throwBeamOrigin, ReadObject); // idBeam* throwBeamOrigin[THROWARC_BEAMCOUNT]
+	SaveFileReadArray((idClass*&)throwBeamTarget, ReadObject); // idBeam* throwBeamTarget[THROWARC_BEAMCOUNT]
+
+	savefile->ReadObject( throwdisc ); //  idEntity* throwdisc
+
+	//  idODE* throwPredictionIntegrator // eric blendo: setup in constructor, regened later
+
+	//savefile->ReadObject( reinterpret_cast<idClass*&>(throwWeaponPhysicsObj) ); //  idPhysics_RigidBody* throwWeaponPhysicsObj
+	savefile->ReadObject( CastClassPtrRef(throwPredictionModel) ); //  idEntity* throwPredictionModel
+	savefile->ReadTrace( throwarcCollision ); //  trace_t throwarcCollision
+
+
+	savefile->ReadObject( placerEnt );
+	savefile->ReadObject( placerEntLine );
+	savefile->ReadObject( placerEntArrow );
+	savefile->ReadBool( placerClearance ); //  bool placerClearance
+	savefile->ReadInt( placerEntityNumber ); //  int placerEntityNumber
+	savefile->ReadInt( placerEntityCollisionID ); //  int placerEntityCollisionID
+
+	savefile->ReadInt( buttonpromptType ); //  int buttonpromptType
+	savefile->ReadInt( buttonpromptTimer ); //  int buttonpromptTimer
+
+
+	savefile->ReadInt( viewpitchTransitionTime ); //  int viewpitchTransitionTime
+
+	savefile->ReadBool( defibAvailable ); //  bool defibAvailable
+	savefile->ReadInt( defibState ); //  int defibState
+	savefile->ReadInt( defibTimer ); //  int defibTimer
+	savefile->ReadObject( defibCamera ); //  idEntity * defibCamera
+	savefile->ReadObject( defibMover ); //  idEntity * defibMover
+	savefile->ReadObject( defibCameraTarget ); //  idEntity * defibCameraTarget
+	savefile->ReadBool( defibFadeDone ); //  bool defibFadeDone
+	savefile->ReadFloat( defibYaw ); //  float defibYaw
+	savefile->ReadBool( defibParticleDone ); //  bool defibParticleDone
+	savefile->ReadInt( defibParticleTimer ); //  int defibParticleTimer
+	savefile->ReadInt( defibButtonTimer ); //  int defibButtonTimer
+	savefile->ReadInt( defibButtonCount ); //  int defibButtonCount
+	savefile->ReadBool( defibButtonState ); //  bool defibButtonState
+
+	savefile->ReadUserInterface( videoMenu ); //  idUserInterface * videoMenu
+	savefile->ReadUserInterface( cameraGuiMenu ); //  idUserInterface* cameraGuiMenu
+
+	savefile->ReadInt( lastBaffleState ); //  int lastBaffleState
+
+	savefile->ReadFloat( currentYawDelta ); //  float currentYawDelta
+
+	savefile->ReadInt( bloodbagState ); //  int bloodbagState
+	savefile->ReadObject( CastClassPtrRef(bloodbagMesh) ); //  idAnimated * bloodbagMesh
+	savefile->ReadInt( bloodbagTimer ); //  int bloodbagTimer
+	savefile->ReadInt( bloodbagMaxTime ); //  int bloodbagMaxTime
+	savefile->ReadInt( bloodbagHealth ); //  int bloodbagHealth
+	savefile->ReadParticle( bloodbagParticles ); // const  idDeclParticle * bloodbagParticles
+	savefile->ReadInt( bloodbagParticleFlytime ); //  int bloodbagParticleFlytime
+	savefile->ReadJoint( bloodbagJoint ); //  saveJoint_t bloodbagJoint
+	savefile->ReadObject( CastClassPtrRef(bloodbagEmitter) ); // idFuncEmitter *bloodbagEmitter
+	savefile->ReadInt( bloodbagDamageTimer ); //  int bloodbagDamageTimer
+	savefile->ReadInt( bloodbagHealthFXState ); //  int bloodbagHealthFXState
+
+	savefile->ReadFloat( luminance ); //  float luminance
+	savefile->ReadInt( lastLuminanceUpdate ); //  int lastLuminanceUpdate
+	lightProbe.Restore( savefile ); //  idEntityPtr<idStaticEntity> lightProbe
+
+	savefile->ReadInt( lastLuminanceState ); //  int lastLuminanceState
+	savefile->ReadInt( luminanceState ); //  int luminanceState
+
+
+	savefile->ReadInt( mechTransitionState ); //  int mechTransitionState
+
+	savefile->ReadInt( mechTransitionTimer ); //  int mechTransitionTimer
+	savefile->ReadVec3( mechplayerStartPos ); //  idVec3 mechplayerStartPos
+	savefile->ReadBool( mechStartupstate ); //  bool mechStartupstate
+	savefile->ReadInt( mechStartupTimer ); //  int mechStartupTimer
+
+
+	savefile->ReadInt( mechSpeedTimer ); //  int mechSpeedTimer
+
+
+	savefile->ReadInt( beaconUITimer ); //  int beaconUITimer
+	savefile->ReadString( beaconCode ); //  idString beaconCode
+	savefile->ReadInt( codeStartTime ); //  int codeStartTime
+	savefile->ReadBool( isEnteringCode ); //  bool isEnteringCode
+	savefile->ReadBool( signalLock ); //  bool signalLock
+	savefile->ReadInt( lastSignalLockUpdate ); //  int lastSignalLockUpdate
+	savefile->ReadVec3( lastBeaconPosition ); //  idVec3 lastBeaconPosition
+	savefile->ReadBool( beaconFlashState ); //  bool beaconFlashState
+	savefile->ReadInt( beaconFlashTimer ); //  int beaconFlashTimer
+	savefile->ReadBool( beaconUIBlink ); //  bool beaconUIBlink
+	savefile->ReadInt( beaconUIBlinkTimer ); //  int beaconUIBlinkTimer
+	savefile->ReadInt( beaconLingerTimer ); //  int beaconLingerTimer
+	savefile->ReadInt( beaconLastStrength ); //  int beaconLastStrength
+	savefile->ReadBool( beaconLastVertArrows ); //  bool beaconLastVertArrows
+
+
+	savefile->ReadInt( nextAttackTime ); //  int nextAttackTime
+
+
+	savefile->ReadInt( confinedlimitsoundTimer ); //  int confinedlimitsoundTimer
+	savefile->ReadInt( confinedRustlesoundTimer ); //  int confinedRustlesoundTimer
+	savefile->ReadVec3( confinedRustlesoundLastPos ); //  idVec3 confinedRustlesoundLastPos
+
+	savefile->ReadBool( playingSuspicionSound ); //  bool playingSuspicionSound
+
+	savefile->ReadInt( ventpeekRustleTimer ); //  int ventpeekRustleTimer
+
+	savefile->ReadObject( smellyInterestpoint ); //  idEntityPtr<idEntity> smellyInterestpoint
+
+
+	savefile->ReadBool( lastListenmodeActive ); //  bool lastListenmodeActive
+	savefile->ReadBool( listenProbemodeActive ); //  bool listenProbemodeActive
+	savefile->ReadInt( listenProbeTimer ); //  int listenProbeTimer
+
+	savefile->ReadInt( lastLocationEntityNum ); //  int lastLocationEntityNum
+
+	savefile->ReadBool( didInitialSpawn ); //  bool didInitialSpawn
+
+
+	savefile->ReadInt( spaceparticleTimer ); //  int spaceparticleTimer
+	savefile->ReadBool( forceSpaceParticles ); //  bool forceSpaceParticles
+
+	savefile->ReadInt( lastSelectedHotbarslot ); //  int lastSelectedHotbarslot
+
+
+	savefile->ReadBool( eventlogMenuActive ); //  bool eventlogMenuActive
+
+	savefile->ReadBool( levelselectMenuActive ); //  bool levelselectMenuActive
+
+	savefile->ReadBool( carryableBashActive ); //  bool carryableBashActive
+	savefile->ReadInt( carryableBashTimer ); //  int carryableBashTimer
+
+	savefile->ReadBool( zoommodeActive ); //  bool zoommodeActive
+	savefile->ReadInt( zoombuttonTimer ); //  int zoombuttonTimer
+	savefile->ReadBool( zoomWaitingForInitialRelease ); //  bool zoomWaitingForInitialRelease
+	savefile->ReadBool( zoomManualInspect ); //  bool zoomManualInspect
+
+	savefile->ReadInt( impactslowmoTimer ); //  int impactslowmoTimer
+	savefile->ReadBool( impactslowmoActive ); //  bool impactslowmoActive
+
+
+	savefile->ReadBool( lastRulerState ); //  bool lastRulerState
+
+	savefile->ReadObject( trashchuteFocus ); //  idEntityPtr<idEntity> trashchuteFocus
+
+	savefile->ReadInt( weaponselectPauseTimer ); //  int weaponselectPauseTimer
+	savefile->ReadBool( isWeaponselectPaused ); //  bool isWeaponselectPaused
+
+	savefile->ReadBool( healthcloudActive ); //  bool healthcloudActive
+	savefile->ReadInt( healthcloudTimer ); //  int healthcloudTimer
+
+	savefile->ReadInt( mushroomDisplayTimer ); //  int mushroomDisplayTimer
+
+	savefile->ReadInt( zoomCurrentFOV ); //  int zoomCurrentFOV
+
+	savefile->ReadBool( scriptedBlur ); //  bool scriptedBlur
+
+	SaveFileReadArray( (int&)flytext, ReadInt ); // flyTextEvent_t flytext[FLYTEXT_COUNT];
+
+	savefile->ReadBool( armstatsActive ); //  bool armstatsActive
+	savefile->ReadObject( CastClassPtrRef(armstatsModel)); //  idAnimatedEntity* armstatsModel
+
+	savefile->ReadInt( armstatsState ); //  int armstatsState
+	savefile->ReadInt( armstatsTimer ); //  int armstatsTimer
+
+	savefile->ReadInt( armstatMode ); //  int armstatMode
+
+	savefile->ReadBool( oxygenmeterIsFaded ); //  bool oxygenmeterIsFaded
+	savefile->ReadInt( oxygenmeterFadeTimer ); //  int oxygenmeterFadeTimer
+
+	savefile->ReadInt( oxygenFreezeTimer ); //  int oxygenFreezeTimer
+	savefile->ReadBool( cameraspliceActive ); //  bool cameraspliceActive
+	savefile->ReadInt( cameraspliceChannel ); //  int cameraspliceChannel
+	savefile->ReadInt( nextCameraspliceChannelTime ); //  int nextCameraspliceChannelTime
+	savefile->ReadBool( inputReadyForTakedown ); //  bool inputReadyForTakedown
+	savefile->ReadInt( jockeyState ); //  int jockeyState
+
+	savefile->ReadObject( jockeyArrow ); //  idEntity * jockeyArrow
+	savefile->ReadVec3( jockeyJointIdlePos ); //  idVec3 jockeyJointIdlePos
+	savefile->ReadQuat( jockeyJointIdleRot ); //  idQuat jockeyJointIdleRot
+	savefile->ReadVec3( jockeyJointModPos ); //  idVec3 jockeyJointModPos
+	savefile->ReadQuat( jockeyJointModRot ); //  idQuat jockeyJointModRot
+
+	savefile->ReadInt( jockeyTimer ); //  int jockeyTimer
+	savefile->ReadInt( lastAvailableJockeyAttacktype ); //  int lastAvailableJockeyAttacktype
+
+
+	savefile->ReadInt( spectateTimer ); //  int spectateTimer
+	savefile->ReadInt( spectateState ); //  int spectateState
+
+	savefile->ReadInt( eliminationCounter ); //  int eliminationCounter
+
+	savefile->ReadBool( toggleCrouch ); //  bool toggleCrouch
+	savefile->ReadInt( teleportCrouchTime ); //  int teleportCrouchTime
+
+
+	savefile->ReadObject( tele_ui_entity ); //  idEntity* tele_ui_entity
+	savefile->ReadObject( tele_ui_disc ); //  idEntity* tele_ui_disc
+
+	savefile->ReadInt( gascloud_timer ); //  int gascloud_timer
+	savefile->ReadInt( gascloud_coughtimer ); //  int gascloud_coughtimer
+
+
+	savefile->ReadInt( isFrozen ); //  int isFrozen
+
+
+	savefile->ReadFloat( fovLerpStart ); //  float fovLerpStart
+	savefile->ReadFloat( fovLerpEnd ); //  float fovLerpEnd
+	savefile->ReadFloat( fovLerpCurrent ); //  float fovLerpCurrent
+	savefile->ReadInt( fovLerpTimer ); //  int fovLerpTimer
+	savefile->ReadInt( fovLerpStartTime ); //  int fovLerpStartTime
+	savefile->ReadInt( fovLerpState ); //  int fovLerpState
+
+	savefile->ReadBool( playerCanFrob ); //  bool playerCanFrob
+
+	savefile->ReadInt( inspectLerpTimer ); //  int inspectLerpTimer
+	savefile->ReadInt( inspectLerpState ); //  int inspectLerpState
+
+
+	savefile->ReadInt( coins ); //  int coins
+
+	savefile->ReadInt( exitLevelHoldTimer ); //  int exitLevelHoldTimer
+	savefile->ReadBool( exitLevelButtonAvailable ); //  bool exitLevelButtonAvailable
+
+	savefile->ReadBool( postgameLoadButtonAvailable ); //  bool postgameLoadButtonAvailable
+
+
+	savefile->ReadInt( knockeddownLastSpeed ); //  int knockeddownLastSpeed
+
+
+	savefile->ReadObject( lastPlayerLookTrigger ); //  idEntityPtr<idEntity> lastPlayerLookTrigger
+
+
+	savefile->ReadInt( currentlyActiveEmailInbox ); //  int currentlyActiveEmailInbox
+	savefile->ReadInt( activeEmailInboxTimer ); //  int activeEmailInboxTimer
+	savefile->ReadBool( emailInboxCheckActive ); //  bool emailInboxCheckActive
+	savefile->ReadString( emailReplyFunc1 ); //  idString emailReplyFunc1
+	savefile->ReadString( emailReplyFunc2 ); //  idString emailReplyFunc2
+
+	savefile->ReadObject( zoominspectEntityPtr ); //  idEntityPtr<idEntity> zoominspectEntityPtr
+	savefile->ReadBool( zoominspect_LabelmodeActive ); //  bool zoominspect_LabelmodeActive
+	savefile->ReadVec3( zoominspect_LabelmodePosition ); //  idVec3 zoominspect_LabelmodePosition
+	savefile->ReadAngles( zoominspect_LabelmodeAngle ); //  idAngles zoominspect_LabelmodeAngle
+	savefile->ReadInt( zoominspect_previousEntNum ); //  int zoominspect_previousEntNum
+	savefile->ReadBool( zoominspect_lerpDone ); //  bool zoominspect_lerpDone
+
+
+	savefile->ReadInt( zoominspect_lerptimer ); //  int zoominspect_lerptimer
+	savefile->ReadVec3( zoominspect_lerpStartPos ); //  idVec3 zoominspect_lerpStartPos
+	savefile->ReadAngles( zoominspect_lerpStartAngle ); //  idAngles zoominspect_lerpStartAngle
+
+	SaveFileReadArray(woundArray, ReadBool) // bool woundArray[WOUNDCOUNT_MAX];
+
+	savefile->ReadBool( throwarcDropMode ); //  bool throwarcDropMode
+	savefile->ReadBool( lastThrowarcDropMode ); //  bool lastThrowarcDropMode
+
+	savefile->ReadInt( vo_chamberchecktimer ); //  int vo_chamberchecktimer
+	savefile->ReadBool( hasSaidChambercheckVO ); //  bool hasSaidChambercheckVO
+
+	savefile->ReadInt( vo_reloadchecktimer ); //  int vo_reloadchecktimer
+	savefile->ReadBool( hasSaidReloadcheckVO ); //  bool hasSaidReloadcheckVO
+
+
+	savefile->ReadInt( pickpocketPipCount ); //  int pickpocketPipCount
+	savefile->ReadInt( pickpocketPipTimer ); //  int pickpocketPipTimer
+	savefile->ReadBool( pickpocketGoodRange ); //  bool pickpocketGoodRange
+	savefile->ReadBool( lastPickpocketGoodRange ); //  bool lastPickpocketGoodRange
+
+	savefile->ReadInt( pickpocketState ); //  int pickpocketState
+	savefile->ReadObject( pickpocketEnt ); //  idEntityPtr<idEntity> pickpocketEnt
+
+	savefile->ReadInt( statsPickpocketAttempts ); //  int statsPickpocketAttempts
+	savefile->ReadInt( statsPickpocketSuccesses ); //  int statsPickpocketSuccesses
+
+
+	savefile->ReadInt( armstatDoorlockUpdateTimer ); //  int armstatDoorlockUpdateTimer
+	savefile->ReadBool( armstatDoorlockNeedsUpdate ); //  bool armstatDoorlockNeedsUpdate
+
+	savefile->ReadInt( armstatFuseboxUpdateTimer ); //  int armstatFuseboxUpdateTimer
+	savefile->ReadBool( armstatFuseboxNeedsUpdate ); //  bool armstatFuseboxNeedsUpdate
+
+
+	savefile->ReadInt( cryoexitEntNum ); //  int cryoexitEntNum
+
+
+	savefile->ReadInt( memorypalaceState ); //  int memorypalaceState
+	savefile->ReadInt( memorypalaceTimer ); //  int memorypalaceTimer
+	savefile->ReadVec3( memorypalacePlayerPos ); //  idVec3 memorypalacePlayerPos
+	savefile->ReadVec3( memorypalaceForwardView ); //  idVec3 memorypalaceForwardView
+
+	savefile->ReadBool( ingresspointsDrawActive ); //  bool ingresspointsDrawActive
+
+	savefile->ReadInt( staminaThrowTimer ); //  int staminaThrowTimer
+
+	savefile->ReadInt( damageTaken ); //  int damageTaken
+	savefile->ReadInt( enemiesPounced ); //  int enemiesPounced
+	savefile->ReadInt( brutalslams ); //  int brutalslams
+	savefile->ReadInt( enemyrespawns ); //  int enemyrespawns
+
+	savefile->ReadBool( iteminspectActive ); //  bool iteminspectActive
+	savefile->ReadInt( iteminspectFOV ); //  int iteminspectFOV
+
+
+	savefile->ReadInt( levelProgressIndex ); //  int levelProgressIndex
+
+
+	savefile->ReadBool( isFallDamageImmune ); //  bool isFallDamageImmune
+
+
+	savefile->ReadBool( spectateUIActive ); //  bool spectateUIActive
+	savefile->ReadBool( spectateStatsActive ); //  bool spectateStatsActive
+
+	savefile->ReadObject( spectateTimelineEnt ); //  idEntity* spectateTimelineEnt
+
+
+	savefile->ReadObject( CastClassPtrRef( ninaOrgansModel ) ); //  idAnimatedEntity* ninaOrgansModel
+	savefile->ReadVec3( ninaOrgansPosStart ); //  idVec3 ninaOrgansPosStart
+	savefile->ReadVec3( ninaOrgansPosEnd ); //  idVec3 ninaOrgansPosEnd
+	savefile->ReadInt( ninaOrgansTimer ); //  int ninaOrgansTimer
+
+
+	savefile->ReadBool( roqVideoStateActive ); //  bool roqVideoStateActive
+
+
+	savefile->ReadInt( particlestreamTimer ); //  int particlestreamTimer
+	savefile->ReadVec3( particleStreamDestination ); //  idVec3 particleStreamDestination
+	savefile->ReadObject( particleStreamEnt ); //  idEntity* particleStreamEnt
+
+
+	savefile->ReadBool( showPlayerBody_Scripted ); //  bool showPlayerBody_Scripted
+
+
+	savefile->ReadObject( lastLocboxTriggered ); //  idEntityPtr<idEntity>	lastLocboxTriggered;
+
+
+	savefile->ReadBool( drawCinematicHUD ); //  bool drawCinematicHUD
+
+	savefile->ReadObject( CastClassPtrRef( vacuumSplineMover ) ); //  idMover* vacuumSplineMover
+
+
+
+	// set the pm_ cvars
+	const idKeyValue	*kv;
+	kv = spawnArgs.MatchPrefix( "pm_", NULL );
+	while( kv ) {
+		cvarSystem->SetCVarString( kv->GetKey(), kv->GetValue() );
+		kv = spawnArgs.MatchPrefix( "pm_", kv );
+	}
+
+	savefile->ReadFloat( fnum );
+	pm_stamina.SetFloat( fnum );
+
+	savefile->ReadInt( num );
+	pm_modelView.SetInteger( num );
+
+	// create combat collision hull for exact collision detection
+	SetCombatModel();
 }
 
 /*
@@ -4654,7 +5958,7 @@ void idPlayer::ServerSpectate( bool spectate )
 		spectateState = SPC_FANFAREDELAY;
 		spectateTimer = gameLocal.hudTime;
 
-		gameSoundWorld->PlayShaderDirectly(spawnArgs.GetString("snd_victorymusic"), SND_CHANNEL_MUSIC);
+		gameSoundWorld->PlayShaderDirectly(spawnArgs.GetString("snd_victorymusic"), SND_CHANNEL_ANY); //BC 3-23-2025: moved victory sound to non-music channel.
 	}
 
 	if ( spectating != spectate )
@@ -4720,9 +6024,26 @@ void idPlayer::ServerSpectate( bool spectate )
 
 		SetupSpectatorMilestones(spectatorMenu);
 
+		// SW 4th March 2025: Handle situation where player finishes game in the mech
+		if (mechTransitionState == MECHTRANSITION_PILOTING)
+		{
+			mechTransitionState = MECHTRANSITION_NONE;
+			mechCockpit->Hide();
+
+			// This Show() needs to be called to avoid tripping a Doom-3-era assert. 
+			// We'll get hidden again almost immediately. It's fine! It's all fine! It's chill, dude!
+			Show(); 
+		}
+
 		Spectate( spectate );
 		if ( spectate ) {
-			SetJockeyMode(false);
+
+			//BC 3-19-2025: only do jockey exit if player is currently jockeying.
+			if (jockeyState == JCK_ATTACHED)
+			{
+				SetJockeyMode(false);
+			}
+
 			SetSpectateOrigin();
 		} else {
 			if ( gameLocal.gameType == GAME_DM ) {
@@ -4757,7 +6078,8 @@ void idPlayer::ServerSpectate( bool spectate )
 				|| ent->IsType(idWallspeaker::Type) 
 				|| ent->IsType(idSecurityCamera::Type)
 				|| ent->IsType(idMaintPanel::Type)
-				|| ent->IsType(idDoorBarricade::Type))
+				|| ent->IsType(idDoorBarricade::Type)
+				|| ent->IsType(idSkullsaver::Type))
 			{
 				ent->StopSound(SND_CHANNEL_ANY, 0);
 			}
@@ -4783,6 +6105,9 @@ void idPlayer::ServerSpectate( bool spectate )
 	StopSound(SND_CHANNEL_ANY, false);
 
 	exitLevelHoldTimer = gameLocal.hudTime + 10000; //if final keystroke during mission is frob, this prevents that keystroke from instantly exiting the postgame screen.
+
+
+	common->g_SteamUtilities->SetSteamTimelineEvent("steam_completed");
 }
 
 //Set up the milestone info for the spectator screen.
@@ -4851,13 +6176,26 @@ void idPlayer::UpdateLevelProgressionIndex()
 		//found the map def.
 		int justcompletedLevelIndex = mapDef->dict.GetInt("levelindex");
 
-
+		//BC hack for some level end achievements...
+		if (common->g_SteamUtilities && common->g_SteamUtilities->IsSteamInitialized())
+		{
+			if (justcompletedLevelIndex == 1 && idStr::Cmp(mapname, "vig_tutorial") == 0) //BC 2-17-2025: fixed bug where strcmp wasn't doing the == 0 check
+			{
+				common->g_SteamUtilities->SetAchievement("ach_tutorial");
+			}
+			else if (justcompletedLevelIndex == 22 && idStr::Cmp(mapname, "vig_credits") == 0) //BC 2-17-2025: fixed bug where strcmp wasn't doing the == 0 check
+			{
+				common->g_SteamUtilities->SetAchievement("ach_theend");
+			}
+		}
 		
 		if (justcompletedLevelIndex > levelProgressIndex)
 		{
 			levelProgressIndex = justcompletedLevelIndex;
 			gameLocal.persistentLevelInfo.SetInt(PERSISTVAR_LEVELPROGRESS, levelProgressIndex);
+#ifdef DEMO
 			SaveProgression("vig_hub");
+#endif
 
 			//TODO: set a little flag so that the level select list gui knows how many levels the player has completed.
 			//See: quadcow "g_leveldone" logic
@@ -5112,11 +6450,13 @@ void idPlayer::RestorePersistantInfo( void ) {
 // 	}
 }
 
-bool idPlayer::SaveProgression(const char* nextMap)
+bool idPlayer::SaveProgression(const char* nextMap, const char* checkPoint)
 {
 #ifndef DEMO
 	SavePersistantInfo();
+
 	gameLocal.persistentLevelInfo.Set(PERSISTVAR_NEXTMAP, nextMap);
+#if 0 // blendo eric: disable progression save in normal game
 	idFile* fileOut = fileSystem->OpenFileWrite("savegames/progression.sav");
 	if (fileOut)
 	{
@@ -5124,22 +6464,32 @@ bool idPlayer::SaveProgression(const char* nextMap)
 		gameLocal.persistentPlayerInfo[entityNumber].WriteToFileHandle(fileOut);
 		delete fileOut;
 
-		if (spectatorMenu)
-		{
-			spectatorMenu->HandleNamedEvent("savegame");
-
-
-		}
+		//if (spectatorMenu)
+		//{
+		//	spectatorMenu->HandleNamedEvent("savegame");
+		//}
 
 		return true;
 	}
+#else
+	if (nextMap == nullptr)
+	{
+		nextMap = "checkpoint";
+	}
+	if (checkPoint == nullptr)
+	{
+		checkPoint = "";
+	}
+	cmdSystem->BufferCommandText( CMD_EXEC_NOW /*CMD_EXEC_APPEND*/, va( "savegameauto %s %s", nextMap, checkPoint) );
+#endif
+
 #endif // DEMO
 	return false;
 }
 
-void idPlayer::Event_SaveProgression(const char* nextMap)
+void idPlayer::Event_SaveProgression(const char* nextMap, const char* checkPoint)
 {
-	SaveProgression(nextMap);
+	SaveProgression(nextMap, checkPoint);
 }
 
 /*
@@ -5252,7 +6602,7 @@ bool idPlayer::UserInfoChanged( bool canModify ) {
 	bool	newready;
 
 	userInfo = GetUserInfo();
-	showWeaponViewModel = userInfo->GetBool( "ui_showGun" );
+	showWeaponViewModel = true; //SM: don't use cvar "ui_showGun"
 
 	if ( !gameLocal.isMultiplayer ) {
 		return false;
@@ -5358,7 +6708,7 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 
 		//BC draw the ammo label string
 		idStr ammoname = inventory.AmmoPickupNameForIndex(weapon.GetEntity()->GetAmmoType());
-		hud->SetStateString("ammolabel", idStr::Format("%s in pocket", ammoname.c_str()));
+		hud->SetStateString("ammolabel", idStr::Format(common->GetLanguageDict()->GetString( "#str_def_gameplay_ammoinpocket"), ammoname.c_str()));
 
 	}
 
@@ -5377,7 +6727,7 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 
 	//_hud->HandleNamedEvent( "updateAmmo" );
 
-	if (mechTransitionState == MECHTRANSITION_PILOTING)
+	if (mechTransitionState == MECHTRANSITION_PILOTING && mountedMech.IsValid())
 	{
 		int displayDir;		
 
@@ -5761,16 +7111,16 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		switch (healState)
 		{
 			case HEALSTATE_GLASSPULL:
-				healText = idStr::Format("Removing glass (%d remaining)", cond_glasswound);
+				healText = idStr::Format(common->GetLanguageDict()->GetString("#str_heal_removeglass"), cond_glasswound);
 				break;
 			case HEALSTATE_BURNING:
-				healText = "Patting out fire";
+				healText = common->GetLanguageDict()->GetString("#str_heal_patfire");
 				break;
 			case HEALSTATE_SHRAPNEL:
-				healText = idStr::Format("Removing shrapnel (%d remaining)", cond_shrapnel);
+				healText = idStr::Format(common->GetLanguageDict()->GetString("#str_heal_shrapnel"), cond_shrapnel);
 				break;
 			case HEALSTATE_BULLETPLUCK:
-				healText = idStr::Format("Removing bullets (%d remaining)", cond_bulletwound);
+				healText = idStr::Format(common->GetLanguageDict()->GetString("#str_heal_bullet"), cond_bulletwound);
 				break;
 		}
 		_hud->SetStateString("healtext", healText.c_str());
@@ -5886,9 +7236,9 @@ void idPlayer::DrawHUD( idUserInterface *_hud )
 		{
 			videoMenu->Redraw(gameLocal.time); //Obsolete?
 
-			if (drawCinematicHUD)
+			if (drawCinematicHUD && g_showHud.GetBool())
 			{
-				_hud->Redraw(gameLocal.hudTime);
+				//_hud->Redraw(gameLocal.hudTime); //BC 3-14-2025: don't draw hud during camera sequences.
 				gameLocal.DrawSubtitles(_hud);
 			}
 
@@ -6562,6 +7912,7 @@ void idPlayer::DrawHUD( idUserInterface *_hud )
 	DrawThrowUI();
 
 	hud->SetStateBool("defibavailable", defibAvailable);
+	contextMenu->SetStateBool("defibavailable", defibAvailable); //BC 4-4-2025: status for defib
 }
 
 void idPlayer::DrawThrowUI()
@@ -6685,7 +8036,7 @@ void idPlayer::DrawZoomInspect()
 	// angle between horizontal axis and the screen corner
 	float screenCornerAngle = idMath::ATan(fovYAdj/fovXAdj);
 
-	idVec3 eyeOrig = GetEyePosition(); // firstPersonViewOrigin is sometimes zero?
+	idVec3 eyeOrig = firstPersonViewOrigin.LengthSqr() > 1.0f ? firstPersonViewOrigin : GetEyePosition();// firstPersonViewOrigin is sometimes zero?
 	// arbitrary center point inside border frustum acting as a new screen plane
 	idVec3 frustumOrigin = eyeOrig + forwardDir * 100.0f;
 
@@ -6695,9 +8046,13 @@ void idPlayer::DrawZoomInspect()
 		if (!ent)
 			continue;
 
-		if (ent->IsHidden() || !ent->spawnArgs.GetBool("zoominspect") || ent->spawnArgs.GetBool("zoominspect_brush"))
+		if (ent->IsHidden() || !ent->spawnArgs.GetBool("zoominspect") /* && !ent->spawnArgs.GetBool("zoominspect_brush")*/ ) //BC 2-13-2025: removed the zoominspect_brush check as it's not needed and was bad logic.
 			continue;
 
+		if (ent->spawnArgs.GetBool("zoominspect_brush"))
+			continue;
+
+		ent->SetPostFlag(POST_ZOOM_INSPECT, IsZoominspectEntInLOS(ent));
 
 		//get dot product. make sure it's in front of player.
 		idVec3 dirToEnt = (ent->GetPhysics()->GetOrigin() - eyeOrig).Normalized();
@@ -6801,11 +8156,8 @@ void idPlayer::DrawZoomInspect()
 		//traceline check.
 		if (!IsZoominspectEntInLOS(ent))
 		{
-			ent->SetPostFlag(POST_ZOOM_INSPECT, false);
 			continue;
 		}
-		
-		ent->SetPostFlag(POST_ZOOM_INSPECT, true);
 
 		idVec3 highlightColor;
 		idVec3 markerColor;
@@ -6854,7 +8206,7 @@ void idPlayer::DrawZoomInspect()
 				renderSystem->DrawStretchPic(entScreenPos.x - MARKER2SIZEX / 2, entScreenPos.y - MARKER2SIZEY / 2, MARKER2SIZEX, MARKER2SIZEY, 0, 0, 1, 1, declManager->FindMaterial(spawnArgs.GetString("mtr_zoominspect_marker2")));
 
 
-				hud->DrawArbitraryText("UNREAD", .5f, idVec4(highlightColor.x, highlightColor.y, highlightColor.z, 1), entScreenPos.x + 12, entScreenPos.y - 7, "petme", idVec4(0, 0, 0, 1));
+				hud->DrawArbitraryText(common->GetLanguageDict()->GetString("#str_def_gameplay_unread"), .5f, idVec4(highlightColor.x, highlightColor.y, highlightColor.z, 1), entScreenPos.x + 12, entScreenPos.y - 7, "petme", idVec4(0, 0, 0, 1));
 			}
 		}
 		
@@ -6881,6 +8233,7 @@ void idPlayer::DrawZoomInspect()
 	if (!zoominspectEntityPtr.IsValid())
 	{
 		hud->SetStateBool("zoominspect_draw", false);
+		hud->SetStateBool("brushdesc_draw", false);
 		return;
 	}
 
@@ -6909,6 +8262,17 @@ void idPlayer::DrawZoomInspect()
 			idVec3 forwardPos = firstPersonViewOrigin + firstPersonViewAxis.ToAngles().ToForward() * 1024;
 			gameLocal.clip.TracePoint(tr, firstPersonViewOrigin, forwardPos, MASK_SOLID, NULL);
 			entityWorldPos = tr.endpos;
+
+			idStr brushDescText = zoominspectEntityPtr.GetEntity()->spawnArgs.GetString("loc_inspectiontext");
+			if (brushDescText.Length() > 0)
+			{
+				hud->SetStateBool("brushdesc_draw", true);
+				hud->SetStateString("brushdesc_text", brushDescText.c_str());
+			}
+		}
+		else
+		{
+			hud->SetStateBool("brushdesc_draw", false);
 		}
 
 		//how large sprite is.
@@ -7052,8 +8416,10 @@ bool idPlayer::IsEntityFuseboxLocked(idEntity* ent)
 	}
 	else if (ent->IsType(idBrittleFracture::Type))
 	{
-		if (ent->health >= ent->maxHealth) //if window has full health, it's inaccesible.
-			return true;
+		//BC 4-10-2025: just return value of windows fusebox lock/unlock.
+		//This originally showed a red padlock for windows that were intact/alive, but this was confusing
+		//because an unlocked breakable window should be considered a viable way to enter the ship.
+		return static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->IsFuseboxLocked(SYS_WINDOWS);
 	}
 	else if (ent->IsType(idTrashExit::Type))
 	{
@@ -7358,7 +8724,7 @@ void idPlayer::DrawEnemyHealth()
 		
 		nametagPos = idVec2(spriteScreenPos.x - (barwidth / 2.0f) - 1.0f, spriteScreenPos.y - ENEMYHEALTHBAR_HEIGHT - 12);
 		uiManager->SetSize( VIRTUAL_WIDTH, VIRTUAL_HEIGHT );
-		hud->DrawArbitraryText(entity->spawnArgs.GetString("displayname", "TOPAZ"), .4f, idVec4(1, 1, 1, 1), nametagPos.x, nametagPos.y, "fonts", idVec4(0,0,0,.3f));
+		hud->DrawArbitraryText(entity->spawnArgs.GetString("displayname", "#str_def_monster_thug_100049"), .4f, idVec4(1, 1, 1, 1), nametagPos.x, nametagPos.y, "fonts", idVec4(0,0,0,.3f)); // SW 24th March 2025: Replacing TOPAZ with loc string
 		
 		//draw numeric health amount.
 		hud->DrawArbitraryText(va("%d",entity->health), .4f, idVec4(0, .9f, 0, 1), spriteScreenPos.x + (barwidth / 2.0f) + 2, spriteScreenPos.y - ENEMYHEALTHBAR_HEIGHT - 3, "fonts", idVec4(0, 0, 0, 1));
@@ -7442,7 +8808,7 @@ void idPlayer::DrawEnemyHealth()
 					0, 0, 1, 1, declManager->FindMaterial("stunbar")); //Innards.
 
 				float stunFontSize = .5f + (idMath::Cos(gameLocal.time * .02f) * .02f);
-				hud->DrawArbitraryText("STUNNED", stunFontSize, idVec4(0, 0, 0, 1),
+				hud->DrawArbitraryText(common->GetLanguageDict()->GetString("#str_def_gameplay_stunned"), stunFontSize, idVec4(0, 0, 0, 1),
 					spriteScreenPos.x - (barwidth / 2) - .5f,
 					spriteScreenPos.y - .5f - STUNBAR_HEIGHT + STUBAR_YOFFSET - 16,
 					"fonts", idVec4(0, 0, 0, 0), 0, 0, idVec4(1, .8f, 0, 1));
@@ -7790,7 +9156,7 @@ void idPlayer::DrawFrobHUD(int time)
 					//TODO: don't draw this if the frobEnt dotproduct is behind player viewangle.
 
 
-					hud->SetStateString("frob_swaptext", "swap");
+					hud->SetStateString("frob_swaptext", common->GetLanguageDict()->GetString( "#str_def_gameplay_swap"));
 					cursorType = CURSOR_SWAP;
 
 
@@ -8523,6 +9889,11 @@ void idPlayer::UpdateBeaconSignalLock()
 			EnableBeaconUI();
 		}
 
+		// SW 17th Feb 2025: Disable signal lock while a lifeboat is in the world,
+		// so the player can't summon multiple lifeboats at once
+		// (budget cuts at miaocorp, you understand)
+		this->signalLock = false; 
+
 		return;
 	}
 
@@ -8573,7 +9944,12 @@ void idPlayer::UpdateBeaconSignalLock()
 		{
 			//If we don't have LOS to the beacon, then just artifically "degrade" the signal strength, so the player can't input a code.
 			EnableBeaconUI();
-			signalStrength = min(signalStrength, BEACON_SIGNAL_STRENGTH_THRESHOLD - .022f);
+
+			//signalStrength = min(signalStrength, BEACON_SIGNAL_STRENGTH_THRESHOLD - .022f);
+			
+			//BC 2-20-2025: make signal strength be zero (instead of 87%)
+			signalStrength = 0;
+			weaponGui->SetStateFloat("vert_arrows", 0);
 		}
 
 		if (signalStrength < BEACON_SIGNAL_STRENGTH_THRESHOLD)
@@ -8603,7 +9979,10 @@ void idPlayer::UpdateBeaconSignalLock()
 			{
 				// Yaw is correct-ish.
 				// Show the arrows to indicate they should pitch up/down.
-				weaponGui->SetStateFloat("vert_arrows", 1);
+				//if (hasClearLOSToBeacon)
+				//{
+				//	weaponGui->SetStateFloat("vert_arrows", 1);
+				//}
 
 				if (!beaconLastVertArrows)
 				{
@@ -8692,7 +10071,7 @@ void idPlayer::EnableBeaconUI()
 	beaconUITimer = gameLocal.time + 100;
 }
 
-void idPlayer::ActivateBeacon(int beaconType, idVec3 beaconSpawnPos)
+void idPlayer::ActivateBeacon(int beaconType, const idVec3 &beaconSpawnPos)
 {
 	const idDeclEntityDef *botDef;
 	idEntity *beaconlogicEnt;
@@ -8909,6 +10288,12 @@ void idPlayer::DrawBeaconUI(void)
 			float distanceToBoat = (boatPos - GetEyePosition()).Length();
 			if (distanceToBoat < LIFEBOAT_LOCATOR_DISTANCETHRESHOLD)
 				return;
+
+			//BC 2-16-2025: don't draw marker if player is inside the catpod.
+			if (static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->GetPlayerIsCurrentlyInCatpod())
+				return;
+			
+
 
 			//Draw the marker on it.            
             idVec2 boatScreenpos = GetWorldToScreen(boatPos);
@@ -9356,20 +10741,18 @@ void idPlayer::FireWeapon( void ) {
 		int currentWeapon = inventory.hotbarSlots[currentWeaponSlot].weaponType;
 		if ( weapon.GetEntity()->AmmoInClip() || weapon.GetEntity()->AmmoAvailable()  || spawnArgs.GetBool(va("weapon%d_allowempty", currentWeapon )))
 		{
-			if (!AI_ATTACK_HELD && currentWeapon > 0) //ignore unarmed weapon.
-			{
-				//event log.
-				const char *weaponName;
-				if (weapon.GetEntity()->displayName[0] != '\0')
-					weaponName = weapon.GetEntity()->displayName.c_str();
-				else
-					weaponName = weapon.GetEntity()->GetName();
-
-
-
-				idStr playerName = (displayName.Length() > 0) ? displayName : idStr(GetName());
-				gameLocal.AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_attack"), playerName.c_str(), common->GetLanguageDict()->GetString(weaponName)), GetPhysics()->GetOrigin());
-			}
+			//if (!AI_ATTACK_HELD && currentWeapon > 0) //ignore unarmed weapon.
+			//{
+			//	//event log.
+			//	const char *weaponName;
+			//	if (weapon.GetEntity()->displayName[0] != '\0')
+			//		weaponName = weapon.GetEntity()->displayName.c_str();
+			//	else
+			//		weaponName = weapon.GetEntity()->GetName();
+			//
+			//	idStr playerName = (displayName.Length() > 0) ? displayName : idStr(GetName());
+			//	gameLocal.AddEventLog(idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_attack"), playerName.c_str(), common->GetLanguageDict()->GetString(weaponName)), GetPhysics()->GetOrigin());
+			//}
 
 			AI_ATTACK_HELD = true;
 			weapon.GetEntity()->BeginAttack();
@@ -9897,6 +11280,33 @@ idEntity * idPlayer::DropCurrentWeapon_SingleItem(int index, idEntity* dropEntTo
 
 		//Update the item with appropriate health.
 		item->health = inventory.hotbarSlots[inventory.GetHotbarSelection()].health;
+
+		// SW 27th March 2025: update weapons to ensure they hold their clip/ammo state when dropped
+		// (This behaviour already existed, but only partially, and only for *thrown* weapons)
+		// SW 8th April 2025: Fixing behaviour for thrown weapons
+		int inclip = inventory.hotbarSlots[inventory.GetHotbarSelection()].clip;
+		bool isGrenade = weapon.GetEntity()->isGrenade;
+		const idKeyValue* keyval = item->spawnArgs.MatchPrefix("inv_ammo_");
+		if (keyval && !isGrenade)
+		{
+			//int ammoavailable = weapon.GetEntity()->AmmoAvailable();
+			//item->spawnArgs.SetInt(keyval->GetKey(), ammoavailable);
+			idStr inclipKey = keyval->GetKey();
+			inclipKey.Insert("inclip_", 4);
+			//inclipKey.Insert(va("%.2d", currentWeapon), 11);
+			item->spawnArgs.SetInt(inclipKey, inclip);
+		}
+
+		// Remember if we had a round chambered
+		int isChambered = (int)(inventory.hotbarSlots[inventory.GetHotbarSelection()].chambered);
+		keyval = item->spawnArgs.MatchPrefix("inv_ammo_");
+		if (keyval && !isGrenade)
+		{
+			idStr chamberedKey = keyval->GetKey();
+			chamberedKey.Insert("inchamber_", 4);
+			item->spawnArgs.SetInt(chamberedKey, isChambered);
+		}
+
 		return item;
 	}
 
@@ -9957,7 +11367,7 @@ void idPlayer::Event_ClearInventory(void)
 bool idPlayer::SelectHotbarslot(int slotIndex)
 {
 	if (usercmd.buttons & BUTTON_QUICKTHROW || IsLeaning() || iteminspectActive
-		|| mechTransitionState != MECHTRANSITION_NONE || physicsObj.GetAcroType() != ACROTYPE_NONE)
+		|| mechTransitionState != MECHTRANSITION_NONE || physicsObj.GetAcroType() != ACROTYPE_NONE || peekObject.IsValid())
 	{
 		return false;
 	}
@@ -11426,58 +12836,6 @@ void idPlayer::SelectWeapon( int hotbarSlot, int weaponNum, bool force ) {
 		else
 		{
 			idealWeaponSlot = hotbarSlot;
-
-
-			//BC check if it's a carryable.
-			//First, we start by hiding the carryables the player is NOT selecting.
-			for (int i = 0; i < MAX_HOTBARSLOTS; i++)
-			{
-				if (i == idealWeaponSlot)
-					continue;
-
-				if (spawnArgs.GetBool(va("weapon%d_carryable", inventory.hotbarSlots[i].weaponType)))
-				{
-					//it's a carryable. See if we can find its pointer.
-					idEntityPtr<idEntity> carryPtr = inventory.hotbarSlots[i].carryPtr;
-					if ( carryPtr.IsValid() )
-					{
-						//This is NOT the one the player wants to select. Hide it.
-						carryPtr.GetEntity()->Hide();
-					}
-				}
-			}
-			
-			//Now we select the carryable the player wants, if applicable.
-			bool foundItem = false;
-			if (spawnArgs.GetBool(va("weapon%d_carryable", weaponNum)))
-			{
-				//it's a carryable. See if we can find its pointer.
-				idEntityPtr<idEntity> carryPtr = inventory.hotbarSlots[hotbarSlot].carryPtr;
-				if ( carryPtr.IsValid() )
-				{
-					//found it.
-					//The one the player wants to select.
-					
-					if (carryableItem.IsValid() && carryableItem.GetEntity() == carryPtr.GetEntity() && !carryPtr.GetEntity()->IsHidden())
-					{
-						//this was already selected. Do nothing.
-						foundItem = true;
-					}
-					else
-					{
-						//Unhide it, put it in player's hand.
-						carryPtr.GetEntity()->Show();
-						SetCarryable( carryPtr.GetEntity(), true );
-						carryPtr.GetEntity()->UpdateVisuals();
-						foundItem = true;
-					}
-				}
-			}
-			
-			if (!foundItem)
-				carryableItem = NULL;
-			
-
 		}
 		UpdateHudWeapon();
 	}
@@ -11521,6 +12879,8 @@ void idPlayer::ThrowCarryable(void)
 
 	//Event log.
 	gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_player_throw"),  item->displayName.c_str()), GetPhysics()->GetOrigin(), false);
+
+	SayVO_WithIntervalDelay("snd_vo_throw");
 }
 
 
@@ -11576,8 +12936,9 @@ void idPlayer::ThrowCurrentWeapon(void)
 
 	//Remember how many rounds are in the mag.
 	inclip = weapon.GetEntity()->AmmoInClip();
+	bool isGrenade = weapon.GetEntity()->isGrenade;
 	const idKeyValue* keyval = item->spawnArgs.MatchPrefix("inv_ammo_");
-	if (keyval)
+	if (keyval && !isGrenade)
 	{
 		//int ammoavailable = weapon.GetEntity()->AmmoAvailable();
 		//item->spawnArgs.SetInt(keyval->GetKey(), ammoavailable);
@@ -11585,6 +12946,16 @@ void idPlayer::ThrowCurrentWeapon(void)
 		inclipKey.Insert("inclip_", 4);
 		//inclipKey.Insert(va("%.2d", currentWeapon), 11);
 		item->spawnArgs.SetInt(inclipKey, inclip);
+	}
+
+	// SW 27th March 2025: Remember if we had a round chambered
+	int isChambered = weapon.GetEntity()->Event_RoundIsChambered();
+	keyval = item->spawnArgs.MatchPrefix("inv_ammo_");
+	if (keyval && !isGrenade)
+	{
+		idStr chamberedKey = keyval->GetKey();
+		chamberedKey.Insert("inchamber_", 4);
+		item->spawnArgs.SetInt(chamberedKey, isChambered);
 	}
 
 	if (weapon.GetEntity()->isGrenade)
@@ -11623,6 +12994,8 @@ void idPlayer::ThrowCurrentWeapon(void)
 	}
 
 	currentWeaponSlot = -1;
+
+	SayVO_WithIntervalDelay("snd_vo_throw");
 }
 
 
@@ -11688,7 +13061,7 @@ void idPlayer::DropCurrentCarryable(idEntity* dropEntTo, bool showMessage)
 
 	if (showMessage)
 	{
-		hud->SetStateString("centermessage", va("Dropped %s", carryableItem.GetEntity()->displayName.c_str()));
+		hud->SetStateString("centermessage", idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_dropitem"), carryableItem.GetEntity()->displayName.c_str()).c_str());
 		hud->HandleNamedEvent("droppedAmmo");
 	}
 
@@ -11858,7 +13231,8 @@ void idPlayer::DropWeapon( bool died ) {
 
 	// set the appropriate ammo in the dropped object
 	const idKeyValue * keyval = item->spawnArgs.MatchPrefix( "inv_ammo_" );
-	if ( keyval )
+	bool isGrenade = weapon.GetEntity()->isGrenade;
+	if ( keyval && !isGrenade )
 	{
 		item->spawnArgs.SetInt( keyval->GetKey(), ammoavailable );
 		idStr inclipKey = keyval->GetKey();
@@ -12045,8 +13419,7 @@ void idPlayer::Weapon_Combat( void ) {
 		else
 		{
 			//Transitioning from one weapon to the next.
-
-			if ( weapon.GetEntity()->IsReady() )
+			if ( weapon.GetEntity()->IsReady())
 			{
 				weapon.GetEntity()->PutAway();
 			}
@@ -12055,6 +13428,60 @@ void idPlayer::Weapon_Combat( void ) {
 			{
 				assert( idealWeaponSlot >= 0 );
 				assert( idealWeaponSlot < MAX_HOTBARSLOTS );
+
+				// SW 5th March 2025: moving carryable selection code here so that it respects weapon state (i.e. won't switch when the weapon is reloading/animating, etc)
+				// (This needed a bit of tweaking to make work here too)
+				// 
+				//BC check if it's a carryable.
+				//First, we start by hiding the carryables the player is NOT selecting.
+				for (int i = 0; i < MAX_HOTBARSLOTS; i++)
+				{
+					if (i == idealWeaponSlot)
+						continue;
+
+					if (spawnArgs.GetBool(va("weapon%d_carryable", inventory.hotbarSlots[i].weaponType)))
+					{
+						//it's a carryable. See if we can find its pointer.
+						idEntityPtr<idEntity> carryPtr = inventory.hotbarSlots[i].carryPtr;
+						if (carryPtr.IsValid())
+						{
+							//This is NOT the one the player wants to select. Hide it.
+							carryPtr.GetEntity()->Hide();
+
+							carryPtr.GetEntity()->StopSound(SND_CHANNEL_VOICE); //BC 2-14-2025: this is to make the skullsaver stop talking if player pockets it.
+						}
+					}
+				}
+
+				//Now we select the carryable the player wants, if applicable.
+				bool foundItem = false;
+				if (spawnArgs.GetBool(va("weapon%d_carryable", inventory.hotbarSlots[idealWeaponSlot].weaponType)))
+				{
+					//it's a carryable. See if we can find its pointer.
+					idEntityPtr<idEntity> carryPtr = inventory.hotbarSlots[idealWeaponSlot].carryPtr;
+					if (carryPtr.IsValid())
+					{
+						//found it.
+						//The one the player wants to select.
+
+						if (carryableItem.IsValid() && carryableItem.GetEntity() == carryPtr.GetEntity() && !carryPtr.GetEntity()->IsHidden())
+						{
+							//this was already selected. Do nothing.
+							foundItem = true;
+						}
+						else
+						{
+							//Unhide it, put it in player's hand.
+							carryPtr.GetEntity()->Show();
+							SetCarryable(carryPtr.GetEntity(), true);
+							carryPtr.GetEntity()->UpdateVisuals();
+							foundItem = true;
+						}
+					}
+				}
+
+				if (!foundItem)
+					carryableItem = NULL;
 
 				int weaponType = inventory.hotbarSlots[currentWeaponSlot].weaponType;
 				if ( weaponType != weapon_pda && !spawnArgs.GetBool( va( "weapon%d_toggle", weaponType ) ) ) {
@@ -12188,7 +13615,7 @@ void idPlayer::Weapon_Combat( void ) {
 						{
 							throwarcDropMode = IsThrowarcAtDropPosition();
 
-							hud->SetStateString("throwtext", throwarcDropMode ? "Drop" : "Throw");
+							hud->SetStateString("throwtext", throwarcDropMode ? common->GetLanguageDict()->GetString("#str_gui_hud_drop") : common->GetLanguageDict()->GetString("#str_gui_hud_100361"));
 							if (lastThrowarcDropMode != throwarcDropMode)
 							{
 								lastThrowarcDropMode = throwarcDropMode;
@@ -12650,14 +14077,24 @@ void idPlayer::UpdateWeapon( void ) {
 						if (gameLocal.time >= grenadeButtonTimer && !GetThrowArcVisible() && (gameLocal.slowmoState == SLOWMO_STATE_OFF || gameLocal.slowmoState == SLOWMO_STATE_RAMPDOWN))
 						{
 							SetThrowArcVisible(true);
-							gameLocal.SetSlowmo(true); //In throw mode, go to slow motion.
+
+							//BC 3-1-2025: only allow slowmo if you have more than zero stamina.
+							if (stamina > 0)
+							{
+								gameLocal.SetSlowmo(true); //In throw mode, go to slow motion.
+							}
+							else
+							{
+								//No stamina. Clarify this by making the stamina UI do a little animation.
+								hud->HandleNamedEvent("no_stamina");
+							}
 						}
 
 						if (GetThrowArcVisible())
 						{
 							throwarcDropMode = IsThrowarcAtDropPosition() && (lastThrowArcState == shouldDrawThrowArc);
 
-							hud->SetStateString("throwtext", throwarcDropMode ? "Drop" : "Throw");
+							hud->SetStateString("throwtext", throwarcDropMode ? common->GetLanguageDict()->GetString("#str_gui_hud_drop") : common->GetLanguageDict()->GetString("#str_gui_hud_100361"));
 							if (lastThrowarcDropMode != throwarcDropMode)
 							{
 								lastThrowarcDropMode = throwarcDropMode;
@@ -13372,12 +14809,24 @@ bool idPlayer::UpdateSpectating( void ) {
 			int buttonHoldDelta = (gameLocal.hudTime + SPECTATE_EXITHOLDTIME) - (exitLevelHoldTimer);
 			if (buttonHoldDelta <= SPECTATE_LOADBUTTONTIME)
 			{				
-				//TODO: bring up load menu.				
+				session->LoadGameMenu();
 			}
 		}
 
 		spectatorMenu->SetStateFloat("holdbar", 0);
 		postgameLoadButtonAvailable = false;
+	}
+
+	//BC 2-26-2025: during spectate, force the windows to update so that their fade in/out still functions.
+	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+	{
+		if (!ent)
+			continue;
+
+		if (ent->IsType(idBrittleFracture::Type))
+		{
+			static_cast<idBrittleFracture*>(ent)->SpectateUpdate();
+		}
 	}
 	
 	return false;
@@ -13543,7 +14992,14 @@ bool idPlayer::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 		ContextmenuConfirm(true);
 
 		//do spit.
-		DoSpit(1);
+		if (g_bloodEffects.GetBool())
+		{
+			DoSpit(1);
+		}
+		else
+		{
+			DoSpit(0);
+		}
 		gameLocal.AddEventLog("#str_def_gameplay_coughblood", GetPhysics()->GetOrigin());
 
 		return true;
@@ -14043,6 +15499,8 @@ void idPlayer::LevelselectMenuOpen(int value)
 		levelselectMenuActive = true;
 		session->SetGUI(levelselectMenu, NULL);
 
+		//static_cast<idUserInterfaceLocal*>(levelselectMenu)->GetDesktop()->ClearFlag(WIN_NOCURSOR);
+
 		UpdateLevelselectMenu();
 
 		return;
@@ -14050,6 +15508,7 @@ void idPlayer::LevelselectMenuOpen(int value)
 
 	session->SetGUI(NULL, NULL);
 	levelselectMenuActive = false;
+	//static_cast<idUserInterfaceLocal*>(levelselectMenu)->GetDesktop()->SetFlag(WIN_NOCURSOR);
 }
 
 bool idPlayer::LevelHasAnyMilestones(const idDeclEntityDef* mapDef)
@@ -14231,6 +15690,9 @@ void idPlayer::OnStartLevelselectIndex(int index)
 			idStr mapname = mapDef->GetName();
 			if (mapname.Length() > 0)
 			{
+				// SW 10th April 2025: Force player to leave dream machine interface to prevent crash involving active GUI
+				LevelselectMenuOpen(0);
+
 				idStr command = idStr::Format("map %s", mapname.c_str());
 				gameLocal.sessionCommand = command.c_str();
 			}
@@ -14462,6 +15924,15 @@ void idPlayer::UpdateFocus( void ) {
 
 	if (emailFullscreenState != EFS_OFF)
 		return;
+
+	// SW 12th March 2025
+	// Don't update focus during the pre-session Think() call
+	// (It's possible to accidentally highlight things in front of the camera at (0,0,0)
+	if (gameLocal.time <= 0)
+	{
+		ClearFocus();
+		return;
+	}
 
 	// only update the focus character when attack button isn't pressed so players
 	// can still chainsaw NPC's
@@ -14865,7 +16336,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 
 	if ( delta > fatalDelta )
 	{
-		//BC fall from long distance.
+		//BC fall from long distance. Enter fallen state.
 		AI_HARDLANDING = true;
 		landChange = -32;
 		landTime = gameLocal.time;
@@ -14891,6 +16362,8 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 			}
 		}
 
+		gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin() + idVec3(0,0,1), spawnArgs.GetString("def_interest_fallhard"));
+
 		PlayerLanded();
 	}
 	else if ( delta > hardDelta )
@@ -14906,7 +16379,12 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		//}
 		//
 		//StartSound("snd_longfall", SND_CHANNEL_ANY, 0, false, NULL);
+		
+
 		StartSound("snd_softfall", SND_CHANNEL_ANY, 0, false, NULL);
+		 
+		//BC 2-13-2025: add grunt when doing a longer jump landing.
+		gameLocal.voManager.SayVO(this, (GetWoundCount() > 0) ? "snd_vo_exertion" : "snd_vo_jumplanding", VO_CATEGORY_GRUNT);
 		PlayerLanded();
 	}
 	else if ( delta > 30 )
@@ -14918,6 +16396,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_softfall", 1.0f, 0 );
 		}
+
 		StartSound("snd_softfall", SND_CHANNEL_ANY, 0, false, NULL);
 		PlayerLanded();
 	}
@@ -15564,7 +17043,9 @@ void idPlayer::UpdateViewAngles( void ) {
 		}
 		viewAngles.pitch = idMath::ClampFloat( -varc, varc, viewAngles.pitch );
 	}
-	else if (peekObject.IsValid())
+	// SW 17th Feb 2025: Adding zoominspect condition to ensure that the ventpeek doesn't override zoom inspect angles
+	// if the player is zoom-inspecting something through a ventpeek
+	else if (peekObject.IsValid() && !zoominspect_LabelmodeActive)
 	{
 		//Ventpeek.	
 
@@ -15642,7 +17123,9 @@ void idPlayer::UpdateViewAngles( void ) {
 	UpdateDeltaViewAngles( viewAngles );
 
 	// orient the model towards the direction we're looking	
-	SetAngles(idAngles(0, viewAngles.yaw, 0));
+	if (!IsJockeying()) { // enemy drives model direction in jockey mode
+		SetAngles(idAngles(0, viewAngles.yaw, 0));
+	}
 	
 
 	// save in the log for analyzing weapon angle offsets
@@ -16986,7 +18469,7 @@ void idPlayer::SetViewRollLerp(float targetRoll, int transitionTime)
 }
 
 //Make the player camera angle lerp toward a specific XYZ in the world.
-void idPlayer::SetViewLerp(idVec3 targetPosition, int moveTime)
+void idPlayer::SetViewLerp(const idVec3 &targetPosition, int moveTime)
 {
 	idAngles lerpviewInitialPosition = this->viewAngles;
 	lerpviewInitialPosition.Normalize180();
@@ -17343,8 +18826,21 @@ void idPlayer::UpdateFrobCursor(void)
 	bool foundSomething = false;
 	bool eyeballInsideFrobbable = false;
 
+	//BC 3-19-2025: mega shameful hack, allow the frob prompt if it is the email prompt. This is the one time we do want a world frob prompt while a gui is active.
+	bool hasActiveGui = false;
+	if (ActiveGui())
+	{
+		idStr pdaname = ActiveGui()->Name();		
+		if (idStr::Icmp(pdaname, "guis/pda.gui") >= 0)
+			hasActiveGui = false;
+		else
+			hasActiveGui = true;
+	}
+
 	//if (contextMenuActive || bodyDragger.isDragging || carryableItem.IsValid() || peekObject.IsValid())
-	if (iteminspectActive || contextMenuActive || peekObject.IsValid() || armstatsActive || !playerCanFrob || zoommodeActive || (grenadeThrowState != GRENADETHROW_IDLE) || meleeTarget.IsValid() || zoominspect_LabelmodeActive || mechTransitionState == MECHTRANSITION_PILOTING)
+	if (iteminspectActive || contextMenuActive || peekObject.IsValid() || armstatsActive || !playerCanFrob || zoommodeActive ||
+		(grenadeThrowState != GRENADETHROW_IDLE) || meleeTarget.IsValid() || zoominspect_LabelmodeActive || mechTransitionState == MECHTRANSITION_PILOTING
+		|| hasActiveGui) //BC 3-18-2025: don't update frob selection if a gui is active.
 	{
 		DeselectFrobItem();
 		return;
@@ -17388,6 +18884,7 @@ void idPlayer::UpdateFrobCursor(void)
 		int				nodeList, i;
 		int				closestDistance = 9999;
 		int				closestIndex = -1;
+		// blendo eric: optimization target
 
 		#define FROB_RADIUS_CHECKDISTANCE 8
 		nodeList = gameLocal.EntitiesWithinRadius(initialTraceEnd, FROB_RADIUS_CHECKDISTANCE, entityList, MAX_GENTITIES);
@@ -17573,19 +19070,6 @@ void idPlayer::UpdateFrobCursor(void)
 		}
 	}
 
-
-
-	//special memory palace frob logic.
-	if (memorypalaceState == MEMP_ACTIVE && !foundSomething)
-	{
-		idEntity *memoryEnt = UpdateMemoryPalaceFrobCursor();
-		if (memoryEnt != NULL)
-		{
-			frobTr.c.entityNum = memoryEnt->entityNumber;
-			foundSomething = true;
-		}
-	}
-
 	if (!foundSomething)
 	{
 		//Get all items within range of player, and do a check to see if it's within valid parameters.
@@ -17629,6 +19113,20 @@ void idPlayer::UpdateFrobCursor(void)
 		if (bestEntityIndex > 0)
 		{
 			frobTr.c.entityNum = entityList[bestEntityIndex]->entityNumber;
+			foundSomething = true;
+		}
+	}
+
+	// SW 25th Feb 2025
+	// Moving this further down and skipping the foundSomething check,
+	// so memory palace items have priority
+	//special memory palace frob logic.
+	if (memorypalaceState == MEMP_ACTIVE)
+	{
+		idEntity* memoryEnt = UpdateMemoryPalaceFrobCursor();
+		if (memoryEnt != NULL)
+		{
+			frobTr.c.entityNum = memoryEnt->entityNumber;
 			foundSomething = true;
 		}
 	}
@@ -17969,9 +19467,9 @@ void idPlayer::UpdateFrob(void)
 	
 	if (meleeTarget.IsValid() && !inDownedState && (usercmd.buttons & BUTTON_FROB) && !(oldButtons & BUTTON_FROB))
 	{
-		if (meleeTarget.GetEntity()->IsType(idAI::Type))
+		if (meleeTarget.GetEntity()->IsType(idAI::Type) && !IsJockeying()) //BC 3-6-2025: don't allow jockey if already jockeying.
 		{			
-			SetJockeyMode(true);			
+			SetJockeyMode(true);
 		}
 		return;
 	}
@@ -18361,7 +19859,7 @@ void idPlayer::PerformImpulse( int impulse ) {
 		case IMPULSE_23:
 		{
 			//debug ventpurge.
-			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge();			
+			static_cast<idMeta *>(gameLocal.metaEnt.GetEntity())->StartVentPurge(nullptr);			
 			break;
 		}
 
@@ -18597,13 +20095,16 @@ bool idPlayer::HandleESC( void ) {
 	{
 		//Exit the email interface.
 
-		//horrible kludge: assume we're in the hub level, grab the email monitor
-		//Note: this doesn't work...
-		//idEntity* ent = gameLocal.FindEntity("prop_emailmonitor"); //bc ugh this is a kludge.......
-		//if (ent)
-		//{
-		//	ent->Event_GuiNamedEvent(1, "resetEmail");
-		//}
+		//BC 2-22-2025: if player very rapidly exits the computer monitor, it messes up the game.
+		//this is because if a gui shows a 3d renderdef (i.e. rotating cat model, rotating nina head), we cannot simultaneously show
+		//that and the gameworld at the same time.
+		//if the player very rapidly mashes the exit button, we end up in this situation.
+		//so do a kludge here and just force the monitor to instantly reset to the contacts page.
+		idEntity* ent = gameLocal.FindEntity("prop_emailmonitor"); //bc ugh this is a kludge....... use hardcoded values, assume hub level. yuk!
+		if (ent)
+		{
+			ent->Event_GuiNamedEvent(1, "resetEmail");
+		}
 
 		SetEmailFullscreen(false);
 		escapedFullScreenMenu = true;
@@ -18741,7 +20242,7 @@ idPlayer::AdjustSpeed
 ==============
 */
 void idPlayer::AdjustSpeed( void ) {
-	float speed;
+	float speed, crouchSpeed;
 	float rate;
 
 	if ( spectating ) {
@@ -18804,10 +20305,13 @@ void idPlayer::AdjustSpeed( void ) {
 		speed *= 0.33f;
 	}
 
+	// SW 3rd March 2025: zoom mode affects crouch movement as well as standing movement
+	crouchSpeed = pm_crouchspeed.GetFloat();
 	if (zoommodeActive)
 	{
 		//When in zoom inspect mode, scale down movement speed to discourage playing the entire game in this mode.
 		speed *= ZOOMINSPECT_MOVEMENTSPEED_MULTIPLIER;
+		crouchSpeed *= ZOOMINSPECT_MOVEMENTSPEED_MULTIPLIER;
 	}
 
 
@@ -18855,7 +20359,7 @@ void idPlayer::AdjustSpeed( void ) {
 		return;
 	}
 
-	physicsObj.SetSpeed(speed, pm_crouchspeed.GetFloat());
+	physicsObj.SetSpeed(speed, crouchSpeed);
 }
 
 /*
@@ -18958,6 +20462,18 @@ void idPlayer::AdjustBodyAngles( void ) {
 		legsYaw = legsYaw * 0.9f + idealLegsYaw * 0.1f;
 	}
 
+	if (IsJockeying())
+	{
+		animator.CurrentAnim(ANIMCHANNEL_TORSO)->SetSyncedAnimWeight(0, 0);
+		animator.CurrentAnim(ANIMCHANNEL_TORSO)->SetSyncedAnimWeight(1, 0);
+		animator.CurrentAnim(ANIMCHANNEL_TORSO)->SetSyncedAnimWeight(2, 0);
+
+		animator.CurrentAnim(ANIMCHANNEL_LEGS)->SetSyncedAnimWeight(0, 0);
+		animator.CurrentAnim(ANIMCHANNEL_LEGS)->SetSyncedAnimWeight(1, 0);
+		animator.CurrentAnim(ANIMCHANNEL_LEGS)->SetSyncedAnimWeight(2, 0);
+		return;
+	}
+
 	if (AI_ACRO_CEILINGHIDE || AI_ACRO_SPLITS )
 	{
 		//Lock body angle. We get the difference between the viewangle and the AcroAngle, and then force the body to face that direction.
@@ -18965,35 +20481,6 @@ void idPlayer::AdjustBodyAngles( void ) {
 		float diff = idMath::AngleNormalize180(physicsObj.GetAcroAngle() - viewAngles.yaw);
 		legsAxis = idAngles( 0.0f, diff, 0.0f).ToMat3();
 		animator.SetJointAxis(originJoint, JOINTMOD_WORLD, legsAxis);
-	}
-	else if (jockeyState == JCK_ATTACHED)
-	{
-		//jockey riding a baddie. Lock body angle. Make player body be locked to same angle as the jockey target.
-		if (meleeTarget.IsValid())
-		{
-			//const float JOCKEY_FWD_OFFSET = 8.0f;
-			//const float JOCKEY_RIGHT_OFFSET = 0.0f;
-
-			float meleetargetYaw = meleeTarget.GetEntity()->viewAxis.ToAngles().yaw;
-			jointHandle_t originJoint = meleeTarget.GetEntity()->GetAnimator()->GetJointHandle("neck");
-			legsAxis = idAngles(0.0f, meleetargetYaw, 0.0f).ToMat3();
-			SetAxis( legsAxis );
-			idVec3 pounceAttachPos;
-			idMat3 pounceAttachMat;
-			meleeTarget.GetEntity()->GetAnimator()->GetJointTransform( originJoint, gameLocal.time, pounceAttachPos, pounceAttachMat );
-			//idVec3 forward, right, up;
-			//legsAxis.ToAngles().ToVectors( &forward, &right, nullptr );
-			//idVec3 offset = (( JOCKEY_FWD_OFFSET + pounceAttachPos.x) * forward) + ((pounceAttachPos.y + JOCKEY_RIGHT_OFFSET) * right);
-
-			//common->Printf("offset %.1f %.1f %.1f  \n", offset.x, offset.y, offset.z);
-
-			//SetOrigin(meleeTarget.GetEntity()->GetPhysics()->GetOrigin() + offset);
-			SetOrigin(meleeTarget.GetEntity()->GetPhysics()->GetOrigin());
-
-			//common->Printf("baddie %.1f %.1f %.1f   player %.1f %.1f %.1f\n",
-			//	meleeTarget.GetEntity()->GetPhysics()->GetOrigin().x, meleeTarget.GetEntity()->GetPhysics()->GetOrigin().y, meleeTarget.GetEntity()->GetPhysics()->GetOrigin().z,
-			//	GetPhysics()->GetOrigin().x, GetPhysics()->GetOrigin().y, GetPhysics()->GetOrigin().z);
-		}
 	}
 	//else if (AI_ACRO_SPLITS)
 	//{
@@ -19218,6 +20705,11 @@ void idPlayer::Move( void ) {
 			{
 				turningSoundThreshold = static_cast<idVentpeek*>(peekObject.GetEntity())->GetTurningSoundThreshold();
 				turningSoundDelay = static_cast<idVentpeek*>(peekObject.GetEntity())->GetTurningSoundDelay();
+
+				//BC 4-10-2025: These values were getting set to zero, resulting in the turnhead sound getting spammed every frame.
+				//Do a failsafe check to fall back to the default value.
+				turningSoundThreshold = Max(turningSoundThreshold, VENTPEEK_TURNING_SOUNDTHRESHOLD);				
+				turningSoundDelay = Max(turningSoundDelay, VENTPEEK_TURNING_SOUNDDELAY);				
 			}
 
 			idAngles lastAngles = loggedViewAngles[(gameLocal.framenum - 1) & (NUM_LOGGED_VIEW_ANGLES - 1)];
@@ -19230,9 +20722,17 @@ void idPlayer::Move( void ) {
 			}
 		}
 	}
-	else if (jockeyState == JCK_ATTACHED)
+	else if (IsJockeying())
 	{
 		physicsObj.SetContents(0);
+		physicsObj.SetMovementType(PM_FREEZE);
+	}
+	else if (vacuumSplineMover != NULL)
+	{
+		// SW 17th Feb 2025:
+		// Player is being sucked out a window via an idVacuumSpline's mover
+		physicsObj.SetContents(CONTENTS_BODY);
+		physicsObj.SetMovementType(PM_FREEZE);
 	}
 	else
 	{
@@ -19672,10 +21172,10 @@ void idPlayer::Think( void ) {
 
 	if(!airless && !noclip && !spectating && !zoominspect_LabelmodeActive)
 	{
-		bool crouchPressed = usercmd.buttonState && usercmd.prevButtonState[UB_DOWN] <= 0 && usercmd.buttonState[UB_DOWN] > 0 && !common->IsConsoleActive();
-		bool jumpPressed = usercmd.buttonState && usercmd.prevButtonState[UB_UP] <= 0 && usercmd.buttonState[UB_UP] > 0 && !common->IsConsoleActive();
+		bool crouchPressed = usercmd.prevButtonState[UB_DOWN] <= 0 && usercmd.buttonState[UB_DOWN] > 0 && !common->IsConsoleActive();
+		bool jumpPressed = usercmd.prevButtonState[UB_UP] <= 0 && usercmd.buttonState[UB_UP] > 0 && !common->IsConsoleActive();
 		// SM: Handle toggle crouch
-		if ( in_toggleCrouch.GetBool() && usercmd.buttonState) {
+		if ( in_toggleCrouch.GetBool() ) {
 			// Should we enter/exit on crouch
 			if ((crouchPressed || jumpPressed ) && toggleCrouch && !physicsObj.CheckUnduckOverheadClear()) {
 				// try to clamber out of cubby and stand if there's a nearby opening
@@ -19733,7 +21233,8 @@ void idPlayer::Think( void ) {
 	// set rolling state to lock character into anim
 	if (physicsObj.GetFallState() == FALLEN_IDLE)
 	{
-		if (!AI_FALLEN_ROLL && usercmd.rightmove != 0 && usercmd.upmove == 0)
+		// SW 24th Feb 2025: changed usercmd.upmove comparison so that crouch doesn't break rolling
+		if (!AI_FALLEN_ROLL && usercmd.rightmove != 0 && usercmd.upmove <= 0)
 		{
 			// start roll
 			fallenRollTimer = gameLocal.time + FALLEN_ROLL_TIME;
@@ -19750,7 +21251,7 @@ void idPlayer::Think( void ) {
 		}
 	}
 
-	if (this->isFrozen != FROZ_NONE || mountedObject || (physicsObj.GetFallState() == FALLEN_HEADONGROUND || physicsObj.GetFallState() == FALLEN_RISING) || mechStartupstate || mechTransitionState == MECHTRANSITION_ENTERING || mechTransitionState == MECHTRANSITION_MOVINGTOBEHIND)
+	if (this->isFrozen != FROZ_NONE || mountedObject || (physicsObj.GetFallState() == FALLEN_HEADONGROUND || physicsObj.GetFallState() == FALLEN_RISING) || mechStartupstate || mechTransitionState == MECHTRANSITION_ENTERING || mechTransitionState == MECHTRANSITION_MOVINGTOBEHIND || vacuumSplineMover != NULL)
 	{
 		usercmd.forwardmove = 0;
 		usercmd.rightmove = 0;
@@ -19844,7 +21345,11 @@ void idPlayer::Think( void ) {
 		}
 	}
 
-	
+	if (IsJockeying() && !meleeTarget.IsValid())
+	{
+		gameLocal.Warning("Jockey mode exited due to no meleetarget / npc horsey.\n");
+		SetJockeyMode(false);
+	}
 
 	if (bodyAngleLocked)
 	{
@@ -19890,7 +21395,8 @@ void idPlayer::Think( void ) {
 	
 	
 
-	if ((usercmd.buttons & BUTTON_ZOOM) && !iteminspectActive && zoombuttonTimer + ZOOM_HOLDTIME_THRESHOLD < gameLocal.time && zoomWaitingForInitialRelease)
+	if ((usercmd.buttons & BUTTON_ZOOM) && !iteminspectActive && zoombuttonTimer + ZOOM_HOLDTIME_THRESHOLD < gameLocal.time && zoomWaitingForInitialRelease
+		&& !peekObject.IsValid()) //BC 2-27-2025: don't allow held item inspect while in peek.
 	{
 		//player held zoom button for a while. enter item inspect mode.
 		zoomWaitingForInitialRelease = false;
@@ -20225,7 +21731,12 @@ void idPlayer::Think( void ) {
 		headRenderEnt->isPlayer = true;
 	}
 
-	if ( !g_stopTime.GetBool() ) {
+	if (!g_stopTime.GetBool()) {
+
+		if (IsJockeying()) { // update jockey transform right before last visual / animation update
+			JockeyAnimTransform(meleeTarget.GetEntity());
+		}
+
 		UpdateAnimation();
 
 		Present();
@@ -20772,7 +22283,7 @@ void idPlayer::Think( void ) {
 			else if (sneezeValue >= 50)
 				voLineToPlay = "snd_sneeze50";
 
-			if (voLineToPlay.Length() > 0)
+			if (voLineToPlay.Length() > 0 && !IsJockeying()) //BC 4-15-2025: don't do the sneeze noises if player is jockeying
 			{
 				if (gameLocal.voManager.SayVO(this, voLineToPlay.c_str(), VO_CATEGORY_BARK) > 0)
 				{
@@ -21227,7 +22738,7 @@ void idPlayer::Think( void ) {
 		hud->HandleNamedEvent("oxygenmeter_fadeout");
 	}
 
-	if (jockeyState == JCK_ATTACHED && meleeTarget.IsValid())
+	if (IsJockeying())
 	{
 		idVec3 playerDesiredDir = gameLocal.GetLocalPlayer()->GetCameraRelativeDesiredMovement();
 
@@ -21440,8 +22951,8 @@ void idPlayer::Think( void ) {
 
 		if (someoneSuspicious || !isInRange)
 		{
-			DoPickpocketFail();
-			pickpocketState = PP_NONE;
+			DoPickpocketFail(true);
+			
 		}
 		else if (pickpocketPipCount >= PICKPOCKET_PIPMAX)
 		{
@@ -21524,7 +23035,8 @@ void idPlayer::Think( void ) {
 
 	if (isInZoomMode())
 	{
-		bool playerIsMoving = GetPhysics()->GetLinearVelocity().Length() > 0;
+		// SW 27th March 2025: added a small threshold here so micro-jostling doesn't affect us
+		bool playerIsMoving = GetPhysics()->GetLinearVelocity().Length() > 0.1f;
 		hud->SetStateBool("playermoving", playerIsMoving);
 	}
 
@@ -21543,6 +23055,12 @@ void idPlayer::Think( void ) {
 	}
 	
 
+
+	if (g_showtimer.GetBool())
+	{
+		idStr elapsedTimeStr = gameLocal.ParseTimeVerbose(gameLocal.time);
+		hud->SetStateString("speedtimer", elapsedTimeStr.c_str());
+	}
 	
 
 	//BC Think End
@@ -21625,6 +23143,9 @@ void idPlayer::UpdateEmailFullscreen()
 			oldMouseY = usercmd.my;
 			session->SetGUI(emailUI, NULL);
 
+			static_cast<idUserInterfaceLocal*>(emailFullscreenMenu)->SetCursor(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+			static_cast<idUserInterfaceLocal*>(emailFullscreenMenu)->GetDesktop()->ClearFlag(WIN_NOCURSOR);
+
 			emailFullscreenState = EFS_ACTIVE;
 		}
 	}
@@ -21633,6 +23154,7 @@ void idPlayer::UpdateEmailFullscreen()
 		if (gameLocal.time >= emailFullscreenTimer + EMAILFULLSCREEN_LERPTIME)
 		{
 			emailFullscreenState = EFS_OFF;
+			static_cast<idUserInterfaceLocal*>(emailFullscreenMenu)->GetDesktop()->SetFlag(WIN_NOCURSOR);
 		}
 	}
 }
@@ -21722,6 +23244,19 @@ void idPlayer::ExitMemoryPalace()
 	memorypalaceState = MEMP_NONE;
 	StartSound("snd_memorypalace_off", SND_CHANNEL_ANY);
 
+	if (isInLabelInspectMode())
+	{
+		ExitLabelinspectMode();
+	}
+	if (isInZoomMode())
+	{
+		DoExitZoomMode();
+	}
+	if (iteminspectActive)
+	{
+		ExitIteminspectMode();
+	}
+
 	for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
 	{
 		if (!ent)
@@ -21734,11 +23269,6 @@ void idPlayer::ExitMemoryPalace()
 				static_cast<idNoteWall*>(ent)->ShowMemoryPalace(false);
 			}
 		}
-	}
-
-	if (memoryLight)
-	{
-		memoryLight->Off();
 	}
 
 	gameLocal.menuPause = false;
@@ -21760,6 +23290,9 @@ void idPlayer::ExitLabelinspectMode()
 		zoomCurrentFOV = ZOOM_MAX;
 		StartSound("snd_zoomout", SND_CHANNEL_ANY, 0, false, NULL);
 		zoomManualInspect = false;
+		// SW 3rd April 2025: Return FOV to default value
+		// (prevents some finicky issues involving FOV changes during note inspect
+		zoomFov.Init(gameLocal.time, ZOOM_LERPTIME, zoomFov.GetCurrentValue(gameLocal.time), DefaultFov());
 	}
 	hud->SetStateBool("showzoomcontrols", true);
 
@@ -21767,6 +23300,7 @@ void idPlayer::ExitLabelinspectMode()
 	zoominspectEntityPtr = nullptr;
 	hud->SetStateBool("zoominspect_draw", false);
 	hud->SetStateBool("zoomdesc_draw", false);
+	hud->SetStateBool("brushdesc_draw", false);
 
 	zoominspect_LabelmodeActive = false;
 
@@ -21846,17 +23380,21 @@ float idPlayer::GetPickpocketDistance()
 	return (pickpocketEnt.GetEntity()->GetPhysics()->GetOrigin() - (GetPhysics()->GetOrigin() + idVec3(0, 0, 36))).Length();
 }
 
-void idPlayer::DoPickpocketFail()
+void idPlayer::DoPickpocketFail(bool doFanfare)
 {
+	pickpocketState = PP_NONE;
+
 	if (!pickpocketEnt.IsValid())
 		return;
 
 	pickpocketEnt.GetEntity()->StopSound(SND_CHANNEL_PDA);
 
-	idVec3 pickpocketPos = pickpocketEnt.GetEntity()->GetPhysics()->GetOrigin();
-	idEntityFx::StartFx(spawnArgs.GetString("fx_pickpocket_fail"), &pickpocketPos, &mat3_identity, NULL, false);	
-
-	gameLocal.GetLocalPlayer()->SetCenterMessage("#str_def_gameplay_pickpocket_fail");
+	if (doFanfare)
+	{
+		idVec3 pickpocketPos = pickpocketEnt.GetEntity()->GetPhysics()->GetOrigin();
+		idEntityFx::StartFx(spawnArgs.GetString("fx_pickpocket_fail"), &pickpocketPos, &mat3_identity, NULL, false);
+		gameLocal.GetLocalPlayer()->SetCenterMessage("#str_def_gameplay_pickpocket_fail");
+	}
 }
 
 void idPlayer::DoPickpocketSuccess(idEntity* ent)
@@ -22090,7 +23628,10 @@ void idPlayer::UpdatePlayerConditions(void)
 				hud->HandleNamedEvent("cond_glassdamage");
 			}
 			
-			gameLocal.ProjectDecal(floorPos.endpos, -floorPos.c.normal, 8.0f, true, 16.0f, glasswoundFoot == 0 ? spawnArgs.GetString("mtr_bloodfoot1") : spawnArgs.GetString("mtr_bloodfoot2") , -decalAngle + 1.57f);
+			if (g_bloodEffects.GetBool())
+			{
+				gameLocal.ProjectDecal(floorPos.endpos, -floorPos.c.normal, 8.0f, true, 16.0f, glasswoundFoot == 0 ? spawnArgs.GetString("mtr_bloodfoot1") : spawnArgs.GetString("mtr_bloodfoot2"), -decalAngle + 1.57f);
+			}
 
 			glasswoundFoot = !glasswoundFoot;
 		}
@@ -22502,6 +24043,9 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 	heartInfo.Init( 0, 0, 0, BASE_HEARTRATE );
 	AdjustHeartRate( DEAD_HEARTRATE, 10.0f, 0.0f, true );
 
+	//BC 3-12-2025: deselect any frobbable.
+	DeselectFrobItem();
+
 	/*
 	//BC don't fade to black.
 	if ( !g_testDeath.GetBool() )
@@ -22513,7 +24057,11 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 
 	AI_DEAD = true;
 
-	SetJockeyMode(false);
+
+	if (jockeyState == JCK_ATTACHED) //BC 3-23-2025: only detach jockey if currently in jockey mode.
+	{
+		SetJockeyMode(false);
+	}
 
 	// SM: Spawn a separate ragdoll actor if the flag is set
 	idActor* newActor = NULL;
@@ -22574,9 +24122,19 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 
 	// get rid of weapon
 	weapon.GetEntity()->OwnerDied();
+	DropWeapon(true);
 
-	// drop the weapon as an item
-	DropWeapon( true );
+	// SW 1st April 2025: slightly hacky solution for dropping held carryable (and making sure it doesn't fall through the floor)
+	if (carryableItem.IsValid())
+	{
+		idEntity* carryable = carryableItem.GetEntity();
+		carryable->SetOrigin(firstPersonViewOrigin);
+		SetCarryable(NULL, false, true);
+		if (carryable->GetPhysics())
+		{
+			carryable->GetPhysics()->SetAngularVelocity(idVec3(gameLocal.random.RandomFloat() * 60, gameLocal.random.RandomFloat() * 60, gameLocal.random.RandomFloat() * 60)); // give it a little twirl so it doesn't awkwardly stand still
+		}
+	}
 
 #ifdef CTF
 	// drop the flag if player was carrying it
@@ -22663,6 +24221,7 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 	//Play the death music.
 	gameSoundWorld->PlayShaderDirectly(spawnArgs.GetString("snd_deathmusic"), SND_CHANNEL_MUSIC);
 	
+	common->g_SteamUtilities->SetSteamTimelineEvent("steam_x");
 }
 
 /*
@@ -23265,7 +24824,10 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 
 			//BC Downed state logic.
 
-			if (!inDownedState)
+			// SW 26th Feb 2025:
+			// Player cannot re-enter downed state after death 
+			// (this was possible in certain circumstances, e.g. if they were on fire)
+			if (!inDownedState && !AI_DEAD)
 			{
 				EnterDownedState(damageDef);
 			}
@@ -23610,7 +25172,8 @@ Fixed fov at intermissions, otherwise account for fov variable and zooms.
 float idPlayer::CalcFov( bool honorZoom ) {
 	float fov;
 
-	int currentTime = gameLocal.spectatePause ? gameLocal.hudTime : gameLocal.time;
+	// SW 19th March 2025: Added condition so that zoom-inspect FOV continues to apply correctly inside memory palace
+	int currentTime = (gameLocal.spectatePause || memorypalaceState == MEMP_ACTIVE) ? gameLocal.hudTime : gameLocal.time;
 
 	if ( fxFov ) {
 		return DefaultFov() + 10.0f + cos( ( currentTime + 2000 ) * 0.01 ) * 10.0f;
@@ -23902,9 +25465,9 @@ void idPlayer::OffsetThirdPersonView( float angle, float range, float height, bo
 	view += range * (sideScale - THIRDPERSON_LATERALOFFSET) * renderView->viewaxis[1];
 
 	if ( clip ) {
-		// trace a ray from the origin to the viewpoint to make sure the view isn't
-		// in a solid block.  Use an 8 by 8 block to prevent the view from near clipping anything
-		bounds = idBounds( idVec3( -4, -4, -4 ), idVec3( 4, 4, 4 ) );
+		// trace a ray from the origin to the viewpoint to make sure the view isn't in a solid block. 
+		// SW 1st April 2025: bounds are based on the spectate bounding box so that if/when we transition to spectate, we don't end up in a wall
+		bounds = idBounds(vec3_origin).Expand(pm_spectatebbox.GetFloat() * 0.5f);
 		gameLocal.clip.TraceBounds( trace, origin, view, bounds, MASK_SOLID, this );
 		if ( trace.fraction != 1.0f ) {
 			view = trace.endpos;
@@ -25373,6 +26936,13 @@ idPlayer::GetPhysicsToVisualTransform
 ================
 */
 bool idPlayer::GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis ) {
+	if (IsJockeying())
+	{
+		axis = mat3_identity; // ignore viewaxis, as the player cam is detached while jockeying
+		origin = modelOffset; // unused?
+		return true;
+	}
+
 	if ( af.IsActive() ) {
 		af.GetPhysicsToVisualTransform( origin, axis );
 		return true;
@@ -26097,6 +27667,8 @@ idEntity* idPlayer::FindAimAssistTarget(idVec3& targetPos)
 	idEntity* optimalTarget = NULL;
 
 	idBounds traceBounds(idVec3(-1.0f, -1.0f, -1.0f), idVec3(1.0f, 1.0f, 1.0f));
+
+	//blendo eric: optmization target
 
 	//Iterate through all aimAssistNode entities.
 	for (idEntity* entity = gameLocal.aimAssistEntities.Next(); entity != NULL; entity = entity->aimAssistNode.Next())
@@ -26958,7 +28530,7 @@ void idPlayer::SetGlasswound(int delta)
 	lastGlasswoundTime = gameLocal.time;
 
 	// place a wound overlay on the model.
-	if (footBloodDecalCount < 2)
+	if (footBloodDecalCount < 2 && g_bloodEffects.GetBool())
 	{
 		const char  *decal;	
 		decal = spawnArgs.RandomPrefix("mtr_wound_flesh", gameLocal.random);
@@ -27027,9 +28599,9 @@ void idPlayer::UpdateContextConditions(void)
 
 	//If I am not wounded, then spit.
 	if (GetWoundCount() <= 0)
-		contextMenu->SetStateString("context_spit", "spit");
+		contextMenu->SetStateString("context_spit", common->GetLanguageDict()->GetString("#str_gui_contextmenu_spit"));
 	else
-		contextMenu->SetStateString("context_spit", "cough blood"); //If I am wounded, then cough blood.
+		contextMenu->SetStateString("context_spit", common->GetLanguageDict()->GetString("#str_gui_contextmenu_coughblood")); //If I am wounded, then cough blood.
 
 	//Whether to draw the autoaim button.
 	if (weapon.GetEntity() != NULL)
@@ -27109,18 +28681,21 @@ void idPlayer::StartHealState(int healstateIndex)
 
 					static_cast<idSpearprojectile *>(gameLocal.entities[i])->DoFrob(DEIMPALE_FROBINDEX);
 
-					//Blood fx.
-					bloodPos = GetEyePosition() + idVec3(0, 0, -24);
-					particleDir.yaw = viewAngles.yaw ;
-					particleDir.pitch = 60;
-					splashArgs.Set("model", "spearbot_blood.prt");
-					splashArgs.Set("start_off", "1");
-					splashEnt = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &splashArgs));
-					splashEnt->GetPhysics()->SetOrigin(bloodPos);
-					splashEnt->GetPhysics()->SetAxis(particleDir.ToMat3());
-					splashEnt->PostEventMS(&EV_Activate, 0, this);
-					splashEnt->PostEventMS(&EV_Remove, 3000);
-					splashEnt->Bind(this, true);
+					if (g_bloodEffects.GetBool())
+					{
+						//Blood fx.
+						bloodPos = GetEyePosition() + idVec3(0, 0, -24);
+						particleDir.yaw = viewAngles.yaw;
+						particleDir.pitch = 60;
+						splashArgs.Set("model", "spearbot_blood.prt");
+						splashArgs.Set("start_off", "1");
+						splashEnt = static_cast<idFuncEmitter*>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &splashArgs));
+						splashEnt->GetPhysics()->SetOrigin(bloodPos);
+						splashEnt->GetPhysics()->SetAxis(particleDir.ToMat3());
+						splashEnt->PostEventMS(&EV_Activate, 0, this);
+						splashEnt->PostEventMS(&EV_Remove, 3000);
+						splashEnt->Bind(this, true);
+					}
 
 					i = gameLocal.num_entities + 1; //break out of loop.
 				}
@@ -27174,27 +28749,36 @@ void idPlayer::StartHealState(int healstateIndex)
 		case HEALSTATE_GLASSPULL:
 
 			//Cannot heal glass wound while crouched.... your arms aren't long enough to reach....
-			if (this->physicsObj.IsCrouching())
+			if (this->physicsObj.IsCrouching() && !airless)
 			{
 				hud->HandleNamedEvent("cantheal");
 				return;
 			}
 
 			//Start glass wound heal.			
-			AI_HEAL_GLASSWOUND = true;
 			healState = HEALSTATE_GLASSPULL;
-			SetArmVisibility(true);
-			SetViewPitchLerp(80);
-			SetViewYawLerp(viewAngles.yaw - 20);
+			AI_HEAL_GLASSWOUND = true;
 			weapon.GetEntity()->HideWorldModel();
-			SetViewYawLock(true, viewAngles.yaw, 90);	
+			SetArmVisibility(true);
+
+			// SW 7th April 2025: If the player is healing in space, skip a load of the camera stuff (it doesn't make sense to look 'down')
+			if (!airless)
+			{
+				SetViewPitchLerp(80);
+				SetViewYawLerp(viewAngles.yaw - 20);
+				SetViewYawLock(true, viewAngles.yaw, 90);
+			}
+
 			SetBodyAngleLock(true);
 
 			//Heal progress bar.
 			#define	GLASSPLUCK_INITIALIZETIMETIME_MS 833
 			#define	GLASSPLUCK_ANIMATIONTIME_MS 1000
+			#define GLASSPLUCK_ZEROG_ANIMATIONTIME_MS 1666 // SW 7th April 2025: we're stealing the crouching bullet pluck anim here, which is why it's exactly the same (hack hack hack)
 			healbarStartTime = gameLocal.time;
-			healbarTotalTime = GLASSPLUCK_INITIALIZETIMETIME_MS + (GLASSPLUCK_ANIMATIONTIME_MS * cond_glasswound);
+			healbarTotalTime = (airless
+				? GLASSPLUCK_ZEROG_ANIMATIONTIME_MS * cond_glasswound
+				: GLASSPLUCK_INITIALIZETIMETIME_MS + (GLASSPLUCK_ANIMATIONTIME_MS * cond_glasswound));
 
 			hud->HandleNamedEvent("onHealGlasswound");
 
@@ -27353,7 +28937,10 @@ void idPlayer::EjectBodyDebris(const char *defName, idVec3 spawnPosition)
 	ejectDir.yaw += gameLocal.random.CRandomFloat() * 10;
 	brassEnt->GetPhysics()->SetLinearVelocity(ejectDir.ToForward() * (96 + gameLocal.random.RandomFloat() * 16));
 
-	idEntityFx::StartFx(spawnArgs.GetString("fx_bulletpluck"), spawnPosition, spurtDir.ToMat3());
+	if (g_bloodEffects.GetBool())
+	{
+		idEntityFx::StartFx(spawnArgs.GetString("fx_bulletpluck"), spawnPosition, spurtDir.ToMat3());
+	}
 }
 
 
@@ -27395,9 +28982,16 @@ void idPlayer::DoGlassYankShard(void)
 	//gameRenderWorld->DebugArrow(idVec4(1, .7f, 0, 1), footPosition + idVec3(0,0,32), footPosition , 10000, true);	
 
 	viewAngles.ToVectors(NULL, &right, NULL);
-	debris->GetPhysics()->SetLinearVelocity(idVec3(0,0, 60 + (gameLocal.random.RandomFloat() * 45)) + (right * (20 + (gameLocal.random.RandomFloat() * 70)))
+	debris->GetPhysics()->SetLinearVelocity(
+		idVec3(0,0, 50 + (gameLocal.random.RandomFloat() * 35))  //upward amount
+		+ (right * (20 + (gameLocal.random.RandomFloat() * 30))) //rightward amount
 		+ idVec3(gameLocal.random.CRandomFloat() * 8, gameLocal.random.CRandomFloat() * 8, 0));
 	debris->GetPhysics()->SetAngularVelocity(idVec3(60 * gameLocal.random.CRandomFloat(), 10 * gameLocal.random.CRandomFloat(), 10 * gameLocal.random.CRandomFloat()));
+
+	if (g_bloodEffects.GetBool())
+	{
+		this->StartFxOnBone("fx/heal_glasswound_blood", "l_foot");
+	}
 }
 
 void idPlayer::DoSneeze(int sneezeType)
@@ -27437,7 +29031,7 @@ void idPlayer::DoSneeze(int sneezeType)
 	if (sneezeType == 0)
 	{
 		//push player backward.
-		GetPhysics()->SetLinearVelocity(physicsObj.GetLinearVelocity() + (viewAngles.ToForward() * -256));
+		GetPhysics()->SetLinearVelocity(physicsObj.GetLinearVelocity() + (viewAngles.ToForward() * (airless  ? SNEEZE_PUSHBACKAMOUNT_SPACE : SNEEZE_PUSHBACKAMOUNT)));
 		StartSound("snd_sneeze", SND_CHANNEL_VOICE, 0, false, NULL);
 		sneezeValue = SNEEZE_MAXVALUE;
 
@@ -27528,7 +29122,7 @@ void idPlayer::Event_TeleportToEnt(idEntity *ent)
 	GetPhysics()->SetLinearVelocity( prevVelocity * idAngles( 0, entityYaw - prevYaw, 0 ).ToMat3() );
 }
 
-void idPlayer::Event_Teleport(idVec3 destination)
+void idPlayer::Event_Teleport(const idVec3 &destination)
 {
 	idVec3 org;
 
@@ -27670,6 +29264,12 @@ void idPlayer::UpdatePlacerSticky(void)
 		showPlacer = false;
 	}
 	
+	//BC 2-21-2025: don't draw placer during throw mode.
+	if (grenadeThrowState == GRENADETHROW_AIMING && shouldDrawThrowArc)
+	{
+		showPlacer = false;
+	}
+
 	if (!showPlacer || frobEnt != NULL || peekObject.IsValid() || viewyawState != LERPSTATE_OFF || IsLeaning())
 	{
 		if (!placerEnt->IsHidden())
@@ -28159,7 +29759,11 @@ void idPlayer::UpdateDefib()
 			//ninaOrgansModel->SetDepthHack(true);
 			ninaOrgansModel->Event_PlayAnim("defib", 0);
 			ninaOrgansModel->SetDepthHack(true);
-			ninaOrgansModel->Show();			
+			ninaOrgansModel->Show();
+
+			//BC 3-4-2025: make the guts make a little squelch noise when it exits your body
+			ninaOrgansModel->StartSoundShader(declManager->FindSound( "impact_gut"), SND_CHANNEL_ANY, 0, false, NULL);
+
 		}
 	}
 	else if (defibState == DEFIB_HEARTANIM)
@@ -28182,6 +29786,10 @@ void idPlayer::UpdateDefib()
 
 			idAngles electricParticleAngle = idAngles(0, 0, 90);
 			gameLocal.DoParticle(spawnArgs.GetString("model_defibparticle"), GetPhysics()->GetOrigin(), electricParticleAngle.ToForward());
+
+			//bc 3-4-2025: do defib sound.
+			idEntityFx::StartFx(spawnArgs.GetString("fx_defibblast"), GetPhysics()->GetOrigin() + idVec3(0, 0, 8), mat3_identity);
+			
 
 			//Do electric blast on the world.
 			//Do electric shock stun on nearby enemies. Only affects actors.
@@ -28213,7 +29821,9 @@ void idPlayer::UpdateDefib()
 
 				idLocationEntity* boxLocation = gameLocal.LocationForEntity(ent);
 				idLocationEntity* playerLocation = gameLocal.LocationForEntity(this);
-				if (boxLocation->entityNumber == playerLocation->entityNumber)
+
+				// SW 3rd April 2025: Adding null checks for safety
+				if (playerLocation != NULL && boxLocation != NULL && boxLocation->entityNumber == playerLocation->entityNumber)
 				{
 					//Electrical box and player are in the same room. Kill the electrical box to kill the power in the room.
 
@@ -28557,13 +30167,16 @@ void idPlayer::UpdateMechCockpit()
 	mechCockpit->SetOrigin(cockpitPos);
 	mechCockpit->SetAxis(idAngles(cockpitAng.pitch, cockpitAng.yaw, 0).ToMat3());
 
-	//Update mech hud.
-	hud->SetStateInt("mechhealth", Max( mountedMech.GetEntity()->health, 0));
+	if (mountedMech.IsValid())
+	{
+		//Update mech hud.
+		hud->SetStateInt("mechhealth", Max(mountedMech.GetEntity()->health, 0));
 
-	float healthbarAmount = mountedMech.GetEntity()->health / (float)mountedMech.GetEntity()->maxHealth;
-	healthbarAmount = idMath::ClampFloat(0, 1, healthbarAmount);
+		float healthbarAmount = mountedMech.GetEntity()->health / (float)mountedMech.GetEntity()->maxHealth;
+		healthbarAmount = idMath::ClampFloat(0, 1, healthbarAmount);
 
-	hud->SetStateFloat("mechhealthbar", healthbarAmount);
+		hud->SetStateFloat("mechhealthbar", healthbarAmount);
+	}
 }
 
 bool idPlayer::IsInMech() const
@@ -28788,7 +30401,7 @@ void idPlayer::SetHudParmInt(const char * parmName, int value)
 }
 
 //lerp from player eyeball to somewhere.
-void idPlayer::SetViewposAbsLerp(idVec3 _target, int _duration)
+void idPlayer::SetViewposAbsLerp(const idVec3 &_target, int _duration)
 {
 	viewposAbsStart = GetEyePosition();
 	viewposAbsTarget = _target;
@@ -28799,7 +30412,7 @@ void idPlayer::SetViewposAbsLerp(idVec3 _target, int _duration)
 }
 
 //lerp from somewhere to player eyeball
-void idPlayer::SetViewposAbsLerp2(idVec3 _target, int _duration)
+void idPlayer::SetViewposAbsLerp2(const idVec3 &_target, int _duration)
 {
 	viewposAbsStart = _target;
 	viewposAbsTarget = GetEyePosition();
@@ -28959,6 +30572,7 @@ void idPlayer::SetCarryable(idEntity * ent, bool value, bool gentleDrop)
 		ent->GetPhysics()->SetGravity(vec3_origin);
 		//carryableItem.GetEntity()->fl.grabbed = true;
 		ent->GetRenderEntity()->weaponDepthHack = true;
+		ent->GetRenderEntity()->suppressShadowInViewID = entityNumber + 1; // SW 4th March 2025: Fix issue where shadow is wonky because of weapon depth hack
 		StartSound("snd_grab", SND_CHANNEL_ANY, 0, false, NULL);
 		ent->GetPhysics()->SetClipMask(0); //turn off collision.
 
@@ -28995,6 +30609,7 @@ void idPlayer::SetCarryable(idEntity * ent, bool value, bool gentleDrop)
         }
 
 		carryableItem.GetEntity()->GetRenderEntity()->weaponDepthHack = false;
+		carryableItem.GetEntity()->GetRenderEntity()->suppressShadowInViewID = 0;
 		carryableItem.GetEntity()->GetPhysics()->SetClipMask(MASK_SOLID | CONTENTS_RENDERMODEL); //re-enable collision.
 
 		if (!gameLocal.GetAirlessAtPoint(carryableItem.GetEntity()->GetPhysics()->GetOrigin())) //If in place that has gravity, then return gravity to item.
@@ -29008,7 +30623,7 @@ void idPlayer::SetCarryable(idEntity * ent, bool value, bool gentleDrop)
 
 		//Nudge the item a little to prevent it from awkwardly perfectly balancing itself.
 		carryableItem.GetEntity()->GetPhysics()->SetAngularVelocity(idVec3((gameLocal.random.RandomInt(2) > 0) ? 6 : -6, 0, 0));
-		carryableItem.GetEntity()->GetPhysics()->SetLinearVelocity(idVec3(0, 0, 2));
+		carryableItem.GetEntity()->GetPhysics()->SetLinearVelocity(idVec3(0, 0, 3));
 
 		//Remove it from the hotbar and inventory.
 		this->RemoveCarryableFromHotbar(inventory.GetHotbarSelection());
@@ -29320,7 +30935,14 @@ void idPlayer::weaponDropCheck()
 	
 	ammoavailable = weapon.GetEntity()->AmmoAvailable();
 	int equippedSlot = inventory.GetHotbarSelection();
-	if (!carryableItem.IsValid() && ammoavailable <= 0 && !spawnArgs.GetBool(va("weapon%d_allowempty", inventory.hotbarSlots[equippedSlot].weaponType)) && (weapon.GetEntity()->AmmoRequired() > 0))
+	if (!carryableItem.IsValid() 
+		&& ammoavailable <= 0 
+		&& !spawnArgs.GetBool(va("weapon%d_allowempty", inventory.hotbarSlots[equippedSlot].weaponType)) 
+		&& (weapon.GetEntity()->AmmoRequired() > 0) 
+		&& equippedSlot == idealWeaponSlot	// SW 12th March 2025: adding condition to handle transitional boundary when switching off carryables
+		&& idealWeaponSlot == currentWeaponSlot) 
+		// SW 20th March 2025: fixing past-suzy's goddamn silly goose mistake where she decided to write 'equippedSlot == idealWeaponSlot == currentWeaponSlot'
+		// which *obviously* is buggy because you're just going to evaluate half of that and then compare the remaining value to a boolean
 	{
 		//Update the hotbar. Clear out the slot.
 		
@@ -29419,7 +31041,7 @@ bool idPlayer::DoCryoSpawnLogic()
 	idAngles spawnAngles;
 	idVec3 forward;
 	gameLocal.entities[cryoInteriorEntNum]->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, NULL); //move player backwards a bit, so the player has more context of the space
-	spawnOrigin = gameLocal.entities[cryoInteriorEntNum]->GetPhysics()->GetOrigin() + idVec3(0, 0, 2) + (forward * -7); //Raise it up a bit so that the player's feet don't spawn inside the model's floor surface.
+	spawnOrigin = gameLocal.entities[cryoInteriorEntNum]->GetPhysics()->GetOrigin() + idVec3(0, 0, 1.1f) + (forward * -.9f); //Raise it up a bit so that the player's feet don't spawn inside the model's floor surface.
 	spawnAngles = gameLocal.entities[cryoInteriorEntNum]->GetPhysics()->GetAxis().ToAngles();
 	SpawnToPoint(spawnOrigin, spawnAngles);
 
@@ -29435,7 +31057,7 @@ void idPlayer::Event_SetDropAmmoMsg(int value)
 
 	const char *ammoName = inventory.AmmoPickupNameForIndex(weapon.GetEntity()->GetAmmoType());
 
-	hud->SetStateString("centermessage", va("Dropped %d %s", value, ammoName));
+	hud->SetStateString("centermessage", idStr::Format2(common->GetLanguageDict()->GetString("#str_def_gameplay_dropammo"), value, ammoName));
 	hud->HandleNamedEvent("droppedAmmo");
 }
 
@@ -29512,8 +31134,6 @@ void idPlayer::UpdateTrackedInteractions(renderEntity_s* renderEnt, idList<track
 
 	if (g_luminance_enabled.GetBool() && !player->isInVignette)
 	{		
-		player->trackedInteractions = interactions;
-
 		// Clamp rate of updates since this stuff is pretty trace-heavy
 		if (gameLocal.time - player->GetLastLuminanceUpdate() > g_luminance_updateRate.GetInteger())
 		{
@@ -29547,9 +31167,9 @@ void idPlayer::UpdateTrackedInteractions(renderEntity_s* renderEnt, idList<track
 					tracePoint = true;
 				}
 
-				for (int i = 0; i < player->trackedInteractions->Num(); i++)
+				for (int i = 0; i < interactions->Num(); i++)
 				{
-					trackedInteraction_t* interaction = &(player->trackedInteractions->Ptr()[i]);
+					trackedInteraction_t* interaction = &(interactions->Ptr()[i]);
 
 					if (interaction->lightCastsShadows)
 					{
@@ -30128,7 +31748,8 @@ void idPlayer::UpdateZoomInspect()
         //check if we're directly hitting the object.
         bool hitsModel = false;
         trace_t modelTr;
-        gameLocal.clip.TracePoint(modelTr, cameraPos, cameraPos + cameraAxis[0] * 1024, MASK_OPAQUE, this);
+		gameLocal.clip.TracePoint(modelTr, cameraPos, cameraPos + cameraAxis[0] * 1024, MASK_SOLID, this); //BC 2-13-2025: changed this from MASK_OPAQUE to MASK_SOLID so that the trace actually touches entities. (opaque just ignores entities)
+
         if (modelTr.c.entityNum == ent->entityNumber)
         {
             hitsModel = true;
@@ -30270,6 +31891,11 @@ bool idPlayer::HasWeaponInInventory(const char *weaponName, bool ignoreMultiCarr
 	return (inventory.GetHotbarslotViaWeaponIndex(frobitemIndex) >= 0);
 }
 
+void idPlayer::Event_HasWeaponInInventory(const char* weaponName, int ignoreMultiCarry)
+{
+	idThread::ReturnInt(HasWeaponInInventory(weaponName, ignoreMultiCarry != 0));
+}
+
 
 void idPlayer::RemoveCarryableFromHotbar(int hotbarIndex)
 {
@@ -30386,6 +32012,43 @@ idEntity *idPlayer::GetCarryableFromInventory(const char *weaponName)
 	}	
 
 	return NULL;
+}
+
+void idPlayer::Event_HasItemViaEntityname(const char* itemname)
+{
+	idThread::ReturnInt(HasItemViaEntityname(itemname) ? 1 : 0);
+}
+
+//SW 12th March 2025: Returns true if player has object in inventory. Uses the ENTITY NAME of item.
+bool idPlayer::HasItemViaEntityname(const char* itemname)
+{
+	idStr strName = itemname;
+	int subIndex = strName.Find("*", false, 0, -1);
+
+	for (int i = 0; i < min(MAX_HOTBARSLOTS, inventory.hotbarUnlockedSlots); i++)
+	{
+		if (inventory.hotbarSlots[i].carryPtr.IsValid())
+		{
+			idStr hotbarname = inventory.hotbarSlots[i].carryPtr.GetEntity()->name;
+
+			if (subIndex >= 0)
+			{
+				//Has a wildcard.
+				idStr classnameChunk = strName.Mid(0, subIndex);
+
+				if (idStr::Icmpn(classnameChunk, hotbarname, subIndex) == 0)
+				{
+					return true;
+				}
+			}
+			else if (idStr::Icmp(strName, hotbarname) == 0) //No wildcard. Do normal check.
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 //Returns true if player has object in inventory. Uses the CLASSNAME of item.
@@ -30753,12 +32416,25 @@ void idPlayer::SetCamSpurt(const char *particleName)
 	idAngles particleAngle = viewAngles;
 	particleAngle.pitch += 60;
 	
-	gameLocal.DoParticle(particleName, particlePos, particleAngle.ToForward());
+	// SW: Technically this could be used for non-blood effects,
+	// but let's face it, how many body fluids are gonna spurt out like this?
+	if (g_bloodEffects.GetBool())
+	{
+		gameLocal.DoParticle(particleName, particlePos, particleAngle.ToForward());
+	}
+	
 }
 
 //default length of slowmo time is IMPACT_SLOWMO_TIME
 void idPlayer::SetImpactSlowmo(bool value, int extraTimeToAdd)
 {
+	if (!g_impactslowmo.GetBool())
+		return;
+
+	//BC 3-14-2025: skip slowmo if player is dead.
+	if (health <= 0)
+		return;
+
 	impactslowmoActive = value;
 	gameLocal.SetSlowmo(value);
 
@@ -30829,7 +32505,7 @@ void idPlayer::SetFlytextEvent(idVec3 position, const char *text, int textAlign 
 	common->Warning("Unable to allocate a free flytext index. Max: %d\n", FLYTEXT_COUNT);
 }
 
-void idPlayer::Event_flytext(idVec3 position, const char *text)
+void idPlayer::Event_flytext(const idVec3 &position, const char *text)
 {
 	SetFlytextEvent(position, text, idDeviceContext::ALIGN_CENTER);
 }
@@ -30868,6 +32544,22 @@ void idPlayer::UpdateFlytext()
 
 void idPlayer::SetArmStatsActive( bool value)
 {
+	// SW 4th March 2025
+	// Don't let player check watch while they're dead (you have all the time in the world now, child)
+	if (AI_DEAD || health <= 0) 
+	{
+		armstatsActive = false;
+		return;
+	}
+
+	// SW 10th April 2025
+	// Don't let the player check watch while jockeying either (your arms are busy, cmon)
+	if (jockeyState == JCK_ATTACHED)
+	{
+		armstatsActive = false;
+		return;
+	}
+
 	if (!gameLocal.world->spawnArgs.GetBool("meta_infowatch", "1"))
 	{
 		// SW: Fail silently (we haven't introduced the infowatch yet)
@@ -31122,8 +32814,10 @@ void idPlayer::SetJockeyMode(bool value)
 		if (!meleeTarget.IsValid())
 			return;
 
+		idAI* jockeyTarget = meleeTarget.GetEntity();
+
 		//if try to jockey someone who is un-jockeyable.
-		if (!meleeTarget.GetEntity()->spawnArgs.GetBool("jockeyable", "1"))
+		if (!jockeyTarget->spawnArgs.GetBool("jockeyable", "1"))
 		{
 			StartSound("snd_error", SND_CHANNEL_ANY); //prompt is up but cannot be jockeyed, so play error sound.
 			hud->HandleNamedEvent("unjockeyFlash");
@@ -31132,10 +32826,10 @@ void idPlayer::SetJockeyMode(bool value)
 
 		if (jockeyState != JCK_ATTACHED)
 		{
-			gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_player_pounce"), meleeTarget.GetEntity()->displayName.c_str()), GetPhysics()->GetOrigin());
+			gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_player_pounce"), jockeyTarget->displayName.c_str()), GetPhysics()->GetOrigin());
 		}
 
-		meleeTarget.GetEntity()->SetJockeyState(true);
+		jockeyTarget->SetJockeyState(true);
 		SetArmVisibility(true);
 
 		//jointHandle_t pounceJoint = meleeTarget.GetEntity()->GetAnimator()->GetJointHandle("shoulders"); //Joint player attaches to.
@@ -31151,7 +32845,11 @@ void idPlayer::SetJockeyMode(bool value)
 
 		AI_JOCKEYRIDE = true;
 		jockeyState = JCK_ATTACHED;
+
 		AdjustBodyAngles();
+
+
+		JockeyAnimTransform(jockeyTarget, true);
 
 		jockeyArrow->Show();
 
@@ -31178,9 +32876,19 @@ void idPlayer::SetJockeyMode(bool value)
 
 		//Find a position to place the player.
 		idVec3 dismountLocation = GetJockeyDismountLocation();
-		if (dismountLocation != vec3_zero && meleeTarget.IsValid())
+		if (dismountLocation != vec3_zero)
 		{
-			idVec3 directionToEnemy = meleeTarget.GetEntity()->GetPhysics()->GetOrigin() - idVec3(dismountLocation.x, dismountLocation.y, meleeTarget.GetEntity()->GetPhysics()->GetOrigin().z);
+			// SW 17th March 2025: made it so having a valid melee target is now optional (we can still teleport, the view angles just might not be perfect)
+			idVec3 directionToEnemy;
+			if (meleeTarget.IsValid())
+			{
+				directionToEnemy = meleeTarget.GetEntity()->GetPhysics()->GetOrigin() - idVec3(dismountLocation.x, dismountLocation.y, meleeTarget.GetEntity()->GetPhysics()->GetOrigin().z);
+			}
+			else
+			{
+				directionToEnemy = viewAngles.ToForward();
+			}
+			
 			Teleport(dismountLocation, directionToEnemy.ToAngles(), NULL);
 		}
 
@@ -31191,54 +32899,367 @@ void idPlayer::SetJockeyMode(bool value)
 
 		jockeyArrow->Hide();
 
+		GetPhysics()->SetAxis(mat3_identity);
+		GetAnimator()->SetJointAxis(GetAnimator()->GetJointHandle("body"), JOINTMOD_NONE, mat3_identity);
+		GetAnimator()->SetJointPos(GetAnimator()->GetJointHandle("body"), JOINTMOD_NONE, vec3_zero);
+
 		hud->SetStateBool("showjockeyattackprompt", false);
 	}
+}
+
+idVec3 GetJointWorldPosition(idActor* animatedEnt, jointHandle_t hJoint) {
+	renderEntity_t* renderEnt = animatedEnt->GetRenderEntity();
+	idVec3 jointPos;
+	idMat3 jointRot;
+	animatedEnt->GetAnimator()->GetJointTransform(hJoint, gameLocal.time, jointPos, jointRot);
+	return (jointPos * renderEnt->axis) + renderEnt->origin;
+}
+
+idVec3 GetJointLocalPosition(idActor* animatedEnt, jointHandle_t hJoint) {
+	idVec3 jointPos;
+	idMat3 jointRot;
+	animatedEnt->GetAnimator()->GetJointTransform(hJoint, gameLocal.time, jointPos, jointRot);
+	return jointPos;
+}
+
+void idPlayer::JockeyAnimTransform(idAI* enemy, bool initRef)
+{
+	idAnimator* enemyAnimator = enemy->GetAnimator();
+	idAnimBlend* playerAnim = GetAnimator()->CurrentAnim(ANIMCHANNEL_TORSO);
+
+#if 1
+	// sync up anims, which might be a frame off due to separate parts state machine
+	idAnimBlend* enemyAnim = enemyAnimator->CurrentAnim(ANIMCHANNEL_TORSO);
+	if (playerAnim->GetStartTime() != enemyAnim->GetStartTime() &&
+		((playerAnim->GetStartTime() - enemyAnim->GetStartTime()) < 150)  )
+	{
+		enemyAnim->SetStartTime(playerAnim->GetStartTime());
+		enemyAnim->SetCycleCount(playerAnim->GetCycleCount());
+		enemyAnim->SetPlaybackRate(gameLocal.time, playerAnim->GetCycleCount());
+	}
+#endif
+
+	if (initRef)
+	{ // get initial jockey joint transform from idle/ref
+		const char* animRef = "jockey_idle";
+		const char* jointIdleRef = "neck";
+		idJointQuat jointArr[100] = {}; // arbitrary large nunmber
+		int chainIndices[12] = {};
+
+		const int* jointParents = enemyAnimator->ModelDef()->JointParents();
+		int jointRefIndex = (int)enemyAnimator->GetJointHandle(jointIdleRef);
+
+		// get ref chain of all ancestors to joint ref
+		int chainCount = 0;
+		int nextJoint = jointRefIndex;
+		while (nextJoint >= 0)
+		{
+			chainIndices[chainCount++] = nextJoint;
+			nextJoint = jointParents[nextJoint];
+		}
+
+		const idMD5Anim* jockeyAnim = enemyAnimator->GetAnim(enemy->GetAnim(ANIMCHANNEL_TORSO, animRef))->MD5Anim(0);
+		jockeyAnim->GetSingleFrame(0, jointArr, chainIndices, chainCount);
+
+		idJointQuat transformedJoint = jointArr[chainIndices[chainCount - 1]];
+		// calculate the 
+		for (int chainIdx = chainCount - 2; chainIdx >= 0; chainIdx--)
+		{
+			idJointQuat& jointChild = jointArr[chainIndices[chainIdx]];
+			transformedJoint.t = jointChild.t * transformedJoint.q + transformedJoint.t;
+			transformedJoint.q = jointChild.q * transformedJoint.q;
+		}
+
+		jockeyJointIdlePos = transformedJoint.t;
+		jockeyJointIdleRot = transformedJoint.q;
+
+		jockeyJointModPos = vec3_zero;
+		jockeyJointModRot = idQuat(0, 0, 0, 1.0f);
+
+		return;
+	}
+
+	if ( idStr::FindText(playerAnim->AnimName(),"mount", false) > 0 )
+	{
+		return;
+	}
+
+
+#if 1
+	// use an anchor position on the enemy, which we keep the player tethered within a set distance
+	const char* anchorRef = "body";
+	jointHandle_t playerAnchorHandle = GetAnimator()->GetJointHandle("body");
+
+	GetAnimator()->SetJointPos(playerAnchorHandle, JOINTMOD_NONE, vec3_zero);
+	idVec3 playerAnchorPos = GetJointWorldPosition(this, GetAnimator()->GetJointHandle(anchorRef));
+
+	idVec3 enemyAnchorPos;
+	idMat3 enemyAnchorRot;
+	enemyAnimator->GetJointTransform(enemyAnimator->GetJointHandle(anchorRef), gameLocal.time, enemyAnchorPos, enemyAnchorRot);
+
+	renderEntity_t* enemyRenderEnt = enemy->GetRenderEntity();
+	enemyAnchorPos = enemyAnchorPos * enemyRenderEnt->axis  + enemyRenderEnt->origin; // convert to world
+
+
+	const idVec3 manualAnchorRef = idVec3(-2.7f, 0.8f, 11.6f); // forward right up
+	idVec3 anchorOffset = (playerAnchorPos - enemyAnchorPos);
+	anchorOffset = anchorOffset - manualAnchorRef* enemyRenderEnt->axis;
+
+	idVec3 manualAnchorRefWorld = manualAnchorRef*enemyRenderEnt->axis  + enemyAnchorPos; 
+	float anchorDist = anchorOffset.LengthFast();
+	anchorOffset = anchorOffset/anchorDist; // normalize
+
+	const float MaxAnchorDist = 2.5f; // any movement beyond this will get offset
+	anchorDist = Max( anchorDist-MaxAnchorDist , 0.0f );
+	anchorOffset *= anchorDist;
+
+	idVec3 anchorPosOverride = anchorOffset + manualAnchorRefWorld;
+	idVec3 anchorPosAdjust = anchorPosOverride - playerAnchorPos;
+
+
+	{	// another hack to stop player from clipping into enemy with unsyncd anim
+		const char* clipRef = "neck";
+		idVec3 playerClipPos = GetJointWorldPosition(this, GetAnimator()->GetJointHandle(clipRef));
+		idVec3 enemyClipPos = GetJointWorldPosition(enemy, enemyAnimator->GetJointHandle(clipRef));
+
+#if 0
+		const float StayWithin = 10.0f;
+		const float StayWithout = 3.0f;
+		idVec3 relPos = (playerClipPos - enemyClipPos);
+		float totalDist = relPos.LengthFast();
+
+		if (totalDist > StayWithin)
+		{
+			relPos /= totalDist;
+			relPos *= totalDist - StayWithin;
+			anchorPosOverride -= relPos;
+			anchorPosAdjust -= relPos;
+		}
+		else if( totalDist < StayWithout  )
+		{
+
+			relPos /= totalDist;
+			relPos *= StayWithout - totalDist;
+			anchorPosOverride += relPos;
+			anchorPosAdjust += relPos;
+		}
+#else
+		const float StayBelowMax = 12.0f;
+		const float StayAboveMin = 3.0f;
+		float dipBelowAmount = Max( -((playerClipPos.z - enemyClipPos.z) - StayAboveMin), 0.0f);
+		dipBelowAmount = Max( -((playerAnchorPos.z - (enemyAnchorPos.z + 5.0f)) - StayAboveMin), dipBelowAmount);
+		float riseAboveAmount = Max( ((playerClipPos.z - enemyClipPos.z) - StayBelowMax), 0.0f);
+		riseAboveAmount = Max( ((playerAnchorPos.z - (enemyAnchorPos.z + 5.0f)) - StayBelowMax), riseAboveAmount);
+		if (dipBelowAmount > 0.0f)
+		{
+			anchorPosOverride.z += dipBelowAmount;
+			anchorPosAdjust.z += dipBelowAmount;
+		}
+		else if (riseAboveAmount > 0.0f)
+		{
+			anchorPosOverride.z -= riseAboveAmount;
+			anchorPosAdjust.z -= riseAboveAmount;
+		}
+
+		idVec2 horizontalVec = playerClipPos.ToVec2() - enemyClipPos.ToVec2();
+		float horizontalDist = horizontalVec.LengthFast();
+
+		const float StayAroundMax = 5.0f;
+
+		if (horizontalDist > StayAroundMax)
+		{
+			horizontalVec /= horizontalDist;
+			horizontalVec *= horizontalDist - StayAroundMax;
+			anchorPosOverride += idVec3( horizontalVec.x, horizontalVec.y, 0.0f);
+			anchorPosAdjust += idVec3( horizontalVec.x, horizontalVec.y, 0.0f);
+		}
+#endif
+	}
+	GetAnimator()->SetJointPos(playerAnchorHandle, JOINTMOD_WORLD, anchorPosAdjust);
+
+
+	const idVec3 manualAdjustPos = idVec3(-5.0f, -6.0f, 13.0f); // forward right up
+	const idAngles manualAdjustAngle = idAngles(-60.0f, 0.0f, 0.0f); // pitch
+	const char* jointIdleRef = "neck";
+
+	jointHandle_t enemyJointHandle = enemyAnimator->GetJointHandle(jointIdleRef);
+	idVec3 enemyJointPos;
+	idMat3 enemyJointRot;
+	enemyAnimator->GetJointTransform(enemyJointHandle, gameLocal.time, enemyJointPos, enemyJointRot);
+
+
+//	float smoothInterp = idMath::ClampFloat(0.0f, 1.0f, MS2SEC(gameLocal.msec)*20.0f); // how quickly to interpolate
+	idVec3 newJointModPos = (enemyJointPos - jockeyJointIdlePos) + manualAdjustPos;
+	jockeyJointModPos = newJointModPos;
+	//jockeyJointModPos.Lerp(jockeyJointModPos, newJointModPos, smoothInterp);
+
+	idQuat newJointMod = (manualAdjustAngle.ToQuat() * jockeyJointIdleRot.Inverse() * enemyJointRot.ToQuat());
+	//jockeyJointModRot.Slerp( jockeyJointModRot, newJointMod, smoothInterp);
+	//jockeyJointModRot.Normalize();
+
+	jockeyJointModRot = newJointMod;
+
+	// change player to new modified origin / enemy axis
+	idVec3 newOrigin = enemyRenderEnt->origin + (jockeyJointModPos * enemyRenderEnt->axis);
+	idMat3 newRot = enemyRenderEnt->axis;
+
+	GetPhysics()->SetAxis(newRot);
+	GetPhysics()->SetOrigin(newOrigin);
+
+	// set the matching body rotation separately, using the enemy jointref
+	GetAnimator()->SetJointAxis(playerAnchorHandle, JOINTMOD_WORLD, jockeyJointModRot.ToMat3());
+#endif
+
+#if 0
+
+	jointHandle_t playerIKRef = GetAnimator()->GetJointHandle("l_foot");
+	jointHandle_t enemyFootRef = enemyAnimator->GetJointHandle("l_upperleg");
+
+	GetAnimator()->SetJointPos(playerIKRef, JOINTMOD_NONE, vec3_zero);
+
+	idVec3 leftLegToEnemyLeg = GetJointWorldPosition(enemy, enemyAnimator->GetJointHandle("l_upperleg")) - GetJointWorldPosition(this, playerIKRef);
+
+	idVec3 playerIKPos;
+	idMat3 playerIKMat;
+	GetAnimator()->GetJointTransform(playerIKRef, gameLocal.time, playerIKPos, playerIKMat);
+
+	idVec3 playerIKPosWorld = playerIKPos * renderEntity.axis + renderEntity.origin;
+
+
+	GetAnimator()->SetJointPos(playerIKRef, JOINTMOD_WORLD, leftLegToEnemyLeg * newRot.InverseFast());
+#if defined(_DEBUG) && 1
+	gameRenderWorld->DebugArrow(colorMagenta, playerIKPosWorld, playerIKPosWorld + playerIKMat[0]* renderEntity.axis *10.0f, 1);
+
+	gameRenderWorld->DebugSphere(colorMagenta, idSphere(GetJointWorldPosition(enemy, enemyFootRef), 1.0f), 1);
+#endif
+#endif
+
+
+#if defined(_DEBUG) && 0
+	ResetJockeyTimer();
+
+	idVec3 enemyJockWorldPos = enemyJointPos * newRot + newOrigin;
+	idMat3 enemyJockWorldRot = enemyJointRot * newRot;
+
+	gameRenderWorld->DebugArrow(colorBlue, enemyJockWorldPos, enemyJockWorldPos + newRot.ToAngles().ToForward() * 20.0f, 1);
+
+	gameRenderWorld->DebugSphere(colorPink, idSphere(enemyJockWorldPos, 1.0f), 1);
+	gameRenderWorld->DebugArrow(colorPink, enemyJockWorldPos, enemyJockWorldPos + enemyJockWorldRot.ToAngles().ToForward() * 20.0f, 1);
+
+	gameRenderWorld->DebugArrow(colorGreen, enemyJockWorldPos, enemyJockWorldPos + enemyJointRot.ToAngles().ToForward() * 20.0f, 1);
+	gameRenderWorld->DebugArrow(colorOrange, enemyJockWorldPos, enemyJockWorldPos + jockeyJointIdleRot.ToAngles().ToForward() * 20.0f, 1);
+	gameRenderWorld->DebugArrow(colorBlack, enemyJockWorldPos, enemyJockWorldPos + (jockeyJointIdleRot * jockeyJointModRot).ToAngles().ToForward() * 21.0f, 1);
+
+
+	gameRenderWorld->DebugArrow(colorGreen, newOrigin, newOrigin + (newRot* jockeyJointModRot.ToMat3()).ToAngles().ToForward() * 20.0f, 1);
+	gameRenderWorld->DebugArrow(colorOrange, newOrigin, newOrigin + (jockeyJointModRot.ToMat3() * newRot).ToAngles().ToForward() * 20.0f, 1);
+	gameRenderWorld->DebugArrow(colorBlack, newOrigin, newOrigin + (newRot).ToAngles().ToForward() * 21.0f, 1);
+#endif
 }
 
 idVec3 idPlayer::GetJockeyDismountLocation()
 {
 	#define DISMOUNTDISTANCE 48
 	idVec3 originPoint;
+	idVec3 forwardYaw = viewAngles.ToForward();
+	forwardYaw.z = 0;
+	forwardYaw.Normalize();
+
 	if (meleeTarget.IsValid())
 		originPoint = meleeTarget.GetEntity()->GetPhysics()->GetOrigin();
 	else
 		originPoint = GetPhysics()->GetOrigin();
 
+
 	//First, try the current viewAngle. This makes for the cleanest transition and makes for smoothest experience for player.
-	idVec3 viewPosition = originPoint + viewAngles.ToForward() * -DISMOUNTDISTANCE;
-	if (CheckDismountViability(viewPosition))
+	idVec3 viewPosition = originPoint + forwardYaw * -DISMOUNTDISTANCE;
+	if (CheckDismountViability(viewPosition, true))
 		return viewPosition;
 
 	//Try the viewAngle + 180 degrees.
-	idVec3 reverseviewPosition = originPoint + viewAngles.ToForward() * DISMOUNTDISTANCE;
-	if (CheckDismountViability(reverseviewPosition))
+	idVec3 reverseviewPosition = originPoint + forwardYaw * DISMOUNTDISTANCE;
+	if (CheckDismountViability(reverseviewPosition, true))
 		return reverseviewPosition;
 
 	//Try behind the melee target.
 	if (meleeTarget.IsValid())
 	{
 		idVec3 behindEnemyPos = meleeTarget.GetEntity()->GetPhysics()->GetOrigin() + meleeTarget.GetEntity()->viewAxis.ToAngles().ToForward() * -DISMOUNTDISTANCE;
-		if (CheckDismountViability(behindEnemyPos))
+		if (CheckDismountViability(behindEnemyPos, true))
 			return behindEnemyPos;
 	}
 
-	return vec3_zero;
+	// SW 18th March 2025
+	// The absolute last thing we want to do is end up in the wall, which is possible if we fall through to the end of this function
+	// So if we've reached this point, it's time to start trying desperate measures.
+	// First level of desperation: we stop caring if there's a floor to stand on.
+	// Repeat the above checks without floor check
+	if (CheckDismountViability(viewPosition, false))
+		return viewPosition;
+
+	if (CheckDismountViability(reverseviewPosition, false))
+		return reverseviewPosition;
+
+	if (meleeTarget.IsValid())
+	{
+		idVec3 behindEnemyPos = meleeTarget.GetEntity()->GetPhysics()->GetOrigin() + meleeTarget.GetEntity()->viewAxis.ToAngles().ToForward() * -DISMOUNTDISTANCE;
+		if (CheckDismountViability(behindEnemyPos, false))
+			return behindEnemyPos;
+	}
+
+	// SW 18th March 2025
+	// Desperation level two: we don't care where we put the player, just don't let them be in the wall, please
+	// The below call returns an array pointer, so please make sure to clean it up afterwards if you do any work here.
+	idVec3* pointsOnSphere = gameLocal.GetPointsOnSphere(128);
+	idVec3 candidate;
+	for (int i = 0; i < 128; i++)
+	{
+		candidate = originPoint + (pointsOnSphere[i] * DISMOUNTDISTANCE);
+		if (CheckDismountViability(candidate, false))
+		{
+			gameLocal.Warning("GetJockeyDismountLocation: Could not find a good location. Returning arbitrary nearby point (%s)", candidate.ToString());
+			delete pointsOnSphere;
+			return candidate;
+		}
+	}
+	delete pointsOnSphere;
+
+	// SW 18th March 2025
+	// Desperation level three: just return the melee target's origin point
+	// This isn't ideal because the melee target most likely uses the pirate's bounding box, which is *smaller* than the player's on the X/Y axes
+	// So it's possible that the player will end up in a wall here. It sucks!!
+	gameLocal.Warning("GetJockeyDismountLocation: Could not find a location. Returning origin point (%s). This might put the player in a wall!", originPoint.ToString());
+
+	return originPoint;
 }
 
-bool idPlayer::CheckDismountViability(idVec3 _position)
+bool idPlayer::CheckDismountViability(idVec3 _position, bool doFloorCheck)
 {
+	// SW 18th March 2025
+	// Basic sanity check to confirm that the point is actually in the world
+	int contentsAtPoint = gameLocal.clip.Contents(_position, NULL, mat3_identity, CONTENTS_SOLID, NULL);
+	if (contentsAtPoint & MASK_PLAYERSOLID)
+	{
+		return false;
+	}
+
 	//Check for bounding box clearance.
 	trace_t viewTr;
 	idBounds playerBounds = GetPhysics()->GetClipModel()->GetBounds();
-	gameLocal.clip.TraceBounds(viewTr, _position, _position, playerBounds, MASK_SOLID, this);
+	gameLocal.clip.TraceBounds(viewTr, _position, _position, playerBounds, MASK_PLAYERSOLID, this);
 	if (viewTr.fraction < 1)
 		return false;
 
-	//Check if there's a floor.
-	trace_t floorTr;
-	gameLocal.clip.TracePoint(floorTr, _position + idVec3(0, 0, 1), _position + idVec3(0, 0, -16), MASK_SOLID, this);
-	if (floorTr.fraction >= 1)
-		return false;
+	// SW 18th March 2025: making floor check optional so we can call it without (if we're getting desperate and we just need to put the player somewhere)
+	if (doFloorCheck)
+	{
+		//Check if there's a floor.
+		// SW 18th March 2025: Increasing trace distance here to help handle cases where the player is jockey slamming up a staircase
+		trace_t floorTr;
+		gameLocal.clip.TracePoint(floorTr, _position + idVec3(0, 0, 1), _position + idVec3(0, 0, -64), MASK_PLAYERSOLID, this);
+		if (floorTr.fraction >= 1)
+			return false;
+	}
 
 	return true;
 
@@ -31734,8 +33755,18 @@ void idPlayer::UpdatePlayerLocboxTriggers()
 {
 	if (!ShouldShowLocBox())
 	{
+		// SW 20th Feb 2025: Adding DisplayLocbox("") call here so that the game correctly updates if we turn off locboxes while one is active.
+		DisplayLocbox("");
 		return;
 	}
+
+	//BC 4-11-2025: if player is in the process of zooming into a label, do not update the locbox target.
+	//This prevents the locbox from changing during the zoom lerp.
+	if (zoominspect_LabelmodeActive)
+	{
+		return;
+	}
+
 
 	idVec3 startTr, endTr;
 	trace_t frobTr;
@@ -31750,42 +33781,92 @@ void idPlayer::UpdatePlayerLocboxTriggers()
 	
 	endTr = startTr + viewAngles.ToForward() * PLAYERLOOK_TRIGGER_DIST;
 
-	gameLocal.clip.TracePoint(frobTr, startTr, endTr, CONTENTS_SOLID | CONTENTS_PLAYERLOOK_TRIGGER, this);
+	gameLocal.clip.TracePoint(frobTr, startTr, endTr, CONTENTS_SOLID | CONTENTS_PLAYERLOOK_TRIGGER, this, CONTENTS_TRANSLUCENT);
 
 	idEntity* ent = frobTr.fraction < 1 ? gameLocal.entities[frobTr.c.entityNum] : nullptr;
 
 
-	bool locboxtriggerThisFrame = false;
+	idEntity* locboxtriggeredThisFrame = NULL;
 	idStr locString = "";
 
 	//Do a straight tracepoint
-	if (ent && ent->IsType(idTrigger_Multi::Type) && !ent->IsHidden())
+	if (ent && ent->IsType(idTrigger_Multi::Type) && !ent->IsHidden() && ent->GetPhysics())
 	{
-		locboxtriggerThisFrame = true;
-		locString = ent->spawnArgs.GetString("text");
+		// SW 12th March 2025: adding cull check based on screenspace size.
+		// This helps with issues where the player mouses over a tiny inscrutable piece of text from across the room
+		float screenSpaceArea = 0;
+		idVec2 rectMin = idVec2(640, 480);
+		idVec2 rectMax = idVec2(0, 0);
+		idVec2 candidate;
+		idVec3 boundPoints3D[8];
+		ent->GetPhysics()->GetAbsBounds().ToPoints(boundPoints3D);
+		for (int i = 0; i < 8; i++)
+		{
+			candidate = GetWorldToScreen(boundPoints3D[i]);
+			if (candidate.x < rectMin.x)
+			{
+				rectMin.x = candidate.x;
+			}
+			if (candidate.x > rectMax.x)
+			{
+				rectMax.x = candidate.x;
+			}
+			if (candidate.y < rectMin.y)
+			{
+				rectMin.y = candidate.y;
+			}
+			if (candidate.y > rectMax.y)
+			{
+				rectMax.y = candidate.y;
+			}
+		}
+
+		screenSpaceArea = (rectMax.x - rectMin.x) * (rectMax.y - rectMin.y);
+		// SW 26th March 2025: adding override scale here for per-entity fine-tuning
+		if (screenSpaceArea * ent->spawnArgs.GetFloat("locboxDistScale", "1") > g_locbox_minscreensize.GetFloat())
+		{
+			if (developer.GetBool())
+			{
+				gameRenderWorld->DebugBounds(idVec4(0, 1, 0, 1), ent->GetPhysics()->GetAbsBounds(), vec3_origin, 1);
+			}
+			locboxtriggeredThisFrame = ent;
+			locString = ent->spawnArgs.GetString("text");
+		}
+		else
+		{
+			locboxtriggeredThisFrame = NULL;
+			if (developer.GetBool())
+			{
+				gameRenderWorld->DebugBounds(idVec4(1, 0, 0, 1), ent->GetPhysics()->GetAbsBounds(), vec3_origin, 1);
+			}
+		}
+
 	}
 	else
 	{
-		locboxtriggerThisFrame = false;
+		locboxtriggeredThisFrame = NULL;
 	}
 
-	if (locboxtriggerThisFrame && !lastLocboxtriggerState)
+	// SW 2nd April 2025: Adjusted logic here so that we take the previous locbox into account.
+	// This allows us to update the locbox if the cursor goes from one locbox to the other without any 'empty' air between.
+	// (this happens quite a bit in some places)
+	if (locboxtriggeredThisFrame != NULL && (!lastLocboxTriggered.GetEntityNum() || lastLocboxTriggered.GetEntityNum() != ent->entityNumber))
 	{
 		//turn on loc box
 		DisplayLocbox(locString.c_str());
 	}
-	else if (!locboxtriggerThisFrame && lastLocboxtriggerState)
+	else if (locboxtriggeredThisFrame == NULL && lastLocboxTriggered.GetEntityNum())
 	{
 		//turn off loc box
 		DisplayLocbox("");
 	}
 
-	lastLocboxtriggerState = locboxtriggerThisFrame;
+	lastLocboxTriggered = locboxtriggeredThisFrame;
 }
 
 void idPlayer::UpdatePlayerLookTriggers()
 {
-	if ( lastPlayerLookTrigger && lastPlayerLookTrigger->IsHidden() )
+	if ( lastPlayerLookTrigger.IsValid() && lastPlayerLookTrigger.GetEntity()->IsHidden() )
 	{
 		lastPlayerLookTrigger = nullptr;
 	}
@@ -31808,21 +33889,21 @@ void idPlayer::UpdatePlayerLookTriggers()
 		float dist = frobTr.fraction * PLAYERLOOK_TRIGGER_DIST;
 		bool isInRange = range == 0.0f || range >= dist;
 		
-		if ( lastPlayerLookTrigger && ( lastPlayerLookTrigger != ent || !isInRange) )
+		if ( lastPlayerLookTrigger.IsValid() && ( lastPlayerLookTrigger.GetEntity() != ent || !isInRange) )
 		{
-			lastPlayerLookTrigger->PostEventMS( &EV_PlayerLookExit, 0 );
+			lastPlayerLookTrigger.GetEntity()->PostEventMS( &EV_PlayerLookExit, 0 );
 			lastPlayerLookTrigger = nullptr;
 		}
 
-		if ( lastPlayerLookTrigger != ent && isInRange )
+		if ( lastPlayerLookTrigger.GetEntity() != ent && isInRange )
 		{
 			lastPlayerLookTrigger = ent;
-			lastPlayerLookTrigger->PostEventMS( &EV_PlayerLookEnter, 0 );
+			lastPlayerLookTrigger.GetEntity()->PostEventMS( &EV_PlayerLookEnter, 0 );
 		}
 	}
-	else if ( lastPlayerLookTrigger )
+	else if ( lastPlayerLookTrigger.IsValid() )
 	{
-		lastPlayerLookTrigger->PostEventMS( &EV_PlayerLookExit, 0 );
+		lastPlayerLookTrigger.GetEntity()->PostEventMS( &EV_PlayerLookExit, 0 );
 		lastPlayerLookTrigger = nullptr;
 	}
 }
@@ -31904,6 +33985,8 @@ void idPlayer::HandleZoomInspectPressFire()
 		return; //cannot inspect the object.
     
 
+	DisplayLocbox(""); //BC 3-19-2025: force locbox off to clear out locbox that may have been active prior to zoominspect activation
+
 	//get the zoominspect label info.	
 	idAngles angleOffset;
 	angleOffset.pitch = zoominspectEntityPtr.GetEntity()->spawnArgs.GetVector("zoominspect_angle")[0];
@@ -31965,7 +34048,8 @@ void idPlayer::HandleZoomInspectPressFire()
 
 	zoominspect_LabelmodeAngle = finalAngle;	
 
-	this->zoomCurrentFOV = ZOOM_MAX; //furthest zoom level	
+	this->zoomCurrentFOV = ZOOM_MAX;
+	zoomFov.Init(gameLocal.hudTime, ZOOMINSPECT_LERPTIME, this->zoomCurrentFOV, zoominspectEntityPtr.GetEntity()->spawnArgs.GetFloat("zoominspect_fov", "70"));
 
 	zoominspect_lerpStartPos = firstPersonViewOrigin;
 	zoominspect_lerptimer = gameLocal.hudTime + ZOOMINSPECT_LERPTIME;
@@ -32030,7 +34114,7 @@ void idPlayer::HandleZoomInspectPressFire()
 		//Generate the textstring of inventory items.
 		hud->SetStateBool("zoomdesc_draw", true);
 
-		hud->SetStateString("zoom_rolename", zoominspectEntityPtr.GetEntity()->spawnArgs.GetString("rolename"));
+		hud->SetStateString("zoom_rolename", common->GetLanguageDict()->GetString( zoominspectEntityPtr.GetEntity()->spawnArgs.GetString("rolename")));
 
 		hud->SetStateString("zoom_title", zoominspectEntityPtr.GetEntity()->displayName.c_str());
 		idStr inventoryString = "";
@@ -32038,7 +34122,7 @@ void idPlayer::HandleZoomInspectPressFire()
 		//Helmet check
 		if (static_cast<idAI *>(zoominspectEntityPtr.GetEntity())->hasHelmet)
 		{
-			inventoryString = idStr::Format("%s- %s\n", inventoryString.c_str(), "Helmet");
+			inventoryString = idStr::Format("%s- %s\n", inventoryString.c_str(), common->GetLanguageDict()->GetString("#str_def_gameplay_900062")); //Helmet
 		}
 
 		//What are the drops.
@@ -32084,6 +34168,7 @@ void idPlayer::HandleZoomInspectPressFire()
 	else
 	{
 		hud->SetStateBool("zoomdesc_draw", false);
+		hud->SetStateBool("brushdesc_draw", false);
 	}
 
 	if (memorypalaceState == MEMP_ACTIVE)
@@ -32244,8 +34329,22 @@ bool idPlayer::IsThrowarcAtDropPosition()
 
 	idAngles discAngle = throwdisc->GetPhysics()->GetAxis().ToAngles();
 	bool isFloor = idMath::Fabs(discAngle.pitch) > FLOORANGLE_THRESHOLD;
+
+
+	//BC 2-21-2025: check if this is a sky brush.
+	//We do a tracepoint to see what material we're hitting.
+	bool isSky = true;
+	if (isFloor)
+	{
+		idVec3 upDir;
+		throwdisc->GetPhysics()->GetAxis().ToAngles().ToVectors(NULL, NULL, &upDir);
+		trace_t skyTr;
+		gameLocal.clip.TracePoint(skyTr, throwdisc->GetPhysics()->GetOrigin() + (upDir * 1), throwdisc->GetPhysics()->GetOrigin() + (upDir * -2), MASK_SOLID, NULL);
+
+		isSky = (skyTr.c.material && skyTr.c.material->GetSurfaceFlags() >= 256);
+	}	
 	
-	return (isFloor && distanceToThrowdisc <= DROP_ITEM_THROWARC_DISTANCE && discAngle.pitch < 0);
+	return (isFloor && !isSky && distanceToThrowdisc <= DROP_ITEM_THROWARC_DISTANCE && discAngle.pitch < 0);
 }
 
 
@@ -32484,8 +34583,12 @@ bool idPlayer::IsPlayerNearSpacenudgeEnt()
 	return false;
 }
 
+void idPlayer::Event_SetObjectiveText(const char* text, bool newObjective)
+{
+	SetObjectiveText(text, newObjective, "");
+}
 
-void idPlayer::SetObjectiveText(const char *text, bool newObjective)
+void idPlayer::SetObjectiveText(const char *text, bool newObjective, idStr objectiveIcon)
 {
 	hud->SetStateString("objectivetext", common->GetLanguageDict()->GetString(text));
 
@@ -32496,15 +34599,32 @@ void idPlayer::SetObjectiveText(const char *text, bool newObjective)
 
 	armstatsModel->Event_SetGuiParm("objectivetext", common->GetLanguageDict()->GetString(text));
 
+	bool clearObjIcon = true;	
+	if (objectiveIcon.Length() > 0)
+	{
+		if (declManager->FindMaterial(objectiveIcon.c_str()) != nullptr)
+		{
+			armstatsModel->Event_SetGuiParm("objpic", objectiveIcon.c_str());
+			clearObjIcon = false;
+		}
+	}
+	
+
+	if (clearObjIcon)
+	{
+		armstatsModel->Event_SetGuiParm("objpic", "");
+	}
+
 	if (text[0] == '\0')
 	{
 		//If text is empty, then hide the objective button prompt.
 		hud->HandleNamedEvent("hideObjectiveButton");
+		armstatsModel->Event_SetGuiParm("objectiveillustration", "");
 	}
 	else if (!newObjective && gameLocal.world->spawnArgs.GetBool("meta_infowatch", "1"))
 	{
 		//Not doing the new objective fanfare, so force the objective button prompt to activate (in case it was off for some reason, like custom scripting in tutorial)
-		hud->HandleNamedEvent("showObjectiveButton");		
+		hud->HandleNamedEvent("showObjectiveButton");
 	}
 }
 
@@ -32567,15 +34687,6 @@ void idPlayer::DoMemoryPalace()
 	{
 		gameSoundWorld->Pause();
 	}
-
-	//Fade in the light. Note: this light is a special spectrum that only affects memory notes.
-	if (memoryLight)
-	{
-		//memoryLight->On();
-		memoryLight->SetOrigin(firstPersonViewOrigin);
-		memoryLight->On();
-	}
-	
 
 	StartSound("snd_memorypalace_on", SND_CHANNEL_ANY);
 	memorypalacePlayerPos = firstPersonViewOrigin;
@@ -32738,6 +34849,14 @@ bool idPlayer::ShouldShowLocBox()
 	if (g_locbox.GetInteger() <= 0)
 	{
 		//g_locbox cvar is set to ALWAYS OFF
+		return false;
+	}
+
+	//BC 4-10-2025: if the player is actively using a gui in the world, do
+	//not draw the locbox. This prevents issues where locboxes obscure
+	//gui that the player is using.
+	if (ActiveGui() != nullptr)
+	{
 		return false;
 	}
 
@@ -32996,7 +35115,7 @@ void idPlayer::DebugPlayerConnectedArea()
 
 //We want the player to say VO, but we don't want the event to happen every single time.
 //So we have a hash table that maintains a record of when a soundcue was last played.
-bool idPlayer::SayVO_WithIntervalDelay(const char *sndName)
+bool idPlayer::SayVO_WithIntervalDelay(const char *sndName, int lineCategory)
 {
 	if (sndName == NULL)
 		return false;
@@ -33005,14 +35124,24 @@ bool idPlayer::SayVO_WithIntervalDelay(const char *sndName)
 		return false;
 
 	//TODO: time intervals are hardcoded, this should be data driven
-	#define VO_DELAYINTERVALMIN 15000
-	#define VO_DELAYINTERVALMAX 20000
+	#define VO_DELAYINTERVALMIN 60000
+	#define VO_DELAYINTERVALMAX 90000
+
+	idStr processedSndName = sndName;
+
+	// SW 26th March 2025: Certain sounds are similar enough that we want them to share a cooldown timer (e.g. Nina picking a variety of things up)
+	// even if they don't have the exact same name. For this, we form a processed or simplified sound name.
+	// SW 14th April 2025: Fixed the logic here, oops
+	if (!idStr::Icmpn(processedSndName, "player_vo_pickup", 16) || !idStr::Icmpn(processedSndName, "snd_vo_pickup", 16))
+	{
+		processedSndName = "player_vo_pickup";
+	}
 
 	int* lastValPtr = nullptr;
-	if (!voIntervalTable.Get(sndName, &lastValPtr))
+	if (!voIntervalTable.Get(processedSndName, &lastValPtr))
 	{
 		//key doesn't exist. Create it.
-		voIntervalTable.Set(sndName, gameLocal.time);
+		voIntervalTable.Set(processedSndName, gameLocal.time);
 	}
 	else
 	{
@@ -33023,20 +35152,21 @@ bool idPlayer::SayVO_WithIntervalDelay(const char *sndName)
 			return false; //Cooldown timer hasn't expired yet. Exit here.
 	}
 	
-	bool playedVO = gameLocal.voManager.SayVO(this, sndName, VO_CATEGORY_BARK);
+	bool playedVO = gameLocal.voManager.SayVO(this, sndName, lineCategory);
 	if (playedVO)
 	{
 		int nextSpeakTime = gameLocal.time + gameLocal.random.RandomInt(VO_DELAYINTERVALMIN, VO_DELAYINTERVALMAX);
-		voIntervalTable.Set(sndName, nextSpeakTime); //reset the cooldown timer for this soundcue.
+		voIntervalTable.Set(processedSndName, nextSpeakTime); //reset the cooldown timer for this soundcue.
 		return true; //successfully played VO.
 	}
 
 	return false; //Didn't play VO.
 }
 
+//This makes VO play with an initial delay. This is helpful if you need a gap of time, i.e. to clarify the cause-and-effect
 void idPlayer::SayVO_WithIntervalDelay_msDelayed(const char *sndName, int msDelay)
 {
-	PostEventMS(&EV_Player_DelayedVO_WithInterval, msDelay, sndName);
+	PostEventMS(&EV_Player_DelayedVO_WithInterval, msDelay, sndName, VO_CATEGORY_BARK); //BC 4-24-2025: added VO_CATEGORY_BARK, fixes issue where SayVO_WithIntervalDelay linecategory was being sent garbage data.
 }
 
 //Handle vo when player picks up an item.
@@ -33153,7 +35283,8 @@ bool idPlayer::CanZoom()
 		}
 	}
 
-	return (jockeyState == JCK_INACTIVE && !contextMenuActive && !zoominspect_LabelmodeActive && !iteminspectActive && (memorypalaceState == MEMP_NONE) && !isInVignette && !spectating && grenadeThrowState == GRENADETHROW_IDLE && mechTransitionState == MECHTRANSITION_NONE && armstatsState == ARMST_DORMANT);
+	// SW 4th March 2025: Adding death condition here
+	return (jockeyState == JCK_INACTIVE && !contextMenuActive && !zoominspect_LabelmodeActive && !iteminspectActive && (memorypalaceState == MEMP_NONE) && !isInVignette && !spectating && grenadeThrowState == GRENADETHROW_IDLE && mechTransitionState == MECHTRANSITION_NONE && armstatsState == ARMST_DORMANT && health > 0 && !AI_DEAD);
 }
 
 void idPlayer::Event_SetFallDamageImmune(int status)
@@ -33373,7 +35504,7 @@ void idPlayer::Event_ResetMaterialTimer(const char* materialName)
 	material->ResetCinematicTime(0);
 }
 
-void idPlayer::Event_ParticleStream(const char* particlename, idVec3 destination, int duration)
+void idPlayer::Event_ParticleStream(const char* particlename, const idVec3 &destination, int duration)
 {
 	particleStreamDestination = destination;
 	particlestreamTimer = gameLocal.time + duration;
@@ -33427,4 +35558,104 @@ void idPlayer::Event_SetCinematicHUD(int value)
 void idPlayer::Event_EnableHeartBeat(int value)
 {
 	heartbeatEnabled = (bool)value;
+}
+
+void idPlayer::RestorePDAEmails(bool clean /*= false*/)
+{
+	if (GetPDA()) {
+		// If doing a clean, get rid of anything else
+		if (clean) {
+			int count = declManager->GetNumDecls(DECL_PDA); //total email count.
+			for (int i = 0; i < count; i++)
+			{
+				const idDeclPDA* pda = static_cast<const idDeclPDA*>(declManager->DeclByIndex(DECL_PDA, i));
+				pda->ResetEmails();
+			}
+		}
+
+		// Add any emails from the inventory
+		for (int i = 0; i < inventory.emails.Num(); i++) {
+			idStrList splits = inventory.emails[i].Split(';');
+			if (splits.Num() == 2) {
+				if (splits[0] == "default") {
+					GiveEmail(splits[1]);
+				}
+				else {
+					GiveEmailViaTalker(splits[0], splits[1], false);
+				}
+			}
+		}
+
+		// Read emails
+		for (int i = 0; i < inventory.emailsRead.Num(); i++) {
+			idStrList splits = inventory.emailsRead[i].Split(';');
+			if (splits.Num() == 2) {
+				if (splits[0] == "default") {
+					GetPDA()->AddEmailRead(splits[1]);
+				}
+				else {
+					const idDeclPDA* pda = GetPDAViaTalker(splits[0]);
+					if (pda)
+					{
+						pda->AddEmailRead(splits[1]);
+					}
+				}
+			}
+		}
+
+		// Replied emails
+		for (int i = 0; i < inventory.emailsReplied.Num(); i++) {
+			idStrList splits = inventory.emailsReplied[i].Split(';');
+			if (splits.Num() == 2) {
+				if (splits[0] == "default") {
+					GetPDA()->AddEmailReplied(splits[1]);
+				}
+				else {
+					const idDeclPDA* pda = GetPDAViaTalker(splits[0]);
+					if (pda)
+					{
+						pda->AddEmailReplied(splits[1]);
+					}
+				}
+			}
+		}
+
+		GetPDA()->SetSecurity(common->GetLanguageDict()->GetString("#str_loc_unknown_00104")); //BC general email access, this might be safe to delete
+	}
+}
+
+// SW 17th Feb 2025
+// Sets the mover that the player will be 'bound' to,
+// in order for them to be swept out of a broken window via an idVacuumSpline.
+// Note that the player is not actually bound to the entity, 
+// as we have no guarantee that the mover remains inside the world
+void idPlayer::SetBeingVacuumSplined(bool enable, idMover* mover)
+{
+	if (enable)
+	{
+		physicsObj.SetVacuumSplineMover(mover);
+	}
+	else
+	{
+		physicsObj.SetVacuumSplineMover(NULL);
+	}
+}
+
+bool idPlayer::GetBeingVacuumSplined(void)
+{
+	return (physicsObj.GetVacuumSplineMover() != NULL);
+}
+
+//BC 3-17-2025
+bool idPlayer::IsPickpocketing()
+{
+	return (pickpocketEnt.IsValid() && pickpocketState != PP_NONE);
+}
+
+idEntity* idPlayer::GetPickpocketEnt()
+{
+	if (!pickpocketEnt.IsValid())
+		return NULL;
+
+	return pickpocketEnt.GetEntity();
 }

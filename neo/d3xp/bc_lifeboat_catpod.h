@@ -10,7 +10,7 @@ public:
 							idCatpod(void);
 	virtual					~idCatpod(void);
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 	void					Spawn( void );
 
@@ -21,7 +21,7 @@ protected:
 
 	virtual void			Think_Landed(void);
 	virtual void			OnLanded(void);
-	//virtual void			OnTakeoff(void);
+	virtual void			OnTakeoff(void);
 
 private:
 

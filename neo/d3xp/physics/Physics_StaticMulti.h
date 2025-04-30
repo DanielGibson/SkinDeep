@@ -47,7 +47,7 @@ public:
 							idPhysics_StaticMulti( void );
 							~idPhysics_StaticMulti( void );
 
-	void					Save( idSaveGame *savefile ) const;
+	void					Save( idSaveGame *savefile ) const; // blendo eric: savegame pass 1
 	void					Restore( idRestoreGame *savefile );
 
 	void					RemoveIndex( int id = 0, bool freeClipModel = true );
