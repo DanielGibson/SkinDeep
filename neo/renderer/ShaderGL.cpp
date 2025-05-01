@@ -143,8 +143,12 @@ void idShaderGL::SetIntUniform(const char* name, int value)
 
 static std::string readFile( const std::string& fileName )
 {
-	idStr basePath;
-	Sys_GetPath(PATH_BASE, basePath);
+	//Sys_GetPath(PATH_BASE, basePath);
+	// DG: if fs_basepath is set  it should be used (helps with dev
+	//     when the executable is not next to the gamedata)
+	//     and if it's not explicitly set it defaults to Sys_GetPath(BASE_PATH,..)
+	//     anyway (see idFileSystemLocal::Init())
+	idStr basePath = cvarSystem->GetCVarString("fs_basepath");
 #ifdef DEMO
 	std::string prefix = basePath.c_str();
 	prefix += "/basedemo/glsl/";

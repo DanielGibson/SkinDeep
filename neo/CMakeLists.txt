@@ -61,7 +61,7 @@ option(SDL2			"Use SDL2 instead of SDL1.2" ON)
 #option(IMGUI		"Build with Dear ImGui integration - requires SDL2/SDL3 and C++11" ON)
 option(REPRODUCIBLE_BUILD "Replace __DATE__ and __TIME__ by hardcoded values for reproducible builds" OFF)
 
-option(SDDEMO		"This is the skindeep demo version" ON)
+option(SDDEMO		"This is the skindeep demo version" OFF)
 
 #option(HARDLINK_GAME "Compile gamecode into executable (no game DLLs)" OFF)
 set(HARDLINK_GAME ON) # skindeep always hardlinks the game

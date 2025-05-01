@@ -699,6 +699,11 @@ bool idFileSystemLocal::CreateOSPath( const char *OSPath ) {
 	for( int idx = 0; idx < path.Length() ; idx++) {
 		if ( path[idx] == PATHSEPERATOR_CHAR ) {
 			idStr ancestorPath = path.Left(idx);
+			// DG: absolute linux paths start with / (like /home/bla/whatever)
+			//     so path.Left(0) returns an empty string there which leads
+			//     to an error.. just ignore empty paths.
+			if(ancestorPath.IsEmpty())
+				continue;
 
 			bool finalFolder = ancestorPath.Length() == (path.Length()-1);
 
