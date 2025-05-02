@@ -2354,6 +2354,11 @@ void idMoveableItem::Spawn( void ) {
 					//and also REMOVE the loose ammo amount.
 					this->spawnArgs.SetInt(keyName, 0);
 				}
+				else
+				{
+					// SW 1st May 2025: even if there are no rounds, we want to make sure we have the keyvalue in there for other code to look at
+					this->spawnArgs.SetInt(inclipKey, 0);
+				}
 			}
 
 			// SW 27th March 2025: add a round to the chamber for initial spawn
@@ -3192,7 +3197,7 @@ bool idMoveableItem::Collide( const trace_t &collision, const idVec3 &velocity )
 				// (so weapons without a round chambered won't misfire)
 				const idKeyValue * inchamber = spawnArgs.MatchPrefix("inv_inchamber_");
 				const idKeyValue * inclip = spawnArgs.MatchPrefix("inv_inclip_");
-				if (inchamber && spawnArgs.GetBool("canMisfire", "0")) //BC 4-3-2025 make this default to canMisfare 0, to prevent crash with non-misfireable entities
+				if (inchamber && inclip && spawnArgs.GetBool("canMisfire", "0")) //BC 4-3-2025 make this default to canMisfare 0, to prevent crash with non-misfireable entities
 				{
 					// There should only ever be 1 or 0 in the chamber, but we express it as an integer, oops
 					int roundsInChamber = atoi(inchamber->GetValue());
