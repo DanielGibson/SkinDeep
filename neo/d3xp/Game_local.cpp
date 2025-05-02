@@ -385,10 +385,14 @@ void idGameLocal::Clear( void ) {
 
 	lastDebugNoteIndex = -1;
 
-	// TODO: DG: still necessary?
+	// DG: these dicts must be cleared on shutdown - if they're freed by the destructor
+	//     of global objects, it's too late, because uncleared idDicts reference strings
+	//     from  idStrPool which gets cleared by idLib::Shutdown() -> idDict::Shutdown()
+	//     and gameLocal is a global variable if the gamecode is statically linked, like in SD
 	for( int i=0; i<CT_NUM; ++i ) {
 		controllerButtonDicts[i].Clear();
 	}
+	mouseButtonDict.Clear();
 
 	metaEnt = nullptr;
 
