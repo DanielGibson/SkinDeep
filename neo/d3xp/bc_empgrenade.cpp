@@ -215,7 +215,7 @@ bool idEMPGrenade::DoEMPBlast()
 		else if (ent->spawnArgs.GetBool("emp_target"))
 		{
 			idLocationEntity *entLocation = gameLocal.LocationForEntity(ent);
-			if (entLocation->entityNumber == grenadeLocation->entityNumber)
+			if (entLocation && entLocation->entityNumber == grenadeLocation->entityNumber)
 			{
 				ent->Damage(this, this, vec3_zero, spawnArgs.GetString("def_blastdamage"), 1000.0f, 0);
 				appliedDamage = true;
