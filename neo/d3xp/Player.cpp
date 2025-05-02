@@ -14025,7 +14025,7 @@ void idPlayer::UpdateWeapon( void ) {
 					if ((usercmd.buttons & BUTTON_ATTACK) && !(oldButtons & BUTTON_ATTACK) 
 						&& gameLocal.time >= nextAttackTime && !ActiveGui())
 					{						
-						if (carryableItem.GetEntity()->spawnArgs.GetBool("carryfrob"))
+						if (carryableItem.IsValid() && carryableItem.GetEntity()->spawnArgs.GetBool("carryfrob"))
 						{
 							idStr carryfrobsound = carryableItem.GetEntity()->spawnArgs.GetString("snd_carryfrob");
 							if (carryfrobsound.Length() > 0)
