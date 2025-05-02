@@ -19568,8 +19568,14 @@ void idPlayer::UpdateFrob(void)
 	}
 	else if ( frobState == FROBSTATE_HOLDING )
 	{
+		// SM: Not sure how we can end up in this state/get here, but just in case?
+		if (!frobEnt)
+		{
+			frobHoldTimer = -1.0f;
+			frobState = FROBSTATE_NONE;
+		}
 		// Did we hold for long enough?
-		if ( gameLocal.time >= frobHoldTimer )
+		else if ( gameLocal.time >= frobHoldTimer )
 		{
 			frobHoldTimer = -1.0f;
 			frobEnt->DoFrobHold( 0, this ); //Frob Hold interaction.
