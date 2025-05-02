@@ -28,6 +28,14 @@ idShaderGL::~idShaderGL()
 bool idShaderGL::LoadCombined(const idStr& prefix)
 {
 	mProgramName = prefix;
+#ifndef _WIN32
+	// DG: Hack to work around wrong case (fx.mtr uses "motionblurBlendo.*",
+	//     but the file is called motionBlurBlendo.* with Big Blur)
+	//     Doesn't matter on Windows (there file systems are case-insensitive)
+	if(prefix == "motionblurBlendo") {
+		return Load("motionBlurBlendo.vert", "motionBlurBlendo.frag");
+	}
+#endif
 	return Load(prefix + ".vert", prefix + ".frag");
 }
 

@@ -1,20 +1,22 @@
-NOTE: This README (everything behind the line of dashes) was included in the SkinDeep sourcecode
-(skindeep_sourcecode_2025_02_13.zip)
+This is an unofficial port of SkinDeep to Linux
 
-SkinDeep isn't really based on dhewm3 1.5.4, but some older version.
+Currently (2025-05-03) the code is based on Hotfix01: https://store.steampowered.com/news/app/301280/view/529845510803030210
+but has additional changes to make it build and work on Linux.
+
+This code should work with both the SkinDeep demo that used to be available on Steam
+and the full version that you can buy for little money at
+
+https://store.steampowered.com/app/301280/Skin_Deep/
 
 Building SkinDeep on Linux should work as expected with CMake.
 
-The only thing you need to change to run the Demo is to go to the skindeep_demo/ directory from Steam,
-there into basedemo/glsl/ and 
-rename "motionBlurBlendo.frag" to "motionblurBlendo.frag" (note the lowercase "b" in "blur")
-and "motionBlurBlendo.vert" to "motionblurBlendo.vert"
+If you want to use this with gamedata from the Demo, make sure to enable `SDDEMO` in CMake.
 
-This is necessary because unlike on Windows, filesystems on Linux are case-sensitive,
-and materials/fx.mtr in pak000.pk4 has the line "program            motionblurBlendo.vfp" where
-it's written like that.
+NOTE: This README (everything behind the line of dashes) was included in the SkinDeep Demo sourcecode
+(skindeep_sourcecode_2025_02_13.zip)
 
-Get the SkinDeep demo at https://store.steampowered.com/app/3483180/Skin_Deep_Demo/
+SkinDeep isn't really based on dhewm3 1.5.4, but on 1.4.1, probably with backports of selected
+newer changes.
 
 -------------
 
