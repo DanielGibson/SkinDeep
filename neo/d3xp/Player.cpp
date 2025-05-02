@@ -23296,7 +23296,10 @@ void idPlayer::ExitLabelinspectMode()
 	}
 	hud->SetStateBool("showzoomcontrols", true);
 
-	zoominspectEntityPtr.GetEntity()->SetPostFlag(POST_INSPECT_LUMINANCE, false);
+	if (zoominspectEntityPtr.IsValid())
+	{
+		zoominspectEntityPtr.GetEntity()->SetPostFlag(POST_INSPECT_LUMINANCE, false);
+	}
 	zoominspectEntityPtr = nullptr;
 	hud->SetStateBool("zoominspect_draw", false);
 	hud->SetStateBool("zoomdesc_draw", false);
