@@ -603,7 +603,7 @@ FILE *idFileSystemLocal::OpenOSFile( const char *fileName, const char *mode, idS
 	fp = fopen( fileName, mode );
 	if( !fp ) {
 		int errOut = errno;
-		common->DPrintf( "idFileSystem::OpenFileWrite: could not open file due to err %d: %s\n", errOut, fileName );
+		common->DPrintf( "idFileSystem::OpenOSFile: could not open file due to err %d: %s\n", errOut, fileName );
 	}
 	if ( !fp && fs_caseSensitiveOS.GetBool() ) {
 		fpath = fileName;
@@ -623,12 +623,12 @@ FILE *idFileSystemLocal::OpenOSFile( const char *fileName, const char *mode, idS
 						caseSensitiveName->StripPath();
 					}
 					if ( fs_debug.GetInteger() ) {
-						common->Printf( "idFileSystemLocal::OpenFileRead: changed %s to %s\n", fileName, entry.c_str() );
+						common->Printf( "idFileSystemLocal::OpenOSFile: changed %s to %s\n", fileName, entry.c_str() );
 					}
 					break;
 				} else {
 					// not supposed to happen if ListOSFiles is doing it's job correctly
-					common->Warning( "idFileSystemLocal::OpenFileRead: fs_caseSensitiveOS 1 could not open %s", entry.c_str() );
+					common->Warning( "idFileSystemLocal::OpenOSFile: fs_caseSensitiveOS 1 could not open %s", entry.c_str() );
 				}
 			}
 		}
