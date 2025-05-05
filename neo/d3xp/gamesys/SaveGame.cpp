@@ -252,9 +252,9 @@ void SG_DumpStack() {
 }
 #endif
 
-void SG_Warn( const char* fmt, ... ) id_attribute((format(printf,2,3)));
-void SG_Error( const char *fmt, ... ) id_attribute((format(printf,2,3)));
-void SG_Print( const char *fmt, ... ) id_attribute((format(printf,2,3)));
+void SG_Warn( const char* fmt, ... ) id_attribute((format(printf,1,2)));
+void SG_Error( const char *fmt, ... ) id_attribute((format(printf,1,2)));
+void SG_Print( const char *fmt, ... ) id_attribute((format(printf,1,2)));
 
 void SG_Warn( const char* fmt, ... ) {
 	va_list args;
@@ -664,7 +664,7 @@ void idSaveGame::DebugCheckObjectList()
 			dumpTxt.Append( objInfo );
 			dumpTxt.Append( (i % 3 == 0) ? "\n" : " |" );
 		}
-		SG_Print( dumpTxt.c_str() );
+		SG_Print( "%s", dumpTxt.c_str() );
 
 
 		SG_Print( "\n--- SAVE WRITING --- \n" );
@@ -2032,7 +2032,7 @@ bool idRestoreGame::ReadAndRestoreObjectsListData( void ) {
 		misc_fixup_ptr_t& valPair = objectsMiscFixUp_r[idx];
 		if (valPair.index > 0 && valPair.index < objectsMisc_r.Num()) {
 			if ( const char * msg = IsBadMemoryAddress( *(valPair.objPtrPtr) ) ) {
-				SG_Warn("idRestoreGame::ReadAndRestoreObjectsListData() bad fixup misc obj ptr ", msg );
+				SG_Warn("idRestoreGame::ReadAndRestoreObjectsListData() bad fixup misc obj ptr %s", msg );
 			}
 
 			if ( *(valPair.objPtrPtr) != nullptr  ) {
@@ -2092,7 +2092,7 @@ void idRestoreGame::DebugCheckObjectLists()
 			dumpTxt.Append( va(" %-16s", objectsGame_r[i] ? objectsGame_r[i]->GetClassname() : "0x00000000" ) );
 			dumpTxt.Append( ((i % 3 == 0) && (i < objectsGame_r.Num()-1)) ? " |"  : "\n");
 
-			SG_Print( dumpTxt );
+			SG_Print( "%s", dumpTxt.c_str() );
 			dumpTxt.Clear();
 		}
 
@@ -2481,7 +2481,7 @@ void idRestoreGame::ReadObjectPtr( idClass** obj ) {
 	RecordSaveStack( va("[%p] ReadObjectPtr", obj ) );
 
 	if ( const char * msg = IsBadMemoryAddress( *obj ) ) {
-		SG_Warn("idRestoreGame::ReadObjectPtr() bad ptr ", msg );
+		SG_Warn("idRestoreGame::ReadObjectPtr() bad ptr %s", msg );
 	}
 
 	int index;
@@ -2504,7 +2504,7 @@ void idRestoreGame::ReadObjectPtr( idClass** obj ) {
 		*obj = objectsGame_r[index];
 
 		if ( const char * msg = IsBadMemoryAddress( *obj ) ) {
-			SG_Warn("idRestoreGame::ReadObjectPtr() bad ptr ", msg );
+			SG_Warn("idRestoreGame::ReadObjectPtr() bad ptr %s", msg );
 		}
 
 		objectsGamePtrCount_r++;
@@ -2545,7 +2545,7 @@ void idRestoreGame::ReadMiscPtr(void ** ptr) {
 	RecordSaveStack( va("[%p] ReadMiscPtr", ptr ) );
 
 	if ( const char * msg = IsBadMemoryAddress( *ptr ) ) {
-		SG_Warn("idRestoreGame::ReadMiscPtr() bad ptr ", msg );
+		SG_Warn("idRestoreGame::ReadMiscPtr() bad ptr %s", msg );
 	}
 
 	int index;
@@ -2575,7 +2575,7 @@ void idRestoreGame::TrackMiscPtr( void * ptr ) {
 	RecordSaveStack( va("[%p] TrackMiscPtr", ptr ) );
 
 	if ( const char * msg = IsBadMemoryAddress( ptr ) ) {
-		SG_Warn("idRestoreGame::TrackMiscPtr() bad ptr ", msg );
+		SG_Warn("idRestoreGame::TrackMiscPtr() bad ptr %s", msg );
 	}
 
 	int index;
