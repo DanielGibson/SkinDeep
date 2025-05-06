@@ -204,7 +204,6 @@ public:
 	void					WriteByte( const byte value );
 	void					WriteSignedChar( const signed char value );
 	void					WriteFloat( const float value );
-	void					WriteLong( const long value );
 	void					WriteBool( const bool value );
 	void					WriteString( const char *string );
 	void					WriteVec2( const idVec2 &vec );
@@ -350,7 +349,6 @@ public:
 	void					ReadByte( byte &value );
 	void					ReadSignedChar( signed char &value );
 	void					ReadFloat( float &value );
-	void					ReadLong( long &value );
 	void					ReadBool( bool &value );
 	void					ReadString( idStr & string );
 	void					ReadString( const char *& string );

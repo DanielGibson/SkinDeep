@@ -803,18 +803,6 @@ void idSaveGame::WriteFloat( const float value ) {
 	WriteCheckType(SG_CHECK_FLOAT);
 }
 
-
-/*
-================
-idSaveGame::WriteLong
-================
-*/
-void idSaveGame::WriteLong( const long value ) {
-	file->WriteLong( value );
-	WriteCheckType(SG_CHECK_INT);
-}
-
-
 /*
 ================
 idSaveGame::WriteBool
@@ -2284,16 +2272,6 @@ void idRestoreGame::ReadFloat( float &value ) {
 
 /*
 ================
-idRestoreGame::ReadLong
-================
-*/
-void idRestoreGame::ReadLong( long &value ) {
-	file->ReadLong( value );
-	ReadCheckType(SG_CHECK_INT);
-}
-
-/*
-================
 idRestoreGame::ReadBool
 ================
 */
@@ -2484,7 +2462,7 @@ void idRestoreGame::ReadObjectPtr( idClass** obj ) {
 		SG_Warn("idRestoreGame::ReadObjectPtr() bad ptr %s", msg );
 	}
 
-	int index;
+	int index = 12345678;
 	ReadInt(index);
 	 
 	if ( index == SG_NULL_INDEX ) {
@@ -3318,7 +3296,6 @@ void idRestoreGame::ReadCurve(idCurve_Spline<idVec3>*& curve) {
 
 // ==========================================
 // blendo eric: test helpers
-
 
 #if defined(_DEBUG) || defined(SG_ALWAYS_READ_CHECKSTRING)
 void idSaveGame::WriteCheckString(idStr checkStr) { // blendo eric: due to size, should only be used for checkpoints, not individual ents
