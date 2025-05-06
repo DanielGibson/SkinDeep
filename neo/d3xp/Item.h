@@ -302,7 +302,7 @@ private:
 
 	void					ThrownFrob(idEntity * ent);
 
-	long					spawnTime;
+	int						spawnTime;
 
 	// for item line
 	bool					showItemLine;

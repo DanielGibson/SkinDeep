@@ -2120,7 +2120,7 @@ void idMoveableItem::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( collideFrobTimer ); //  int collideFrobTimer
 
 
-	savefile->ReadLong( spawnTime ); //  int spawnTime
+	savefile->ReadInt( spawnTime ); //  int spawnTime
 	savefile->ReadBool( showItemLine ); //  bool showItemLine
 	savefile->ReadInt( itemLineHandle ); //  int itemLineHandle
 	savefile->ReadVec3( itemLineColor ); //  idVec3 itemLineColor
