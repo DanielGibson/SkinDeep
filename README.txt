@@ -1,5 +1,10 @@
 This is an unofficial port of SkinDeep to Linux
 
+Should still support Windows, should also work on the BSDs etc, but will *not* on macOS.
+macOS support would require bigger changes, as macOS doesn't support the required version of OpenGL
+(3.3 with a Compatibility profile - macOS only supports OpenGL Core profiles - and
+ the GL_ARB_shading_language_420pack extension).
+
 Currently (2025-05-07) the code is based on Hotfix02: https://store.steampowered.com/news/app/301280/view/529845510803032094
 but has additional changes to make it build and work on Linux (and I replaced libjpeg with stb_image.h).
 
