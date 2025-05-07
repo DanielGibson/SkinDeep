@@ -198,12 +198,6 @@ endif()
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIRS})
 
-find_package(JPEG REQUIRED)
-include_directories(${JPEG_INCLUDE_DIR})
-
-set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIR})
-set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARY})
-
 find_package(OGG REQUIRED)
 include_directories(${OGG_INCLUDE_DIR})
 
@@ -1216,7 +1210,6 @@ endif()
 		${VORBIS_LIBRARIES}
 		${OGG_LIBRARIES}
 		${CURL_LIBRARY}
-		${JPEG_LIBRARY}
 		${ZLIB_LIBRARY}
 		${SDLx_LIBRARY}
 		${sys_libs}
