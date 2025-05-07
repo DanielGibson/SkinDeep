@@ -852,6 +852,11 @@ doom set test blah + map test
 int			com_numConsoleLines;
 idCmdArgs	com_consoleLines[MAX_CONSOLE_LINES];
 
+#ifdef EPICSTORE
+int			com_numEpicConsoleLines;
+idCmdArgs	com_epicConsoleLines[MAX_EPIC_CONSOLE_LINES];
+#endif
+
 /*
 ==================
 idCommonLocal::ParseCommandLine
@@ -861,16 +866,37 @@ void idCommonLocal::ParseCommandLine( int argc, char **argv ) {
 	int i;
 
 	com_numConsoleLines = 0;
+
+#ifdef EPICSTORE
+	com_numEpicConsoleLines = 0;
+#endif
+
 	// API says no program path
 	for ( i = 0; i < argc; i++ ) {
 		if ( argv[ i ][ 0 ] == '+' ) {
 			com_numConsoleLines++;
 			com_consoleLines[ com_numConsoleLines-1 ].AppendArg( argv[ i ] + 1 );
 		} else {
-			if ( !com_numConsoleLines ) {
-				com_numConsoleLines++;
+#ifdef EPICSTORE
+			if ((!strstr(argv[i], "AUTH_LOGIN")) && (!strstr(argv[i], "AUTH_PASSWORD")) && (!strstr(argv[i], "AUTH_TYPE")) && (!strstr(argv[i], "epicapp")) && (!strstr(argv[i], "epicenv")) && (!strstr(argv[i], "epicdeploymentid")) &&
+				(!strstr(argv[i], "EpicOverlay"))  && (!strstr(argv[i], "EpicPortal")) && (!strstr(argv[i], "epicusername")) && (!strstr(argv[i], "epicuserid")) && (!strstr(argv[i], "epiclocale")) && (!strstr(argv[i], "epicsandboxid")))
+#endif
+			{
+				if (!com_numConsoleLines) {
+					com_numConsoleLines++;
+				}
+				com_consoleLines[com_numConsoleLines - 1].AppendArg(argv[i]);
 			}
-			com_consoleLines[ com_numConsoleLines-1 ].AppendArg( argv[ i ] );
+#ifdef EPICSTORE
+			else {
+				
+					com_epicConsoleLines[com_numEpicConsoleLines].AppendArg(argv[i]);
+
+					if (com_numEpicConsoleLines < MAX_EPIC_CONSOLE_LINES-1) {
+						com_numEpicConsoleLines++;
+					}
+			}
+#endif
 		}
 	}
 }
@@ -2746,6 +2772,7 @@ void idCommonLocal::Frame( void ) {
 
 		if (g_SteamUtilities)
 		{
+			// on EPIC this is where we tick EPIC
 			g_SteamUtilities->RunCallbacks();
 		}
 
@@ -3463,10 +3490,14 @@ void idCommonLocal::InitGame( void ) {
 #endif
 
 	bool steamInitialized = false;
+
+	// Epic is initialized after render init
+#if !defined(EPICSTORE)
 	if (g_SteamUtilities)
 	{
 		steamInitialized = g_SteamUtilities->InitializeSteam();
 	}
+#endif
 
 	// initialize the file system
 	fileSystem->Init();
@@ -3527,6 +3558,7 @@ void idCommonLocal::InitGame( void ) {
 			else if (idStr::Cmp(steamLang, "portuguese") == 0)	{ newLanguage = "portuguese"; } //portugal portuguese
 			else if (idStr::Cmp(steamLang, "latam") == 0)		{ newLanguage = "latam"; }		//spanish latin america
 
+			common->Printf("[steam] Setting sys_lang:'%s'\n", newLanguage.c_str());
 			cvarSystem->SetCVarString("sys_lang", newLanguage.c_str());
 		}
 	}
@@ -3620,6 +3652,49 @@ void idCommonLocal::InitGame( void ) {
 		// init OpenGL, which will open a window and connect sound and input hardware
 		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04348" ) );
 		InitRenderSystem();
+	}
+#endif
+
+#if defined(EPICSTORE)
+	// After render init for overlay
+	if (g_SteamUtilities)
+	{
+		steamInitialized = g_SteamUtilities->InitializeSteam();
+	}
+
+	if (steamInitialized)
+	{
+		g_SteamUtilities->SteamCloudLoad();
+
+		//Set default language at first game start.
+		if (steamInitialized && (fileSystem->ReadFile(CONFIG_FILE, NULL) <= 0))
+		{
+			//if steam is initialized and this is the FIRST TIME that the game is running.
+			const char* steamLang = g_SteamUtilities->GetSteamLanguage();
+			common->Printf("[steam] First-time language auto select: '%s'\n", steamLang);
+
+			//set default language at game start, using Steam's language setting.
+			idStr newLanguage = "english"; //Default to english.
+
+			//Convert between Steam API Language Name to the idTech4 sys_lang name.
+			if (idStr::Cmp(steamLang, "french") == 0) { newLanguage = "french"; }
+			else if (idStr::Cmp(steamLang, "italian") == 0) { newLanguage = "italian"; }
+			else if (idStr::Cmp(steamLang, "german") == 0) { newLanguage = "german"; }
+			else if (idStr::Cmp(steamLang, "spanish") == 0) { newLanguage = "spanish"; } //spanish (spain)
+			else if (idStr::Cmp(steamLang, "russian") == 0) { newLanguage = "russian"; }
+			else if (idStr::Cmp(steamLang, "japanese") == 0) { newLanguage = "japanese"; }
+			else if (idStr::Cmp(steamLang, "koreana") == 0) { newLanguage = "korean"; }
+			else if (idStr::Cmp(steamLang, "schinese") == 0) { newLanguage = "chinese"; } //simplified chinese
+			else if (idStr::Cmp(steamLang, "tchinese") == 0) { newLanguage = "tradchinese"; } //traditional chinese
+			else if (idStr::Cmp(steamLang, "polish") == 0) { newLanguage = "polish"; }
+			else if (idStr::Cmp(steamLang, "brazilian") == 0) { newLanguage = "brportuguese"; } //brazilian portuguese
+			else if (idStr::Cmp(steamLang, "turkish") == 0) { newLanguage = "turkish"; }
+			else if (idStr::Cmp(steamLang, "portuguese") == 0) { newLanguage = "portuguese"; } //portugal portuguese
+			else if (idStr::Cmp(steamLang, "latam") == 0) { newLanguage = "latam"; }		//spanish latin america
+
+			common->Printf("[steam] Setting sys_lang:'%s'\n", newLanguage.c_str());
+			cvarSystem->SetCVarString("sys_lang", newLanguage.c_str());
+		}
 	}
 #endif
 

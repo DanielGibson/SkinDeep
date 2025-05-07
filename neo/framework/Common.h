@@ -230,6 +230,12 @@ public:
 	IPlatformUtilities* g_SteamUtilities;
 };
 
+#ifdef EPICSTORE
+const int MAX_EPIC_CONSOLE_LINES = 32;
+extern int			com_numEpicConsoleLines;
+extern idCmdArgs	com_epicConsoleLines[MAX_EPIC_CONSOLE_LINES];
+#endif
+
 extern idCommon *		common;
 
 #endif /* !__COMMON_H__ */

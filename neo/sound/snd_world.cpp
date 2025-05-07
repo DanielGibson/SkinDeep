@@ -1419,6 +1419,17 @@ void idSoundWorldLocal::WriteToSaveGameSoundChannel( idSaveGame *saveGame, idSou
 	saveGame->WriteFloat( ch->channelFade.fadeEndVolume );
 }
 
+// SM: Added to fix case where we have a crazy high fade start/end time on restore
+static void FixUpFadeTimeOnRestore(int currentTime, int& outFadeStart, int& outFadeEnd)
+{
+	if (currentTime < outFadeStart)
+	{
+		int diff = outFadeEnd - outFadeStart;
+		outFadeStart = currentTime;
+		outFadeEnd = outFadeStart + diff;
+	}
+}
+
 /*
 ===================
 idSoundWorldLocal::ReadFromSaveGame
@@ -1530,6 +1541,7 @@ void idSoundWorldLocal::ReadFromSaveGame( idRestoreGame *savefile ) {
 			if ( chan->channelFade.fadeStart44kHz != 0 ) {
 				chan->channelFade.fadeStart44kHz += soundTimeOffset;
 				chan->channelFade.fadeEnd44kHz += soundTimeOffset;
+				FixUpFadeTimeOnRestore(currentSoundTime, chan->channelFade.fadeStart44kHz, chan->channelFade.fadeEnd44kHz);
 			}
 
 			// next command
@@ -1542,6 +1554,13 @@ void idSoundWorldLocal::ReadFromSaveGame( idRestoreGame *savefile ) {
 	{
 		savefile->ReadInt( soundClassFade[idx].fadeStart44kHz ); // int fadeStart44kHz
 		savefile->ReadInt( soundClassFade[idx].fadeEnd44kHz ); // int fadeEnd44kHz
+		
+		if (soundClassFade[idx].fadeStart44kHz != 0) {
+			soundClassFade[idx].fadeStart44kHz += soundTimeOffset;
+			soundClassFade[idx].fadeEnd44kHz += soundTimeOffset;
+			FixUpFadeTimeOnRestore(currentSoundTime, soundClassFade[idx].fadeStart44kHz, soundClassFade[idx].fadeEnd44kHz);
+		}
+
 		savefile->ReadFloat( soundClassFade[idx].fadeStartVolume ); // float fadeStartVolume
 		savefile->ReadFloat( soundClassFade[idx].fadeEndVolume ); // float fadeEndVolume
 	}
@@ -1551,6 +1570,13 @@ void idSoundWorldLocal::ReadFromSaveGame( idRestoreGame *savefile ) {
 	{
 		savefile->ReadInt( autoDuckClassFade[idx].fadeStart44kHz ); // int fadeStart44kHz
 		savefile->ReadInt( autoDuckClassFade[idx].fadeEnd44kHz ); // int fadeEnd44kHz
+
+		if (autoDuckClassFade[idx].fadeStart44kHz != 0) {
+			autoDuckClassFade[idx].fadeStart44kHz += soundTimeOffset;
+			autoDuckClassFade[idx].fadeEnd44kHz += soundTimeOffset;
+			FixUpFadeTimeOnRestore(currentSoundTime, autoDuckClassFade[idx].fadeStart44kHz, autoDuckClassFade[idx].fadeEnd44kHz);
+		}
+
 		savefile->ReadFloat( autoDuckClassFade[idx].fadeStartVolume ); // float fadeStartVolume
 		savefile->ReadFloat( autoDuckClassFade[idx].fadeEndVolume ); // float fadeEndVolume
 	}

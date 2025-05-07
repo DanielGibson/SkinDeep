@@ -34,6 +34,8 @@ public:
 
 	virtual void			Killed(idEntity* inflictor, idEntity* attacker, int damage, const idVec3& dir, int location);
 
+	virtual void			PostSaveRestore( idRestoreGame * savefile ) override;
+
 private:
 //
 //	int						nextTouchTime;
