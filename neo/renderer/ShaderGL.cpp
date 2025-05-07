@@ -182,7 +182,14 @@ static std::string readFile( const std::string& fileName )
 				std::string includeFile = line.substr( startFile, endFile - startFile );
 				contents += readFile( includeFile );
 			}
-			else
+			// DG: evil hack: remove "layout(binding = X) " from all such lines (at least currently X is between 0 and 6)
+			else if(idStr::Cmpn(line.c_str(), "layout(binding = ", strlen("layout(binding = ")) == 0)
+			{
+				contents += line.c_str() + strlen("layout(binding = 1) ");
+				contents += '\n';
+			}
+			else if(idStr::Cmpn(line.c_str(), "#extension GL_ARB_shading_language_420pack", // DG: another hack to skip those #extension lines
+			          strlen("#extension GL_ARB_shading_language_420pack")) != 0)
 			{
 				contents += line;
 				contents += '\n';
@@ -292,13 +299,14 @@ void idShaderGL::SetupUniforms()
 // 	}
 
 	// Setup the texture sampler uniforms
-// 	const int MAX_SAMPLERS = 16;
-// 	for (int i = 0; i < MAX_SAMPLERS; i++)
-// 	{
-// 		GLint sampler = qglGetUniformLocation(mShaderProgram, va("uTexture%d", i));
-// 		if (sampler != -1)
-// 		{
-// 			qglUniform1i(sampler, i);
-// 		}
-// 	}
+	// DG: this was commented out, do it anyway so GL_ARB_shading_language_420pack isn't needed
+	const int MAX_SAMPLERS = 16;
+	for (int i = 0; i < MAX_SAMPLERS; i++)
+	{
+		GLint sampler = qglGetUniformLocation(mShaderProgram, va("uTexture%d", i));
+		if (sampler != -1)
+		{
+			qglUniform1i(sampler, i);
+		}
+	}
 }

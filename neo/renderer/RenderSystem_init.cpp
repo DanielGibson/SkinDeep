@@ -662,7 +662,8 @@ static void R_CheckPortableExtensions( void ) {
 		glConfig.isBrokenAMDR7200 = glConfig.isBrokenAMDR7200 || gpuStr.Find(amdGPUs[i]) != -1;
 	}
 
-	if (!R_CheckExtension("GL_ARB_texture_float") || !glConfig.GLSLAvailable || !R_CheckExtension("GL_ARB_shading_language_420pack"))
+	if (!R_CheckExtension("GL_ARB_texture_float") || !glConfig.GLSLAvailable
+		/*|| !R_CheckExtension("GL_ARB_shading_language_420pack")*/ )
 	{
 		idStr errorMessage = "Skin Deep requires a graphics card that supports DirectX 11_0 feature level or higher.\n";
 		errorMessage += idStr::Format("Your video card is: %s\n\n", glConfig.renderer_string);
@@ -673,8 +674,8 @@ static void R_CheckPortableExtensions( void ) {
 		if (!glConfig.GLSLAvailable)
 			errorMessage += "- Your video card doesn't support GLSL\n";
 
-		if (!R_CheckExtension("GL_ARB_shading_language_420pack"))
-			errorMessage += "- Your video card doesn't support GL_ARB_shading_language_420pack\n";
+		//if (!R_CheckExtension("GL_ARB_shading_language_420pack"))
+		//	errorMessage += "- Your video card doesn't support GL_ARB_shading_language_420pack\n";
 
 		errorMessage += "\nExiting now.";
 
