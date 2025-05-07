@@ -2083,14 +2083,12 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		return false;
 	}
 
-#if 0
 	// blendo eric: added for post setup, similar to spawn
-	for (i = 0; i < MAX_GENTITIES; i++) {
-		if (entities[i] != NULL) {
-			entities[i]->Event_PostSaveRestore();
+	for (int idx = 0; idx < MAX_GENTITIES; idx++) {
+		if (entities[idx] != NULL) {
+			entities[idx]->PostSaveRestore( &savegame );
 		}
 	}
-#endif
 
 	mpGame.Reset();
 

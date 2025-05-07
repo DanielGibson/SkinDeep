@@ -69,7 +69,6 @@ extern const idEventDef EV_SetSkin;
 extern const idEventDef EV_StartSoundShader;
 extern const idEventDef EV_StopSound;
 extern const idEventDef EV_CacheSoundShader;
-extern const idEventDef EV_PostSaveRestore;
 
 // SM
 extern const idEventDef EV_PostPhysicsRest;
@@ -500,7 +499,7 @@ public:
 
 	idVec2					infomapPositionOffset;
 
-	virtual void			Event_PostSaveRestore() {} // blendo eric: allow ents to setup after game save load/restore
+	virtual void			PostSaveRestore( idRestoreGame * savefile ) {} // blendo eric: allow ents to setup after game save load/restore
 
 	virtual bool			RequiresPresentOnRestore() const { return modelDefHandle != -1; }
 

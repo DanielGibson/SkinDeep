@@ -121,7 +121,7 @@ void idWiregrenade::Save(idSaveGame *savefile) const
 	SaveFileWriteArray( wireOrigin, MAXWIRES, WriteObject ); // idBeam* wireOrigin[MAXWIRES]
 	SaveFileWriteArray( wireTarget, MAXWIRES, WriteObject ); // idBeam* wireTarget[MAXWIRES]
 
-	SaveFileWriteArray( wireTarget, MAXWIRES, WriteObject ); // idStaticEntity* wireHooks[MAXWIRES]
+	SaveFileWriteArray( wireHooks, MAXWIRES, WriteObject ); // idStaticEntity* wireHooks[MAXWIRES]
 
 	savefile->WriteInt( checkTimer ); // int checkTimer
 
@@ -140,11 +140,52 @@ void idWiregrenade::Restore(idRestoreGame *savefile)
 	SaveFileReadArrayCast( wireOrigin, ReadObject, idClass*& ); // idBeam* wireOrigin[MAXWIRES]
 	SaveFileReadArrayCast( wireTarget, ReadObject, idClass*&  ); // idBeam* wireTarget[MAXWIRES]
 
-	SaveFileReadArrayCast( wireTarget, ReadObject, idClass*&  ); // idStaticEntity* wireHooks[MAXWIRES]
+	if (savefile->GetSaveVersion() <= SAVEGAME_VERSION_0002)
+	{
+		SaveFileReadArrayCast(wireTarget, ReadObject, idClass*&); // idStaticEntity* wireHooks[MAXWIRES] // this was accidentally set to wireTarget
+	}
+	else
+	{
+		SaveFileReadArrayCast(wireHooks, ReadObject, idClass*&); // idStaticEntity* wireHooks[MAXWIRES]
+	}
 
 	savefile->ReadInt( checkTimer ); // int checkTimer
 
 	savefile->ReadInt( playerLeniencyTime ); // int playerLeniencyTime
+}
+
+void idWiregrenade::PostSaveRestore( idRestoreGame * savefile )
+{
+	if (savefile->GetSaveVersion() <= SAVEGAME_VERSION_0002)
+	{
+		// try to recover wires
+		for (idEntity* ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next())
+		{
+			if (ent->IsType(idStaticEntity::Type) && ent->GetPhysics() && (idStr::Icmp(ent->spawnArgs.GetString("model"), "models/weapons/wiregrenade/wiregrenade_arm.ase") == 0))
+			{
+				for (int idx = 0; idx < MAXWIRES; idx++)
+				{
+					if (!wireHooks[idx] && (ent != wireTarget[idx]) && (wireTarget[idx]->GetPhysics()->GetOrigin() == ent->GetPhysics()->GetOrigin()))
+					{
+						wireHooks[idx] = static_cast<idStaticEntity*>(ent);
+						break;
+					}
+				}
+			}
+		}
+
+		
+		for (int idx = 0; idx < MAXWIRES; idx++)
+		{
+			if (!wireHooks[idx])
+			{ 
+				// couldn't recover, delete self
+				BecomeInactive( TH_THINK & TH_PHYSICS & TH_UPDATEVISUALS );
+				PostEventMS(&EV_Remove, 0);
+				break;
+			}
+		}
+	}
 }
 
 bool idWiregrenade::Collide(const trace_t &collision, const idVec3 &velocity)

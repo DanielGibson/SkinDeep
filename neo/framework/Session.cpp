@@ -3068,7 +3068,7 @@ void idSessionLocal::Frame() {
 		gameLocal.requestPauseMenu = false;
 
 		idPlayer* player = gameLocal.GetLocalPlayer();
-		bool allowESC = !guiActive || (player && player->IsFullscreenUIActive());
+		bool allowESC = !guiActive || (player && !player->IsFullscreenUIActive());
 		if (allowESC && g_pauseOnFocusLost.GetBool())
 		{
 			StartMenu();

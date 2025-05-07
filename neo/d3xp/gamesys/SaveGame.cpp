@@ -679,9 +679,9 @@ idSaveGame::CallSave
 // blendo eric: wrapper for CallSave_r for debugging
 void idSaveGame::CallSave(const idTypeInfo* cls, const idClass* obj) {
 	WriteCheckType(SG_CHECK_CALLSAVE);
-#if defined(_DEBUG)
-	WriteCheckString(cls->classname);
-#endif
+// #if defined(_DEBUG)
+// 	WriteCheckString(cls->classname);
+// #endif
 
 	CallSave_r(cls, obj);
 
@@ -2136,9 +2136,9 @@ idRestoreGame::CallRestore
 // blendo eric: wrapper for the full object, rather than each type in CallRestore_r
 bool idRestoreGame::CallRestore(const idTypeInfo* cls, idClass* obj) {
 	ReadCheckType(SG_CHECK_CALLSAVE);
-#if defined(_DEBUG)
-	ReadCheckString(cls->classname);
-#endif
+// #if defined(_DEBUG)
+// 	ReadCheckString(cls->classname);
+// #endif
 
 	bool restoreOk = CallRestore_r(cls, obj);
 	if (!restoreOk) {

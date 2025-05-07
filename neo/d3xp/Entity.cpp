@@ -170,7 +170,6 @@ const idEventDef EV_RepairEntity("setRepair", NULL);
 const idEventDef EV_EntityTeleport("entityTeleport", "vv");
 const idEventDef EV_SetSystemicVOEnabled("setSystemicVOEnabled", "d");
 const idEventDef EV_IsPlayingSound("isPlayingSound", "d", 'd');
-const idEventDef EV_PostSaveRestore("<postsaverestore>", NULL);
 
 ABSTRACT_DECLARATION(idClass, idEntity)
 EVENT(EV_GetName, idEntity::Event_GetName)
@@ -265,7 +264,6 @@ EVENT(EV_RepairEntity,			idEntity::Event_RepairEntity)
 EVENT(EV_EntityTeleport,		idEntity::Event_EntityTeleport)
 EVENT(EV_SetSystemicVOEnabled,	idEntity::Event_SetSystemicVoEnabled)
 EVENT(EV_IsPlayingSound,		idEntity::Event_IsPlayingSound)
-EVENT(EV_PostSaveRestore,		idEntity::Event_PostSaveRestore)
 
 END_CLASS
 

@@ -3647,9 +3647,9 @@ void Cmd_DebugEventLog_f(const idCmdArgs& args)
 
 		idStr str;
 		if (randomInt % 5 == 0)
-			str = idStr::Format("%d hello world", randomInt);
+			str = idStr::Format("%d %s", randomInt, common->GetLanguageDict()->GetString("#str_dispatch_a_checkin_start_01"));
 		else if (randomInt % 3 == 0)
-			str = idStr::Format("%d debug debug debug debug", randomInt);
+			str = idStr::Format("%d %s", randomInt, common->GetLanguageDict()->GetString("#str_dispatch_a_ventpurge_01"));
 		else
 			str = idStr::Format("%d", randomInt);
 

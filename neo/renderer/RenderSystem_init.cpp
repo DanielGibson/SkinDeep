@@ -638,7 +638,28 @@ static void R_CheckPortableExtensions( void ) {
 	// completely breaks alpha. Pretty sure this is a driver bug, but we have no
 	// real way to fix this. Disabling the logic op means that some overlapping
 	// outlines of different types may artifact, but that's better than a black screen.
-	glConfig.isBrokenAMDR7200 = gpuStr.Find("R7 ") != -1 || gpuStr.Find("R9 ") != -1;
+	idStrList amdGPUs;
+	amdGPUs.AddUnique("R7 ");			// Reported by Huwiz
+	amdGPUs.AddUnique("R9 ");			// Reported by Huwiz
+	
+	amdGPUs.AddUnique("RX 480");		// Reported on Steam Forums
+	amdGPUs.AddUnique("RX 455");		// https://en.wikipedia.org/wiki/Radeon_400_series 
+	amdGPUs.AddUnique("RX 460");
+	amdGPUs.AddUnique("RX 470");
+	amdGPUs.AddUnique("R5 ");
+
+	amdGPUs.AddUnique("HD 78");			// Reported on Steam Forums (there's lots of 78xx)
+	amdGPUs.AddUnique("HD 77");			// https://en.wikipedia.org/wiki/Radeon_HD_7000_series
+	amdGPUs.AddUnique("HD 73");
+	amdGPUs.AddUnique("HD 74");
+	amdGPUs.AddUnique("HD 75");
+	amdGPUs.AddUnique("HD 76");
+	amdGPUs.AddUnique("HD 79");
+
+	glConfig.isBrokenAMDR7200 = false;
+	for (int i = 0; i < amdGPUs.Num(); i++) {
+		glConfig.isBrokenAMDR7200 = glConfig.isBrokenAMDR7200 || gpuStr.Find(amdGPUs[i]) != -1;
+	}
 
 	if (!R_CheckExtension("GL_ARB_texture_float") || !glConfig.GLSLAvailable || !R_CheckExtension("GL_ARB_shading_language_420pack"))
 	{

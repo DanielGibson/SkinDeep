@@ -14026,7 +14026,7 @@ void idPlayer::UpdateWeapon( void ) {
 					if ((usercmd.buttons & BUTTON_ATTACK) && !(oldButtons & BUTTON_ATTACK) 
 						&& gameLocal.time >= nextAttackTime && !ActiveGui())
 					{						
-						if (carryableItem.IsValid() && carryableItem.GetEntity()->spawnArgs.GetBool("carryfrob"))
+						if (carryableItem.IsValid() && carryableItem.GetEntity()->spawnArgs.GetBool("carryfrob")) //4-30-2025: added another isValid check, as it seems to be sometimes changing in some cases
 						{
 							idStr carryfrobsound = carryableItem.GetEntity()->spawnArgs.GetString("snd_carryfrob");
 							if (carryfrobsound.Length() > 0)
@@ -23178,7 +23178,7 @@ void idPlayer::UpdateMemoryPalace()
 		}
 
 		//Do a short delay before entering memory palace, as it's jarring when it immediately appears on button press
-		if (gameLocal.time > memorypalaceTimer && GetPhysics()->HasGroundContacts())
+		if (gameLocal.time > memorypalaceTimer && (GetPhysics()->HasGroundContacts() || (airless))) //BC 5-4-2025: fixed bug where activating memorypalace in space was causing a quasi-softlock state
 		{
 			memorypalaceState = MEMP_ACTIVE;
 			DoMemoryPalace();
@@ -23302,6 +23302,7 @@ void idPlayer::ExitLabelinspectMode()
 	}
 	hud->SetStateBool("showzoomcontrols", true);
 
+	//4-30-2025: fix crash when zoominspecting a handdryer about to explode (sd-554)
 	if (zoominspectEntityPtr.IsValid())
 	{
 		zoominspectEntityPtr.GetEntity()->SetPostFlag(POST_INSPECT_LUMINANCE, false);
