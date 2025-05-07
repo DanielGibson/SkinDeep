@@ -1,7 +1,7 @@
 This is an unofficial port of SkinDeep to Linux
 
-Currently (2025-05-03) the code is based on Hotfix01: https://store.steampowered.com/news/app/301280/view/529845510803030210
-but has additional changes to make it build and work on Linux.
+Currently (2025-05-07) the code is based on Hotfix02: https://store.steampowered.com/news/app/301280/view/529845510803032094
+but has additional changes to make it build and work on Linux (and I replaced libjpeg with stb_image.h).
 
 You can find the original source code as released by Blendo Games in the "upstream" branch.
 
@@ -18,7 +18,10 @@ If you want to use this with gamedata from the Demo, make sure to enable `SDDEMO
 
 See https://github.com/dhewm/dhewm3/?tab=readme-ov-file#compiling for compiling instructions.
 Note that due to this being based on an older version of dhewm3, you'll need additional dependencies:
-zlib, libogg, libvorbis, libvorbisfile, libjpeg
+zlib, libogg, libvorbis, libvorbisfile
+Just like with current dhewm3, you need:
+libSDL2, libopenal (OpenAL-Soft), cmake, make or ninja, GCC/G++ or clang/clang++
+(you won't need libcurl though)
 
 Furthermore, Blendo Games added a Visual Studio solution for building and includes the necessary
 dependencies for Windows in this repo, see neo/solution/
