@@ -36,7 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 
 idCVar in_nograb("in_nograb", "0", CVAR_SYSTEM | CVAR_NOCHEAT, "prevents input grabbing");
 idCVar r_waylandcompat("r_waylandcompat", "0", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ARCHIVE, "wayland compatible framebuffer");
-idCVar r_debugGLContext( "r_debugGLContext", "0", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ARCHIVE | CVAR_BOOL, "Enable a debug OpenGL context" );
+idCVar r_debugGLContext( "r_debugGLContext", "0", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_BOOL, "Enable a debug OpenGL context" );
 
 static bool grabbed = false;
 
@@ -196,11 +196,11 @@ bool GLimp_Init(glimpParms_t parms) {
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, parms.multiSamples);
 
 		// SM: Option to create a debug context
-#ifdef _DEBUG
+//#ifdef _DEBUG DG: always allow this
 		if ( r_debugGLContext.GetBool() ) {
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG );
 		}
-#endif
+//#endif
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 		window = SDL_CreateWindow(GAME_NAME,

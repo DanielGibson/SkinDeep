@@ -579,15 +579,18 @@ static void R_CheckPortableExtensions( void ) {
 		qglDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKARBPROC)GLimp_ExtensionPointer( "glDebugMessageCallback" );
 
 		// SM: Enable debug output if requested
-#ifdef _DEBUG
+//#ifdef _DEBUG // DG: always enable this, I see no reason to restrict it to debug builds - it's only active if r_debugGLContext is set
 		if ( r_debugGLContext.GetBool() ) {
+			common->Printf("Using GL_KHR_debug to log OpenGL Warnings/Errors\n");
 			qglEnable( GL_DEBUG_OUTPUT );
 			// logging synchronous means that you can put breakpoints in DebugCallback()
 			// to see what caused the warning/error
 			qglEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 			qglDebugMessageCallback(DebugCallback, NULL);
 		}
-#endif
+//#endif
+	} else if( r_debugGLContext.GetBool() ) {
+		common->Warning("r_debugGLContext is set to 1, but GL_KHR_debug is not supported!");
 	}
 
 	// blendo eric: gl frame / render buffers
