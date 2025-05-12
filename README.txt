@@ -23,7 +23,7 @@ If you want to use this with gamedata from the Demo, make sure to enable `SDDEMO
 
 See https://github.com/dhewm/dhewm3/?tab=readme-ov-file#compiling for compiling instructions.
 Note that due to this being based on an older version of dhewm3, you'll need additional dependencies:
-zlib, libogg, libvorbis, libvorbisfile
+zlib, libogg, libvorbis, libvorbisfile (sometimes part of libvorbis)
 Just like with current dhewm3, you need:
 libSDL2, libopenal (OpenAL-Soft), cmake, make or ninja, GCC/G++ or clang/clang++
 (you won't need libcurl though)

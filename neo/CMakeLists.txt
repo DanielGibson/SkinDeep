@@ -393,10 +393,12 @@ if(D3_COMPILER_IS_GCC_OR_CLANG)
 	add_compile_options(-Wno-switch)
 	add_compile_options(-Wno-unused-function -Wno-unused-variable)
 	add_compile_options(-Wno-deprecated-enum-float-conversion)
+	add_compile_options(-Wno-unused-but-set-variable)
+	add_compile_options(-Wno-format-security) # those should really be fixed..
 
 	CHECK_CXX_COMPILER_FLAG("-Woverloaded-virtual" cxx_has_Woverload_virtual)
 	if(cxx_has_Woverload_virtual)
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Woverloaded-virtual")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-overloaded-virtual")
 	endif()
 	
 	# shut up about using memcpy() on classes, in the cases doom3 uses it it seems to be fine
