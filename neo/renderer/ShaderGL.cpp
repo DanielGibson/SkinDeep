@@ -13,9 +13,9 @@
 #include "tr_local.h"
 
 idShaderGL::idShaderGL()
-	: mShaderProgram(0)
-	, mVertexShader(0)
+	: mVertexShader(0)
 	, mFragShader(0)
+	, mShaderProgram(0)
 {
 	
 }
@@ -193,12 +193,40 @@ static std::string readFile( const std::string& fileName )
 	return contents;
 }
 
+// DG: workaround for https://gitlab.freedesktop.org/mesa/mesa/-/issues/13144
+//     (where line rendering fails if no shader is bound and an integer
+//      framebuffer exists, even if it's inactive)
+//     A very basic shader that only calculates the vertex position
+//     and sets gl_Color as output color - just what you need for lines.
+static const char* basisColorOnlyVert = R"(#version 110
+varying vec4 passColor;
+void main() {
+	// using legacy sources for input data because it's rendered with immediate mode
+	passColor = gl_Color;
+	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+}
+)";
+static const char* basisColorOnlyFrag = R"(#version 110
+varying vec4 passColor;
+void main() {
+	gl_FragColor = passColor;
+}
+)";
+
 bool idShaderGL::CompileShader(const idStr& fileName,
 				   GLenum shaderType,
 				   GLuint& outShader)
 {
 	// Open file
-	std::string contents = readFile( fileName.c_str() );
+	std::string contents;
+	// DG: load basicColorOnly from string instead of file, because it doesn't exist as file (yet?)
+	if (fileName == "basicColorOnly.vert") {
+		contents = basisColorOnlyVert;
+	} else if (fileName == "basicColorOnly.frag") {
+		contents = basisColorOnlyFrag;
+	} else {
+		contents = readFile( fileName.c_str() );
+	}
 	if (!contents.empty())
 	{
 		const char* contentsChar = contents.c_str();

@@ -414,6 +414,7 @@ idStr globalShaders[] = {
 	"depthOnly",
 	"basicSurf",
 	"basicCube",
+	"basicColorOnly", // DG: for rendering without a texture, e.g. GL_LINES
 	"basicObjectLinear",
 	"fogLight",
 	"customMaskPass"

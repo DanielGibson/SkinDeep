@@ -2357,6 +2357,12 @@ void RB_RenderDebugTools( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
 
 
+	// DG: use a simple shader that just calculates the position and sets gl_Color as color
+	//     works around https://gitlab.freedesktop.org/mesa/mesa/-/issues/13144
+	//     (Mesa refused to render lines if no shader was set if an integer framebuffer
+	//      is attached, even if it's inactive)
+	R_GLSL_SetActiveProgram("basicColorOnly");
+
 	RB_ShowLightCount();
 	RB_ShowShadowCount();
 	RB_ShowTexturePolarity( drawSurfs, numDrawSurfs );
