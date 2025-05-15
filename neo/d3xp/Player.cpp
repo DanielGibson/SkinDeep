@@ -2979,7 +2979,6 @@ void idPlayer::LinkScriptVariables( void ) {
 	AI_HEAL_BLEEDOUT.LinkTo(	scriptObject, "AI_HEAL_BLEEDOUT");
 	AI_ACRO_CEILINGHIDE.LinkTo( scriptObject, "AI_ACRO_CEILINGHIDE");
 	AI_ACRO_SPLITS.LinkTo(		scriptObject, "AI_ACRO_SPLITS");
-	AI_ACRO_SPLITS_DOWN.LinkTo(	scriptObject, "AI_ACRO_SPLITS_DOWN");
 	AI_FALLEN.LinkTo(			scriptObject, "AI_FALLEN");
 	AI_FALLEN_GETUP.LinkTo(		scriptObject, "AI_FALLEN_GETUP");
 	AI_FALLEN_ROLL.LinkTo(		scriptObject, "AI_FALLEN_ROLL");
@@ -3240,7 +3239,6 @@ void idPlayer::Init( void ) {
 	AI_HEAL_HEALWOUND			= false;
 	AI_ACRO_CEILINGHIDE			= false;
 	AI_ACRO_SPLITS				= false;
-	AI_ACRO_SPLITS_DOWN			= false;
 	AI_FALLEN					= false;
 	AI_FALLEN_GETUP				= false;
 	AI_FALLEN_ROLL				= false;
@@ -6083,8 +6081,18 @@ void idPlayer::ServerSpectate( bool spectate )
 			{
 				ent->StopSound(SND_CHANNEL_ANY, 0);
 			}
+
+			// SW 7th May 2025: Hide interestpoints
+			if (ent->IsType(idInterestPoint::Type))
+			{
+				ent->Hide();
+			}
 		}
 
+		//BC 5-9-2025: hide the LKP when the spectate mode starts.
+		static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->SetLKPVisible(false);
+
+		
 
 
 
@@ -10608,7 +10616,6 @@ void idPlayer::EnterCinematic( void ) {
 	AI_HEAL_SHRAPNEL			= false;
 	AI_ACRO_CEILINGHIDE			= false;
 	AI_ACRO_SPLITS				= false;
-	AI_ACRO_SPLITS_DOWN			= false;
 	AI_FALLEN					= false;
 	AI_FALLEN_GETUP				= false;
 	AI_FALLEN_ROLL				= false;
@@ -11360,6 +11367,13 @@ void idPlayer::Event_ClearInventory(void)
 			{
 				itemPtr.GetEntity()->PostEventMS(&EV_Remove, 0);
 			}
+		}
+
+		// SW 12th May 2025: This handles weapons as well as carryables now
+		if (inventory.hotbarSlots[i].weaponType != 0)
+		{
+			inventory.Drop(i);
+			SetHotbarSlot(i, 0, "", 0, NULL); //set unarmed.
 		}
 	}
 }
@@ -14304,9 +14318,10 @@ void idPlayer::UpdateWeapon( void ) {
 //Determines when the player weapon should be lowered. Example: when clambering.
 bool idPlayer::ShouldLowerWeapon()
 {
+	// SW 12th May 2025: Added memory palace condition so marking notes read/unread doesn't cause gun to fire
 	if (carryableItem.IsValid() || bodyDragger.isDragging || g_dragEntity.GetBool() || (physicsObj.GetClamberState() == CLAMBERSTATE_RAISING
 		|| physicsObj.GetClamberState() == CLAMBERSTATE_SETTLING) || mechTransitionState == MECHTRANSITION_ENTERING
-		|| mechTransitionState == MECHTRANSITION_MOVINGTOBEHIND || peekObject.IsValid() || armstatsActive || physicsObj.GetAcroType() != ACROTYPE_NONE)
+		|| mechTransitionState == MECHTRANSITION_MOVINGTOBEHIND || peekObject.IsValid() || armstatsActive || physicsObj.GetAcroType() != ACROTYPE_NONE || memorypalaceState == MEMP_ACTIVE) 
 		return true;
 
 
@@ -14828,6 +14843,18 @@ bool idPlayer::UpdateSpectating( void ) {
 			static_cast<idBrittleFracture*>(ent)->SpectateUpdate();
 		}
 	}
+
+
+	//BC 5-6-2025: allow exit from dreammachine level replay
+	if ((usercmd.buttons & BUTTON_BASH) && !(oldButtons & BUTTON_BASH) && gameLocal.IsInEndGame() && exitLevelButtonAvailable)
+	{
+		//Exit level.
+		exitLevelButtonAvailable = false; //set a flag to guarantee the level transition only happens once.
+		gameLocal.spectatePause = false;
+		gameLocal.RunMapScript("_OnVictory");
+		return true;
+	}
+
 	
 	return false;
 }
@@ -14897,6 +14924,10 @@ bool idPlayer::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 		ContextmenuConfirm(true);
 
 		if (airless)
+		{
+			SetCenterMessage("#str_def_gameplay_cannotlie");
+		}
+		else if (physicsObj.GetAcroType() != ACROTYPE_NONE) //BC 5-8-2025: prevent lie down while in acro spot.
 		{
 			SetCenterMessage("#str_def_gameplay_cannotlie");
 		}
@@ -16896,6 +16927,12 @@ void idPlayer::UpdateViewAngles( void ) {
 		return;
 	}
 
+	// SW 6th May 2025: handles case where player finished mission while bleeding out
+	if (spectating)
+	{
+		viewAngles.roll = 0.0f;
+	}
+
 	
 
 	if ( !centerView.IsDone( gameLocal.time ) )
@@ -17007,24 +17044,6 @@ void idPlayer::UpdateViewAngles( void ) {
 			viewAngles.pitch = Min(viewAngles.pitch, pm_maxviewpitch.GetFloat()); //downward pitch.		
 			viewAngles.pitch = Max(viewAngles.pitch, pm_minviewpitch.GetFloat()); //upward pitch.
 		}
-	}
-	else if (physicsObj.GetAcroType() == ACROTYPE_SPLITS_DOWN && physicsObj.GetClamberState() == CLAMBERSTATE_ACRO)
-	{
-		//player is flipping upside down splits
-		//common->Printf("%f\n", viewAngles.pitch);
-
-		if (viewpitchState == LERPSTATE_OFF)
-		{
-			if (viewAngles.pitch > 0)
-			{
-				viewAngles.pitch = Max(viewAngles.pitch, 91.0f);
-			}
-			else
-			{
-				viewAngles.pitch = Min(viewAngles.pitch, -91.0f);
-			}
-		}
-		
 	}
 	else if ( mountedObject )
 	{
@@ -20228,6 +20247,13 @@ void idPlayer::EvaluateControls( void )
 		gameLocal.spectatePause = true; //Pause the world.
 
 		spectatorMenu->HandleNamedEvent("defeat"); //make the restart/load UI show up in the post-game ui screen (spectate.gui).
+
+		
+		//BC 5-6-2025: show the dreammachine exit button, so player isn't forced to succeed the mission replay.
+		if (gameLocal.IsInEndGame())
+		{
+			spectatorMenu->HandleNamedEvent("showHabitatButton");
+		}
 	}
 
 	if ( ( usercmd.flags & UCF_IMPULSE_SEQUENCE ) != ( oldFlags & UCF_IMPULSE_SEQUENCE ) ) {
@@ -20389,7 +20415,7 @@ void idPlayer::AdjustBodyAngles( void ) {
 
 	blend = true;
 
-	if (AI_ACRO_CEILINGHIDE || AI_ACRO_SPLITS || AI_ACRO_SPLITS_DOWN)
+	if (AI_ACRO_CEILINGHIDE || AI_ACRO_SPLITS)
 	{
 		//if in ceiling, then do nothing. the Body mesh angle is controlled in this function, some further lines below here.
 
@@ -20872,7 +20898,6 @@ void idPlayer::Move( void ) {
 
 		AI_ACRO_CEILINGHIDE = (physicsObj.GetAcroType() == ACROTYPE_CEILINGHIDE);
 		AI_ACRO_SPLITS = (physicsObj.GetAcroType() == ACROTYPE_SPLITS);
-		AI_ACRO_SPLITS_DOWN = (physicsObj.GetAcroType() == ACROTYPE_SPLITS_DOWN);
 
 		if (lastAcroState != physicsObj.GetAcroType())
 		{
@@ -20890,11 +20915,6 @@ void idPlayer::Move( void ) {
 				//Player has just entered splits. Call this.
 				//SetBodyAngleLock(true);
 				SetViewPitchLerp(70);
-			}
-			else if (physicsObj.GetAcroType() == ACROTYPE_SPLITS_DOWN)
-			{
-				SetViewPitchLerp(170);
-				SetViewPosActive(true, idVec3(0, 0, -16));
 			}
 		}
 
@@ -22945,6 +22965,7 @@ void idPlayer::Think( void ) {
 
 		//do range check.
 		bool isInRange = true;
+		bool isOwnerAlive = true;
 		if (pickpocketEnt.IsValid())
 		{
 			float dist = GetPickpocketDistance();
@@ -22953,9 +22974,34 @@ void idPlayer::Think( void ) {
 			{
 				isInRange = false;
 			}
+
+			// SW 22nd April 2025: do alive check (if the owner dies while we're pickpocketing them, we want to interrupt the pickpocket)
+			idEntity* bindMaster = pickpocketEnt.GetEntity()->GetBindMaster();
+			if (bindMaster == NULL)
+			{
+				isOwnerAlive = false;
+			}
+			else if (bindMaster->IsType(idAI::Type))
+			{
+				if (static_cast<idAI*>(bindMaster)->GetBleedingOut() || static_cast<idAI*>(bindMaster)->IsGibbed())
+				{
+					isOwnerAlive = false;
+				}
+			}
 		}
 
-		if (someoneSuspicious || !isInRange)
+		
+		// SW 5th May 2025: do PVS check.
+		// We don't want to do an exact line-of-sight check because it sucks for the player to get interrupted by tiny bits of geometry,
+		// but we do want to handle the scenario where the player becomes separated from their target by a door (e.g. if they climb into a vent)
+		bool isInPVS = true;
+		if (pickpocketEnt.IsValid() && !gameLocal.InPlayerPVS(pickpocketEnt.GetEntity()))
+		{
+			isInPVS = false;
+		}
+
+
+		if (someoneSuspicious || !isInRange || !isOwnerAlive || !isInPVS)
 		{
 			DoPickpocketFail(true);
 			
@@ -23419,7 +23465,8 @@ void idPlayer::DoPickpocketSuccess(idEntity* ent)
 		//spawn an interestpoint at player location.
 		if (bindMaster->IsType(idGunnerMonster::Type))
 		{
-			static_cast<idGunnerMonster*>(bindMaster)->DoPickpocketReaction(GetPhysics()->GetOrigin() + idVec3(0, 0, 48));
+			// SW 5th May 2025: Making sure that the pickpocket reaction interestpoint is in the world 
+			static_cast<idGunnerMonster*>(bindMaster)->DoPickpocketReaction(firstPersonViewOrigin);
 		}
 	}
 
@@ -27827,6 +27874,9 @@ bool idPlayer::ComputeTargetPos(idEntity* entity, idVec3& primaryTargetPos, idVe
 	idVec3 headPos;
 	idMat3 headAxis;
 	jointHandle_t headJoint;
+	idVec3 chestPos;
+	idMat3 chestAxis;
+	jointHandle_t chestJoint;
 
 
 	primaryTargetPos = vec3_zero;
@@ -27848,6 +27898,7 @@ bool idPlayer::ComputeTargetPos(idEntity* entity, idVec3& primaryTargetPos, idVe
 	actor = (idActor*)entity;
 
 	headJoint = actor->GetAnimator()->GetJointHandle(actor->spawnArgs.GetString("lockon_joint", "camera"));
+	chestJoint = actor->GetAnimator()->GetJointHandle(actor->spawnArgs.GetString("lockon_joint2", "spine2"));
 
 	if (headJoint == INVALID_JOINT)
 	{
@@ -27856,6 +27907,7 @@ bool idPlayer::ComputeTargetPos(idEntity* entity, idVec3& primaryTargetPos, idVe
 	}
 
 	actor->GetAnimator()->GetJointTransform(headJoint, gameLocal.time, headPos, headAxis);
+	
 	primaryTargetPos = actor->GetRenderEntity()->origin + headPos * actor->GetRenderEntity()->axis;
 	//gameRenderWorld->DebugSphere(colorRed, idSphere(primaryTargetPos, 2), 50);
 
@@ -27863,9 +27915,14 @@ bool idPlayer::ComputeTargetPos(idEntity* entity, idVec3& primaryTargetPos, idVe
 	{
 		secondaryTargetPos = actor->GetHeadEntity()->GetPhysics()->GetOrigin();
 	}
+	else if (chestJoint != INVALID_JOINT)
+	{
+		actor->GetAnimator()->GetJointTransform(chestJoint, gameLocal.time, chestPos, chestAxis);
+		secondaryTargetPos = actor->GetRenderEntity()->origin + chestPos * actor->GetRenderEntity()->axis; //SW 7th May 2025: If head targeting fails, go for the chest bone instead
+	}
 	else
 	{
-		secondaryTargetPos = actor->GetPhysics()->GetAbsBounds().GetCenter(); //IF targeting fails, then aim for center of mass.
+		secondaryTargetPos = primaryTargetPos;
 	}
 
 	return true;	
@@ -29280,7 +29337,8 @@ void idPlayer::UpdatePlacerSticky(void)
 		showPlacer = false;
 	}
 
-	if (!showPlacer || frobEnt != NULL || peekObject.IsValid() || viewyawState != LERPSTATE_OFF || IsLeaning())
+	// SW 7th May 2025: prevent placer being shown while in zoom mode
+	if (!showPlacer || frobEnt != NULL || peekObject.IsValid() || viewyawState != LERPSTATE_OFF || IsLeaning() || zoommodeActive)
 	{
 		if (!placerEnt->IsHidden())
 		{
@@ -29562,6 +29620,11 @@ void idPlayer::Event_SetFallState(bool enable, bool hardFall, bool immediateExit
 	{
 		// Exit fallen state with no animation, no anything
 		this->physicsObj.SetImmediateExitFallState();
+
+		// SW 7th May 2025: Break animation controller out of lying-down state 
+		// (fixes bug where the player can move normally but their body is still lying on the ground)
+		AI_FALLEN = false;
+		AI_FALLEN_GETUP = false;
 	}
 	else
 	{
@@ -30118,6 +30181,13 @@ void idPlayer::SetHideState(idEntity * hideEnt, int hideType)
 
 void idPlayer::SetAcroHide(idEntity * hideEnt)
 {
+	//BC 5-8-2025: if in lie down state, kick player out of it when entering an acro point.
+	if (GetFallenState())
+	{
+		SetFallState(false, false);
+		physicsObj.SetImmediateExitFallState();
+	}
+
 	//if (GetCarryable() != NULL)
 	//{
 	//	DropCurrentCarryable(true);
@@ -30147,6 +30217,7 @@ void idPlayer::EnterMech(idEntity * mechEnt)
 
 	if (AI_FALLEN || AI_FALLEN_GETUP)
 	{
+		SetFallState(false, false); //BC 5-12-2025: force player to stand up.
 		this->physicsObj.SetImmediateExitFallState();
 	}
 
@@ -35497,6 +35568,12 @@ void idPlayer::DoExitZoomMode()
 	zoomFov.Init(gameLocal.time, ZOOM_LERPTIME, zoomFov.GetCurrentValue(gameLocal.time), DefaultFov()); //Reset fov to default.
 	zoommodeActive = false;
 	StartSound("snd_zoomout", SND_CHANNEL_ANY, 0, false, NULL);
+
+	//BC 5-2-2025: force the zoom inspect ent to be null.
+	//This fixes the bug where when ventpeeking, clicking LMB would suddenly inspect this last zoominspectentity.
+	//We DO null this out when exiting a label inspect, but, this zoominspectentity variable gets *re-assigned* when you return
+	//to zoom mode and hover over an inspectable object.
+	zoominspectEntityPtr = nullptr;
 }
 
 void idPlayer::Event_SetTitleFlyMode(int value)

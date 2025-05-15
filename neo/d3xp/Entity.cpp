@@ -170,6 +170,7 @@ const idEventDef EV_RepairEntity("setRepair", NULL);
 const idEventDef EV_EntityTeleport("entityTeleport", "vv");
 const idEventDef EV_SetSystemicVOEnabled("setSystemicVOEnabled", "d");
 const idEventDef EV_IsPlayingSound("isPlayingSound", "d", 'd');
+const idEventDef EV_UpdateGravity("updateGravity", NULL);
 
 ABSTRACT_DECLARATION(idClass, idEntity)
 EVENT(EV_GetName, idEntity::Event_GetName)
@@ -264,6 +265,7 @@ EVENT(EV_RepairEntity,			idEntity::Event_RepairEntity)
 EVENT(EV_EntityTeleport,		idEntity::Event_EntityTeleport)
 EVENT(EV_SetSystemicVOEnabled,	idEntity::Event_SetSystemicVoEnabled)
 EVENT(EV_IsPlayingSound,		idEntity::Event_IsPlayingSound)
+EVENT(EV_UpdateGravity,			idEntity::Event_UpdateGravity)
 
 END_CLASS
 
@@ -6770,6 +6772,12 @@ void idEntity::Event_GetCurrentHealth(void)
 void idEntity::Event_GetMaxHealth(void)
 {
 	idThread::ReturnInt(this->maxHealth);
+}
+
+// SW 12th May 2025: Force entity to update its gravity from script (necessary for monsters respawning)
+void idEntity::Event_UpdateGravity(void)
+{
+	UpdateGravity(true);
 }
 
 //BC

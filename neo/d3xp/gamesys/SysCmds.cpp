@@ -3659,6 +3659,12 @@ void Cmd_DebugEventLog_f(const idCmdArgs& args)
 	common->Printf("Created %d event log entries.\n", ENTRIES_TO_MAKE);
 }
 
+//BC 4-25-2025: basic help command for someone new to the console
+void Cmd_Help(const idCmdArgs& args)
+{
+	common->Printf("\nHi. You're in the Skin Deep developer console. Some hotkeys:\n - ctrl+alt+tilde = open console.\n - tilde          = close console.\n - up/down arrow  = command history.\n - tab            = autocomplete.\n\nTo exit to main menu, type in: disconnect\nTo exit to desktop, type in:   quit\n");
+}
+
 //BC 4-21-2025: debug to "unstuck" a player who may be stuck in geometry
 void Cmd_UnstuckPlayer(const idCmdArgs& args)
 {
@@ -4755,6 +4761,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 
 	cmdSystem->AddCommand("resetSettings",			Cmd_ResetSettings, CMD_FL_GAME , "Reset your settings to default.");
 	cmdSystem->AddCommand("unstuck",				Cmd_UnstuckPlayer, CMD_FL_GAME, "Debug to un-stuck player if they're trapped in geometry.");
+	cmdSystem->AddCommand("help",					Cmd_Help, CMD_FL_GAME, "Help command.");
 
 
 	//Hotreload from DARKMOD

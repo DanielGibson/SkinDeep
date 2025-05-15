@@ -516,7 +516,6 @@ public:
 	idScriptBool			AI_HEAL_BLEEDOUT;
 	idScriptBool			AI_ACRO_CEILINGHIDE;
 	idScriptBool			AI_ACRO_SPLITS;
-	idScriptBool			AI_ACRO_SPLITS_DOWN;
 	idScriptBool			AI_FALLEN;
 	idScriptBool			AI_FALLEN_GETUP;
 	idScriptBool			AI_FALLEN_ROLL;

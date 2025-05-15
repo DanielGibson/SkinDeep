@@ -355,24 +355,34 @@ bool idGlassPiece::DoFrob(int index, idEntity * frobber)
 // blendo eric: quickly limit the amount of active glass pieces, if too many destroyed at same time
 void idGlassPiece::LimitActiveGlassPieces()
 {
-	if (glassList.Num() < GLASS_PIECES_ACTIVE_MAX)
+	if ( glassList.Num() < GLASS_PIECES_ACTIVE_MAX )
 	{
 		return;
 	}
 
 	// get active pieces
 	float avgRadius = 0.0f;
-	for (int idx = 0 ; idx < glassList.Num(); idx++ )
+	int activeCount = 0;
+	for ( int idx = 0 ; idx < glassList.Num(); idx++ )
 	{
-		float radius = glassList[idx]->GetPhysics()->GetBounds().GetRadius();
-		avgRadius = avgRadius > 0.0f ? avgRadius + radius : radius;
+		if ( glassList[idx]->IsActive() && !glassList[idx]->IsRemoved() && (glassList[idx]->thinkFlags != TH_DISABLED) )
+		{
+			float radius = glassList[idx]->GetPhysics()->GetBounds().GetRadius();
+			avgRadius = avgRadius > 0.0f ? avgRadius + radius : radius;
+			activeCount++;
+		}
 	}
 
-	int destroyCount = (glassList.Num() - GLASS_PIECES_ACTIVE_MAX);
+	int destroyCount = Min( (activeCount - GLASS_PIECES_ACTIVE_MAX), GLASS_PIECES_DESTROY_MAX );
 
-	gameLocal.Warning("exceeded glass piece max %d / %d, destroying smallest", glassList.Num(), GLASS_PIECES_ACTIVE_MAX);
+	if ( destroyCount <= 0 )
+	{
+		return;
+	}
 
-	while (destroyCount > 0)
+	gameLocal.Warning("exceeded glass piece max %d / %d, destroying smallest %d", glassList.Num(), GLASS_PIECES_ACTIVE_MAX, destroyCount);
+
+	while ( destroyCount > 0 )
 	{
 		int stepSize = Max( glassList.Num() / destroyCount, GLASS_PIECES_SAMPLE_SIZE );
 
@@ -393,14 +403,17 @@ void idGlassPiece::LimitActiveGlassPieces()
 			{
 				idGlassPiece* piece = glassList[subIdx];
 				float rad = glassList[subIdx]->modelRadius;
-				if (rad < smallestPieceSize)
+				if ( piece->IsActive() && !piece->IsRemoved() && (piece->thinkFlags != TH_DISABLED) )
 				{
-					smallestPiece = piece;
-					smallestPieceSize = rad;
+					if (rad < smallestPieceSize)
+					{
+						smallestPiece = piece;
+						smallestPieceSize = rad;
+					}
 				}
 			}
 
-			if (smallestPiece && !smallestPiece->IsActive() && !smallestPiece->IsRemoved())
+			if ( smallestPiece )
 			{
 				smallestPiece->ShatterAndRemove(true); // make sure to only destroy only this piece, not spawn fx or recursive destroy pieces
 			}

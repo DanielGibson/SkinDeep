@@ -240,6 +240,7 @@ idCVar r_stencilReverse("r_stencilReverse", "1", CVAR_RENDERER | CVAR_BOOL, "use
 
 // DG: let users disable the "scale menus to 4:3" hack
 idCVar r_scaleMenusTo169( "r_scaleMenusTo169", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Scale menus, fullscreen videos and PDA to 16:9 aspect ratio even when widescreen" );
+idCVar r_AMDWorkaround( "r_AMDWorkaround", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_INIT, "Whether to force enable to AMD workaround" );
 
 // define qgl functions
 #define QGLPROC(name, rettype, args) rettype (APIENTRYP q##name) args;
@@ -655,8 +656,9 @@ static void R_CheckPortableExtensions( void ) {
 	amdGPUs.AddUnique("HD 75");
 	amdGPUs.AddUnique("HD 76");
 	amdGPUs.AddUnique("HD 79");
+	amdGPUs.AddUnique("Pro Vega");
 
-	glConfig.isBrokenAMDR7200 = false;
+	glConfig.isBrokenAMDR7200 = r_AMDWorkaround.GetBool();
 	for (int i = 0; i < amdGPUs.Num(); i++) {
 		glConfig.isBrokenAMDR7200 = glConfig.isBrokenAMDR7200 || gpuStr.Find(amdGPUs[i]) != -1;
 	}

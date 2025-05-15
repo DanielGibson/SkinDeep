@@ -7400,7 +7400,7 @@ void idGameLocal::DisplayEventLogAlert(const char *text, const char * icon, idVe
 	}
 }
 
-void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoFeed, int eventType)
+void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoFeed, int eventType, bool showDupes)
 {
 	if (gameLocal.GetLocalPlayer()->spectating)
 		return;
@@ -7425,7 +7425,6 @@ void idGameLocal::AddEventLog(const char *text, idVec3 _position, bool showInfoF
 		idStr iconName = "";
 		idVec4 bgColor = idVec4(0, 0, 0, 1);
 		idVec4 textColor = idVec4(1, 1, 1, 1);
-		bool showDupes = true; // SW 19th March 2025: cutting down on interestpoint spam by adding this arg to the DisplayEventLogAlert call
 
 		if (eventType == EL_INTERESTPOINT)
 		{
@@ -8527,7 +8526,7 @@ void idGameLocal::DoSpewBurst(idEntity *ent, int spewType)
 	if (spewType == SPEWTYPE_PEPPER)
 	{
 		//Spawn pepper cloud.
-		gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_pepper_created"), ent->displayName.c_str()), ent->GetPhysics()->GetOrigin());
+		gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_pepper_created"), ent->displayName.c_str()), ent->GetPhysics()->GetOrigin(), true, 0, false); // SW 6th May 2025: Adding showDupes = false
 		args.SetFloat("multiplier", ent->spawnArgs.GetFloat("sneezemultiplier", "1"));
 		args.Set("classname", "trigger_cloud_sneeze");
 		spewTrigger = (idTrigger_sneeze*)gameLocal.SpawnEntityDef(args);
@@ -8535,7 +8534,7 @@ void idGameLocal::DoSpewBurst(idEntity *ent, int spewType)
 	else if (spewType == SPEWTYPE_DEODORANT)
 	{
 		//Spawn a flammable cloud.		
-		gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_cloud_created"), ent->displayName.c_str()), ent->GetPhysics()->GetOrigin());
+		gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_cloud_created"), ent->displayName.c_str()), ent->GetPhysics()->GetOrigin(), true, 0, false);
 		args.Set("classname", "trigger_cloud_deodorant");
 		spewTrigger = (idTrigger_deodorant*)gameLocal.SpawnEntityDef(args);
 	}

@@ -6,6 +6,7 @@
 #define CLEANUP_RADIUS 32 //when glass is stepped on, remove all other glass pieces in XX radius.
 
 const int GLASS_PIECES_ACTIVE_MAX = 64;
+const int GLASS_PIECES_DESTROY_MAX = 64; //  per frame destroy
 const int GLASS_PIECES_SAMPLE_SIZE = 10; // should be big enough sample to compare pieces, but smaller than max
 
 class idGlassPiece : public idMoveableItem

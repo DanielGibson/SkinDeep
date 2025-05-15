@@ -17,6 +17,7 @@
 #include "bc_windowshutter.h"
 
 CLASS_DECLARATION(idStaticEntity, idWindowShutter)
+	EVENT(EV_SpectatorTouch, idWindowShutter::Event_SpectatorTouch)
 END_CLASS
 
 #define SHUTTER_CLOSETIME 5000
@@ -191,4 +192,39 @@ void idWindowShutter::Think(void)
 			shutterState = SHT_SHUTTERED;
 		}
 	}
+}
+
+// SW 22nd April 2025: mostly copied from BrittleFracture
+void idWindowShutter::Event_SpectatorTouch(idEntity* other, trace_t* trace)
+{
+	idVec3		contact, translate, normal;
+	idBounds	bounds;
+	idPlayer* p;
+
+	assert(other && other->IsType(idPlayer::Type) && static_cast<idPlayer*>(other)->spectating);
+
+	p = static_cast<idPlayer*>(other);
+	// avoid flicker when stopping right at clip box boundaries
+	if (p->lastSpectateTeleport > gameLocal.hudTime - 300) { //BC was 1000
+		return;
+	}
+
+	//Attempt to find a space for player to teleport to.
+	idVec3 glassContact = trace->endpos;
+
+	idVec3 playerMovedir = p->GetPhysics()->GetLinearVelocity().ToAngles().ToForward();
+	idVec3 candidateSpot = glassContact + playerMovedir * 64;
+
+	if (gameLocal.LocationForPoint(candidateSpot) == NULL)
+		return;
+
+	trace_t candidateTr;
+	gameLocal.clip.TraceBounds(candidateTr, candidateSpot, candidateSpot + idVec3(0, 0, 1), p->GetPhysics()->GetBounds(), MASK_SOLID, NULL);
+
+	if (candidateTr.fraction < 1.0f)
+		return;
+
+	p->SetOrigin(candidateSpot);
+	p->lastSpectateTeleport = gameLocal.hudTime;
+	gameLocal.GetLocalPlayer()->StartSound("snd_spectate_door", SND_CHANNEL_ANY);
 }

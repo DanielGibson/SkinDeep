@@ -471,7 +471,7 @@ void idDamageJet::SpawnCloud(const idDeclEntityDef	*cloudEntityDef, idVec3 pos)
 		idEntity *ownerEnt = gameLocal.entities[ownerIndex];
 		if (ownerEnt != NULL)
 		{
-			gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_cloud_created"), ownerEnt->displayName.c_str()), GetPhysics()->GetOrigin());
+			gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_cloud_created"), ownerEnt->displayName.c_str()), GetPhysics()->GetOrigin(), true, 0, false); // SW 6th May 2025: anti-spam measures
 		}
 	}
 }

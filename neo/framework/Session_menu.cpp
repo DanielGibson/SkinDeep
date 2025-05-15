@@ -286,49 +286,10 @@ void idSessionLocal::SetSaveGameGuiVars( void ) {
 		//idStr date = Sys_TimeStampToStr( fileTimes[i].timeStamp );
 		//name += date;
 
-		//BC don't show the date. Instead, print string of how long ago the save was relative to now.
-		ID_TIME_T curTime = time(nullptr);
-		localtime(&curTime);
-
-		ID_TIME_T timeDiff = difftime( curTime, fileTimes[i].timeStamp );
-
-		const ID_TIME_T dayLimit = 9999*24*60*60; // 9999 days in seconds
-		if ( timeDiff < 0 ) {
-			timeDiff = 0;
-		} else if ( timeDiff > dayLimit ) {
-			timeDiff = dayLimit;
-		}
-
-		int days = timeDiff / (24*60*60);
-		int hours = timeDiff / (60*60);
-		int mins = timeDiff / (60);
-		int seconds = timeDiff;
-
 		idStr diffString;
-		if ( days > 1 )
-		{
-			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_daysago"), days);
-		}
-		else if ( days == 1 )
-		{
-			diffString = common->GetLanguageDict()->GetString("#str_loadgame_yesterday");
-		}
-		else if ( hours > 0 )
-		{
-			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_hoursago"), hours);
-		}
-		else if ( mins > 0 )
-		{
-			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_minutesago"), mins);
-		}
-		else if ( seconds > 0 )
-		{
-			diffString = idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_secondsago"), seconds);
-		}
-		else
-		{
-			diffString = "";
-		}
+
+		//BC don't show the date. Instead, print string of how long ago the save was relative to now.
+		diffString = ParseSavetime(fileTimes[i].timeStamp);
 
 		name += diffString; //Add the relative time elapsed to the savegame display name in the list.
 
@@ -384,6 +345,52 @@ void idSessionLocal::SetSaveGameGuiVars( void ) {
 
 	guiActive->SetStateString( "loadgame_sel_0", "-1" );
 	guiActive->SetStateString( "loadgame_shot", "guis/assets/teapot" );
+
+}
+
+//BC 5-6-2025: breaking this out into its own function because it now needs to get called from multiple places.
+idStr idSessionLocal::ParseSavetime(time_t filetimestamp)
+{
+	ID_TIME_T curTime = time(nullptr);
+	localtime(&curTime);
+
+	ID_TIME_T timeDiff = difftime(curTime, filetimestamp);
+
+	const ID_TIME_T dayLimit = 9999 * 24 * 60 * 60; // 9999 days in seconds
+	if (timeDiff < 0) {
+		timeDiff = 0;
+	}
+	else if (timeDiff > dayLimit) {
+		timeDiff = dayLimit;
+	}
+
+	int days = timeDiff / (24 * 60 * 60);
+	int hours = timeDiff / (60 * 60);
+	int mins = timeDiff / (60);
+	int seconds = timeDiff;
+
+	if (days > 1)
+	{
+		return idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_daysago"), days);
+	}
+	else if (days == 1)
+	{
+		return common->GetLanguageDict()->GetString("#str_loadgame_yesterday");
+	}
+	else if (hours > 0)
+	{
+		return  idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_hoursago"), hours);
+	}
+	else if (mins > 0)
+	{
+		return idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_minutesago"), mins);
+	}
+	else if (seconds > 0)
+	{
+		return idStr::Format(common->GetLanguageDict()->GetString("#str_loadgame_secondsago"), seconds);
+	}
+	
+	return "";
 
 }
 
@@ -1038,9 +1045,24 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		{
 			//open reportabug overlay.
 
-			idStr infostring = GetPlayerLocationString();
 
-			common->g_SteamUtilities->OpenSteamOverlaypage(idStr::Format("https://docs.google.com/forms/d/e/1FAIpQLScejbJ0SFfkHb0iWhFagXAikLwnyHOSie-n7tHUtFheFQ6oiQ/viewform?usp=dialog&entry.561524408=%s", infostring.c_str()).c_str());
+			//BC 5-8-2025: only allow bugreport if mod is not loaded.
+			idStr basegame = cvarSystem->GetCVarString("fs_game");
+			bool canDoReport = false;
+			if (basegame.IsEmpty())
+			{
+				canDoReport = true;
+			}
+			else if (basegame.Icmp(BASE_GAMEDIR) == 0)
+			{
+				canDoReport = true;
+			}
+
+			if (canDoReport)
+			{
+				idStr infostring = GetPlayerLocationString();
+				common->g_SteamUtilities->OpenSteamOverlaypage(idStr::Format("https://docs.google.com/forms/d/e/1FAIpQLScejbJ0SFfkHb0iWhFagXAikLwnyHOSie-n7tHUtFheFQ6oiQ/viewform?usp=dialog&entry.561524408=%s", infostring.c_str()).c_str());
+			}
 		}
 
 		//BC 2-26-2025: open steam workshop page.
@@ -1092,6 +1114,11 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			}
 
 			cvarSystem->SetCVarInteger("g_skill", guiMainMenu->State().GetInt("skill"));
+
+			// SM 5/12/25: Fix for SD-603 where loading into another save then starting
+			// a new game didn't reset progression
+			gameLocal.persistentLevelInfo.Clear();
+			gameLocal.persistentPlayerInfo[0].Clear();
 
 			StartNewGame(levelnameToLoad.c_str());
 
@@ -1723,8 +1750,61 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 
 
 		//-- end reportabug
+
+
+		//BC 5-6-2025: show last savegame time.
+		if (!idStr::Icmp(cmd, "showlastsave"))
+		{
+			idStr lastSaveStr = GetLastSavetime();
+
+			if (lastSaveStr.Length() > 0)
+			{
+				guiMainMenu->SetStateBool("lastsavevisible", true);
+				guiMainMenu->SetStateString("lastsavetime", lastSaveStr.c_str());				
+			}
+			else
+			{
+				guiMainMenu->SetStateBool("lastsavevisible", false);
+			}
+		}
 	}
 }
+
+//BC 5-6-2025: show last savegame time.
+idStr idSessionLocal::GetLastSavetime()
+{
+	idStrList fileList;
+	idList<fileTIME_T> fileTimes;
+	GetSaveGameList(fileList, fileTimes);
+
+	if (fileList.Num() > 0) //If there is at least 1 file in the save folder...
+	{
+		//Search for the highest timestamp. The highest timestamp is the most-recent savegame.
+		int64 highestTimestamp = 0;
+		for (int i = 0; i < fileList.Num(); i++)
+		{
+			if (fileTimes[i].timeStamp > highestTimestamp)
+			{
+				highestTimestamp = fileTimes[i].timeStamp;
+			}
+		}
+
+		if (highestTimestamp > 0)
+		{
+			idStr diffString = ParseSavetime(highestTimestamp);
+			if (diffString.Length() <= 0)
+			{
+				return "";
+			}
+
+			return diffString;
+		}		
+	}
+	
+	//no files. return empty.
+	return "";
+}
+
 
 //BC 2-25-2025: make the gamepad display show what the current binds are.
 void idSessionLocal::DisplayGamepadBind(idStr key)

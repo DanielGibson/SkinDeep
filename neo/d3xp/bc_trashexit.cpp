@@ -136,6 +136,18 @@ void idTrashExit::Restore(idRestoreGame *savefile)
 
 bool idTrashExit::DoFrob(int index, idEntity * frobber)
 {
+	//BC 5-8-2025: only player can frob the trash exit.
+	if (frobber == nullptr)
+	{
+		return false;
+	}
+
+	if (frobber != gameLocal.GetLocalPlayer())
+	{
+		return false;
+	}
+
+
 	if (!myChute.IsValid())
 	{
 		gameLocal.Error("trash exit '%s' has invalid chute.", this->GetName());

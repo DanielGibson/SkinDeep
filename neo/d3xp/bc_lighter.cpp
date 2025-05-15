@@ -191,6 +191,11 @@ bool idLighter::DoFrob(int index, idEntity * frobber)
 
         return true;
     }
+    else
+    {
+        //picking up lighter in the world.
+        spawnArgs.SetBool("isfire", false); //BC 5-8-2025: Force its "fire" state to be off, so that the player isn't igniting things by just carrying the lighter around.
+    }
 
     KillLight();
     return idMoveableItem::DoFrob(index, frobber);

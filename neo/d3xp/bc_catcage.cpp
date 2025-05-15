@@ -673,6 +673,24 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 		if (idStr::Icmp(invname, "catkey") == 0)
 		{
 			//found a catkey.
+
+			//SW 13th May 2025: Moving this check above everything else so that it doesn't get skipped under certain circumstances (e.g. if the cat key is in the same room, or in an invalid location)
+			//BC 5-9-2025. Do a check that checks if key is in invalid place (i.e. inside geometry).
+			//This is an emergency failsafe in case the key gets lodged somewhere it shouldn't.
+			//Basically: asking the cat will "fix" keys that are in invalid positions.
+			int penetrationContents = gameLocal.clip.Contents(ent->GetPhysics()->GetOrigin(), NULL, mat3_identity, CONTENTS_SOLID, NULL);
+			if (penetrationContents & MASK_SOLID)
+			{
+				//The key is inside geometry.
+				if (ent->IsType(idMoveableItem::Type))
+				{
+					//The key is trapped inside geometry, so just force the key to get lost in space, to make it go to lost and found.
+					static_cast<idMoveableItem*>(ent)->SetLostInSpace();
+				}
+
+				continue;
+			}
+
 			idLocationEntity* locEntCatkey = gameLocal.LocationForEntity(ent);
 			if (locEntCatkey)
 			{

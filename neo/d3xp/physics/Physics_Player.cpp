@@ -1438,14 +1438,6 @@ void idPhysics_Player::CheckDuck( void ) {
 	}
 	else if (acroType == ACROTYPE_SPLITS && clamberState == CLAMBERSTATE_ACRO)
 	{
-		//Press crouch while in splits.
-		if (command.upmove < 0)
-		{
-			//Go to flip-upside-down splits mode.
-			acroType = ACROTYPE_SPLITS_DOWN;
-			gameLocal.GetLocalPlayer()->UnsetToggleCrouch();
-		}
-
 		maxZ = ACRO_CEILINGHIDE_PLAYERHEIGHT;
 	}
 	else if (gameLocal.GetLocalPlayer()->IsJockeying())
@@ -3694,7 +3686,7 @@ void idPhysics_Player::UpdateClamber(void)
 			{
 				//enter an acro state.
 
-				if (acroType == ACROTYPE_SPLITS || acroType == ACROTYPE_SPLITS_DOWN)
+				if (acroType == ACROTYPE_SPLITS)
 				{
 					//for splits, stand up.
 					current.movementFlags &= ~PMF_DUCKED;
@@ -4634,7 +4626,7 @@ void idPhysics_Player::UpdateAcro()
 	bool crouchPressed = command.prevButtonState[UB_DOWN] <= 0 && command.buttonState[UB_DOWN] > 0 && !common->IsConsoleActive();
 	bool jumpPressed = command.prevButtonState[UB_UP] <= 0 && command.buttonState[UB_UP] > 0 && !common->IsConsoleActive();
 
-	if (acroType == ACROTYPE_CEILINGHIDE || acroType == ACROTYPE_SPLITS || acroType == ACROTYPE_SPLITS_DOWN)
+	if (acroType == ACROTYPE_CEILINGHIDE || acroType == ACROTYPE_SPLITS)
 	{
 		if (crouchPressed || jumpPressed)
 		{
@@ -5256,7 +5248,7 @@ void idPhysics_Player::SetHideState(idEntity * hideEnt, int _hideType)
 	idVec3 forward, up, finalPos, dustPos;
 	int verticalOffset = 0;
 	int forwardOffset = 8;
-	float targetPitch = -30;
+	float targetPitch = hideEnt->spawnArgs.GetFloat("targetpitch", "0"); // SW 5th May 2025: Making this value data-driven
 
 	cargohideEnt = hideEnt;	
 	hideEnt->GetPhysics()->GetAxis().ToAngles().ToVectors(&forward, NULL, &up);
@@ -5277,7 +5269,6 @@ void idPhysics_Player::SetHideState(idEntity * hideEnt, int _hideType)
 		verticalOffset = -16;
 		forwardOffset = -22;
 		dustPos = hideEnt->GetPhysics()->GetOrigin() + (up * 16) + (forward*4) ;
-		targetPitch = 10;
 	}
 	hideType = _hideType;
 

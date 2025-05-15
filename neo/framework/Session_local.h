@@ -416,6 +416,9 @@ private:
 	void				DisplayGamepadBind(idStr key);
 
 	void				ShowSavegameInfo();
+
+	idStr				GetLastSavetime(); //BC 5-6-2025: show last savegame time.
+	idStr				ParseSavetime(time_t filetimestamp); //BC 5-6-2025: show last savegame time.
 };
 
 extern idSessionLocal	sessLocal;
