@@ -603,7 +603,10 @@ FILE *idFileSystemLocal::OpenOSFile( const char *fileName, const char *mode, idS
 	fp = fopen( fileName, mode );
 	if( !fp ) {
 		int errOut = errno;
-		common->DPrintf( "idFileSystem::OpenOSFile: could not open file due to err %d: %s\n", errOut, fileName );
+		// DG: turned debug printf (shown if developer 1) into fs_debug > 1 because this is very spammy
+		if(fs_debug.GetInteger() > 1) {
+			common->Printf( "idFileSystem::OpenOSFile: could not open file due to err %d: %s\n", errOut, fileName );
+		}
 	}
 	if ( !fp && fs_caseSensitiveOS.GetBool() ) {
 		fpath = fileName;
