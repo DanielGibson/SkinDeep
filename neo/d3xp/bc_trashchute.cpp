@@ -38,6 +38,7 @@ CLASS_DECLARATION(idStaticEntity, idTrashchute)
 	EVENT(EV_PostSpawn, idTrashchute::Event_PostSpawn)
 	EVENT(EV_Chute_Enable, idTrashchute::Event_ChuteEnable)
 	EVENT(EV_Chute_IsEnabled, idTrashchute::Event_IsChuteEnabled)
+	EVENT(EV_SpectatorTouch, idTrashchute::Event_SpectatorTouch)
 END_CLASS
 
 idTrashchute::idTrashchute(void)
@@ -467,6 +468,13 @@ void idTrashchute::Think(void)
 						gameLocal.GetLocalPlayer()->SayVO_WithIntervalDelay_msDelayed("snd_vo_trash_skull", 1200);
                     }
 
+					// SW 6th May 2025: Do a little particle effect on objects sitting higher in the chute (or balanced on the lip) so they don't appear to just 'vanish'
+					if (ent->IsType(idMoveableItem::Type) || ent->IsType(idMoveable::Type)
+						&& ent->GetPhysics()->GetOrigin().z > GetPhysics()->GetOrigin().z + 32)
+					{
+						gameLocal.DoParticle(this->spawnArgs.GetString("model_teleport_prt"), ent->GetPhysics()->GetAbsBounds().GetCenter());
+					}
+
 					//Teleport the object.
 					ent->Teleport(outputLocation, ent->GetPhysics()->GetAxis().ToAngles(), targets[randomIdx].GetEntity());
 
@@ -657,4 +665,39 @@ bool idTrashchute::IsChuteEnabled()
 void idTrashchute::Event_IsChuteEnabled(void)
 {
 	idThread::ReturnFloat((float)IsChuteEnabled());
+}
+
+void idTrashchute::Event_SpectatorTouch(idEntity* other, trace_t* trace)
+{
+	idVec3		contact, translate, normal;
+	idBounds	bounds;
+	idPlayer* p;
+
+	assert(other && other->IsType(idPlayer::Type) && static_cast<idPlayer*>(other)->spectating);
+
+	p = static_cast<idPlayer*>(other);
+	// avoid flicker when stopping right at clip box boundaries
+	if (p->lastSpectateTeleport > gameLocal.hudTime - 300) { //BC was 1000
+		return;
+	}
+
+	// SW May 7th 2025: All our trash chutes only have a single exit and there's no reason to copy all this random selection stuff from Think(),
+	// but I'd feel bad if I broke it now.
+	int totalOutputs = targets.Num();
+
+	int randomIdx = gameLocal.random.RandomInt(totalOutputs);
+	idAngles exitAngle = targets[randomIdx].GetEntity()->GetPhysics()->GetAxis().ToAngles();
+
+	if (!targets[randomIdx].GetEntity())
+	{
+		gameLocal.Error("idTrashchute '%s' at (%s) has an invalid 'target' key.", name.c_str(), GetPhysics()->GetOrigin().ToString(0));
+	}
+
+	idVec3 outputLocation = targets[randomIdx].GetEntity()->GetPhysics()->GetOrigin();
+	outputLocation += exitAngle.ToForward() * 48;
+
+	p->SetOrigin(outputLocation);
+	p->SetViewAngles(exitAngle);
+	p->lastSpectateTeleport = gameLocal.hudTime;
+	gameLocal.GetLocalPlayer()->StartSound("snd_spectate_door", SND_CHANNEL_ANY);
 }

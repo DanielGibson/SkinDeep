@@ -266,6 +266,7 @@ void idAirlockAccumulator::SetDeflate()
 	}
 
 	SetSkin(declManager->FindSkin("skins/airlock_pressure/skin_deflate"));
+	spawnArgs.SetBool("zoominspect", false); // SW 6th May 2025: Can't inspect once the label disappears
 
 
 	//Make the cable func_static stop animating.
@@ -347,6 +348,8 @@ bool idAirlockAccumulator::DoFrob(int index, idEntity * frobber)
 		headlight.shaderParms[1] = 0.8f;
 		headlight.shaderParms[2] = 0;
 		gameRenderWorld->UpdateLightDef(headlightHandle, &headlight);
+
+		spawnArgs.SetBool("zoominspect", false); //BC 5-8-2025 call this again earlier, for players who quickly inspect right after frobbing it
 	}
 
 	return true;

@@ -1825,7 +1825,8 @@ void idBrittleFracture::PrintEventMessage(idEntity *inflictor)
 		return;
 	}
 
-	idStr inflictorName = (inflictor->displayName.Length() > 0) ? inflictor->displayName : idStr(inflictor->GetName());
+	//BC 5-2-2025: don't ever use the internal entity name. Just use question mark.
+	idStr inflictorName = (inflictor->displayName.Length() > 0) ? inflictor->displayName : idStr(common->GetLanguageDict()->GetString("#str_07001"));
 	gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_window_break"), inflictorName.c_str()), GetPhysics()->GetOrigin());
 }
 

@@ -36,5 +36,7 @@ private:
 	//BC 3-26-2025: locbox.
 	idEntity*				locbox = nullptr;
 
+	// SW 22nd April 2025
+	void						Event_SpectatorTouch(idEntity* other, trace_t* trace);
 };
 //#pragma once#pragma once

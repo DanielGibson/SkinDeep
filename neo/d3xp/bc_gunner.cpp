@@ -5243,7 +5243,15 @@ void idGunnerMonster::UpdatePickpocketReaction()
 			interestPos = GetPhysics()->GetOrigin() + interestDir * PICKPOCKET_INTEREST_MAXDISTANCE;
 		}
 
-		gameLocal.SpawnInterestPoint(gameLocal.GetLocalPlayer(), interestPos, spawnArgs.GetString("interest_pickpocket"));
+		idEntity* interestPoint = gameLocal.SpawnInterestPoint(gameLocal.GetLocalPlayer(), interestPos, spawnArgs.GetString("interest_pickpocket"));
+
+		// SW 5th May 2025: if the interestpoint fails to spawn for some reason (this hopefully shouldn't happen),
+		// then we need to manually break the pirate out of their idle animation.
+		// This fixes an issue where a pirate could get locked into their pickpocket react animation.
+		if (interestPoint == NULL)
+		{
+			AI_CUSTOMIDLEANIM = false;
+		}
 	}
 	
 }

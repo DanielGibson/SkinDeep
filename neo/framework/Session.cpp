@@ -1497,7 +1497,17 @@ idSessionLocal::SaveGameSession
 void idSessionLocal::SaveGameSession(const idCmdArgs& args)
 {
 	idStr sessionName = sessLocal.GetSessionSaveName();
-	sessLocal.SaveGame(sessionName, false);
+	
+	if (sessLocal.SaveGame(sessionName, false))
+	{
+		common->Printf("Saved: %s\n", sessionName.c_str());
+	}
+	else
+	{
+		common->Warning("SaveGameSession: failed to save.");
+	}
+
+	
 }
 
 

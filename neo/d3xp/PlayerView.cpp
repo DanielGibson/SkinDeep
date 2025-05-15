@@ -723,6 +723,11 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view ) 
 			hackedView.shaderParms[4] = shiftScale.x;
 			hackedView.shaderParms[5] = shiftScale.y;
 
+			// SM: This is so janky, but need some way to flag this is a portalSky
+			// without adding more parameters to renderView_t
+			// This fixes SD-90: Extra outlines rendered due to portal sky
+			portalView.shaderParms[11] = -42.0f;
+
 			gameRenderWorld->RenderScene(&portalView);
 			renderSystem->CaptureRenderToImage("_currentRender");
 

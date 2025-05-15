@@ -3178,6 +3178,44 @@ idEntity * idMeta::SpawnInterestPoint(idEntity *ownerEnt, idVec3 position, const
 	const idDeclEntityDef	*interestDef;
 	interestDef = gameLocal.FindEntityDef(interestName);
 
+	// SW 5th May 2025: Avoid spawning interestpoints outside the world. But do some little checks to see if it's borderline (e.g. coplanar to a wall)
+	if (gameRenderWorld->PointInArea(position) == -1)
+	{
+		#define	INTEREST_OFFSETCOUNT 6
+		bool inWorld = false;
+		idVec3 testPos;
+		idVec3 offsets[INTEREST_OFFSETCOUNT] = {
+			idVec3(0, 0, 1),
+			idVec3(0, 0, -1),
+			idVec3(0, 1, 0),
+			idVec3(0, -1, 0),
+			idVec3(1, 0, 0),
+			idVec3(-1, 0, 0)
+		};
+
+		for (int i = 0; i < INTEREST_OFFSETCOUNT; i++)
+		{
+			testPos = position + offsets[i];
+			if (gameRenderWorld->PointInArea(testPos) != -1)
+			{
+				inWorld = true;
+				break;
+			}
+		}
+		
+		if (inWorld)
+		{
+			// Modify our position to be inside the world
+			position = testPos;
+		}
+		else
+		{
+			// Return NULL to indicate that the interestpoint didn't spawn
+			return NULL;
+		}
+	}
+		
+
 	// SW: See if there are any interestpoints of the same type inside our 'duplicate radius' (if so, we refrain from spawning).
 	// This helps avoid spamming unnecessary interestpoints for more chaotic stimuli (things exploding, shattering, bouncing all over the place, etc)
 	int duplicateRadius = interestDef->dict.GetInt("duplicateRadius", 0);

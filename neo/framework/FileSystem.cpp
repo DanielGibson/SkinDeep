@@ -688,7 +688,8 @@ bool idFileSystemLocal::CreateOSPath( const char *OSPath ) {
 
 	// make absolutely sure that it can't back up the path
 	// FIXME: what about c: ?
-	if ( strstr( OSPath, ".." ) || strstr( OSPath, "::" ) ) {
+	// blendo eric 25.05.13: allow folder names to contain double period, but not start with double period
+	if ( idStr::FindText(OSPath,"..") == 0 || strstr( OSPath, "/.." ) || strstr( OSPath, "\\.." ) || strstr( OSPath, "::" ) ) {
 #ifdef _DEBUG
 		common->DPrintf( "idFileSystemLocal::CreateOSPath: can't create relative paths \"%s\"\n", OSPath );
 #endif

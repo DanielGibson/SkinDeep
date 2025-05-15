@@ -48,6 +48,8 @@ private:
 	int						shutterState;
 	int						shutterTimer;
 
+	void					Event_SpectatorTouch(idEntity* other, trace_t* trace);
+
 
 //	idAnimated*				handle;
 //	int						flushTimer;

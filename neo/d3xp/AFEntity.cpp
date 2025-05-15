@@ -1428,25 +1428,28 @@ void idAFEntity_Gibbable::Gib( const idVec3 &dir, const char *damageDefName ) {
 
 	if ( g_bloodEffects.GetBool() )
 	{
-		if ( gameLocal.time > gameLocal.GetGibTime() )
+		// SW 8th May 2025: Gib rate limiter now only applies to the actual act of spawning gibs, not the process of entering the 'gibbed' state.
+		// This should fix some gnarly issues where actors getting gibbed in rapid succession could spawn multiple skullsavers
+		if (gameLocal.time > gameLocal.GetGibTime())
 		{
-			gameLocal.SetGibTime( gameLocal.time + GIB_DELAY );
-			SpawnGibs( dir, damageDefName );
-			renderEntity.noShadow = true;
-			renderEntity.shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f;
-			StartSound( "snd_gibbed", SND_CHANNEL_ANY, 0, false, NULL );
-			gibbed = true;
-
-
-			//BC make a floor decal.
-			trace_t decalTr;
-			gameLocal.clip.TracePoint(decalTr, GetPhysics()->GetOrigin() + idVec3(0,0,4), GetPhysics()->GetOrigin() + idVec3(0, 0, -8), MASK_SHOT_RENDERMODEL, this);
-			if (decalTr.fraction < 1)
-			{
-				gameLocal.ProjectDecal(decalTr.endpos, -decalTr.c.normal, 8.0f, true, 128, "textures/decals/bloodsplat03");
-			}
-
+			gameLocal.SetGibTime(gameLocal.time + GIB_DELAY);
+			SpawnGibs(dir, damageDefName);
 		}
+
+		renderEntity.noShadow = true;
+		renderEntity.shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f;
+		StartSound( "snd_gibbed", SND_CHANNEL_ANY, 0, false, NULL );
+		gibbed = true;
+
+
+		//BC make a floor decal.
+		trace_t decalTr;
+		gameLocal.clip.TracePoint(decalTr, GetPhysics()->GetOrigin() + idVec3(0,0,4), GetPhysics()->GetOrigin() + idVec3(0, 0, -8), MASK_SHOT_RENDERMODEL, this);
+		if (decalTr.fraction < 1)
+		{
+			gameLocal.ProjectDecal(decalTr.endpos, -decalTr.c.normal, 8.0f, true, 128, "textures/decals/bloodsplat03");
+		}
+
 	} else {
 		gibbed = true;
 	}

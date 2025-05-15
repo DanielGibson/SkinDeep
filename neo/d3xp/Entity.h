@@ -643,6 +643,7 @@ private:
 	void					Event_GetMaxHealth(void);
 	void					Event_SetCurrentHealth(int newHealth);
 	void					Event_SetMaxHealth(int newHealth);
+	void					Event_UpdateGravity(void);
 
 	bool					lastGravityState;
 	bool					forceNoGravity;

@@ -498,6 +498,11 @@ void RB_STD_FillCustomMask(drawSurf_t** drawSurfs, int numDrawSurfs) {
 		return;
 	}
 
+	// SM: This means its a portal sky, so skip it
+	if (backEnd.viewDef->renderView.shaderParms[11] == -42.0f) {
+		return;
+	}
+
 	// enable the second texture for mirror plane clipping if needed
 	if (backEnd.viewDef->numClipPlanes) {
 		GL_SelectTexture(1);

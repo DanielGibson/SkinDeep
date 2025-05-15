@@ -63,8 +63,8 @@ bool idNoteWall::DoFrob(int index, idEntity * frobber)
 	{
 		if (frobber == gameLocal.GetLocalPlayer())
 		{
-			SetRead();
 			gameLocal.GetLocalPlayer()->DoZoominspectEntity(this);
+			SetRead(); //BC 5-8-2025: setread() now happens AFTER the zoom, so that the "memory palace notification" works properly.
 		}
 	}
 

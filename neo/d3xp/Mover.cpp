@@ -5281,6 +5281,13 @@ void idDoor::Killed(idEntity *inflictor, idEntity *attacker, int damage, const i
 		gameLocal.SetPortalState(areaPortal, PS_BLOCK_NONE);
 	}
 
+	//BC 5-8-2025: destruction fx when a door is blown up
+	idStr destructionFx = spawnArgs.GetString("fx_destruction", "");
+	if (destructionFx.Length() > 0)
+	{
+		idEntityFx::StartFx(destructionFx.c_str(), GetPhysics()->GetAbsBounds().GetCenter(), mat3_identity);
+	}
+
 	gameLocal.SetDebrisBurst("moveable_metalgib1", originalCenterMass, 24, 48, 256, dir);
 
 	PostEventMS(&EV_Remove, 0);

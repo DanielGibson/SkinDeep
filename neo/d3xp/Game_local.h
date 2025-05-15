@@ -234,10 +234,10 @@ enum { CONF_VENT, CONF_HIDETRIGGER };
 
 enum
 {
-	ACROTYPE_NONE,			//0
-	ACROTYPE_SPLITS,		//1
-	ACROTYPE_SPLITS_DOWN,	//2
-	ACROTYPE_CEILINGHIDE,	//3
+	ACROTYPE_NONE,				//0
+	ACROTYPE_SPLITS,			//1
+	//ACROTYPE_SPLITS_DOWN,		//2 // SW 5th May 2025: We haven't been officially able to flip upside down in splits for a long time and it's high time we removed it for good. I'm keeping the enum values the same just in case, though.
+	ACROTYPE_CEILINGHIDE = 3,	//3
 	ACROTYPE_CARGOHIDE
 };
 
@@ -815,7 +815,7 @@ public:
 	void					ShutdownEventLog();
 	void					InitEventLogFile(bool startOfSession);
 	void					CloseEventLogFile(void);
-	void					AddEventLog(const char *text, idVec3 _position, bool showInfoFeed = true, int eventType = 0);
+	void					AddEventLog(const char *text, idVec3 _position, bool showInfoFeed = true, int eventType = 0, bool showDupes = true); // SW 6th May 2025: adding showDupes arg, defaults to true
 	void					AddEventlogDamage(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname);
 	void					AddEventlogDeath(idEntity *target, int damage, idEntity *inflictor, idEntity *attackerEnt, const char *damageDefname, int eventType);
 	void					DisplayEventLogAlert(const char *text, const char * icon = nullptr, idVec4 * textColor = nullptr, idVec4 * bgColor = nullptr, idVec4 * iconColor = nullptr, float durationSeconds = 0.0f, bool allowDupes = true);
