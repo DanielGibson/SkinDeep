@@ -1711,8 +1711,8 @@ void	RB_STD_DrawView( void ) {
 	RB_DetermineLightScale();
 
 	// Do the custom mask pass first
-	// Only draw to color attachment 1 (mask texture)
-	GLenum customBuffers[] = { GL_COLOR_ATTACHMENT1 };
+	// Only draw to color attachment 2 (mask texture)
+	GLenum customBuffers[] = { GL_COLOR_ATTACHMENT2 };
 	qglDrawBuffers(1, customBuffers);
 	RB_STD_FillCustomMask( drawSurfs, numDrawSurfs );
 
@@ -1724,8 +1724,8 @@ void	RB_STD_DrawView( void ) {
 	RB_STD_FillDepthBuffer( drawSurfs, numDrawSurfs );
 
 	// main light renderer
-	// For interactions, we want color attachment 0 (main color) and 2 (light)
-	GLenum interactionBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT2 };
+	// For interactions, we want color attachment 0 (main color) and 1 (light)
+	GLenum interactionBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	qglDrawBuffers(2, interactionBuffers);
 	switch( tr.backEndRenderer ) {
 	case BE_GLSL:
