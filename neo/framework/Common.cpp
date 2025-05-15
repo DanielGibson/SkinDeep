@@ -2911,6 +2911,8 @@ void idCommonLocal::Frame( void ) {
 
 		// set idLib frame number for frame based memory dumps
 		idLib::frameNumber = com_frameNumber;
+
+		D3P_FRAMEMARK // tell profiler (tracy) that this is the end of a frame
 	}
 
 	catch( idException & ) {
