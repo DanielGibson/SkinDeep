@@ -117,6 +117,8 @@ idCVar com_showHitchWarnings( "com_showHitchWarnings", "0", CVAR_BOOL | CVAR_SYS
 
 //blendo eric:
 idCVar com_timing("com_timing", "0", CVAR_INTEGER | CVAR_SYSTEM | CVAR_NOCHEAT, "show engine timings");
+// DG: com_speeds and similar cvars work better if they don't spam my terminal (and when using con_noPrint 0)
+static idCVar com_printToStdout("com_printToStdout", "1", CVAR_BOOL | CVAR_SYSTEM, "print to stdout in addition to ingame console");
 
 // com_speeds times
 // blendo eric: use doubles for timing and add extra timing vars
@@ -402,8 +404,10 @@ void idCommonLocal::VPrintf( const char *fmt, va_list args ) {
 	// remove any color codes
 	idStr::RemoveColors( msg );
 
-	// echo to dedicated console and early console
-	Sys_Printf( "%s", msg );
+	if (com_printToStdout.GetBool()) {
+		// echo to dedicated console and early console
+		Sys_Printf( "%s", msg );
+	}
 
 	// print to script debugger server
 	// DebuggerServerPrint( msg );
