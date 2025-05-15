@@ -129,6 +129,7 @@ double			time_frontend;			// renderSystem frontend time
 double			time_backend;			// renderSystem backend time
 double			time_alpha; // blendo eric: for profiling testing
 double			time_beta; // blendo eric: for profiling testing
+double			time_vsync; // DG: how much time was spent in SDL_GL_SwapWindow()
 
 int				com_frameTime;			// time for the current frame in milliseconds
 int				com_frameNumber;		// variable frame number
@@ -2827,7 +2828,7 @@ void idCommonLocal::Frame( void ) {
 			lastTime = nowTime;
 
 			if (com_speeds.GetInteger() == 1)
-				Printf( "Game:%3.0f Frontend:%3.0f Backend:%3.0f  ALL:%3.0f\n",  time_gameFrame, time_frontend, time_backend, com_frameMsec);
+				Printf( "Game:%3.0f Frontend:%3.0f Backend:%3.0f  ALL:%3.0f of that vsync: %3.0f\n",  time_gameFrame, time_frontend, time_backend, com_frameMsec, time_vsync);
 			else
 				Printf("frame:%i all:%3.0f gfr:%3.0f rf:%3.0f bk:%3.0f\n", com_frameNumber, com_frameMsec, time_gameFrame, time_frontend, time_backend);
 		}

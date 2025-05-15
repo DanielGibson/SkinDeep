@@ -534,7 +534,7 @@ void RB_ShowImages( void ) {
 	common->Printf( "%i msec to draw all images\n", end - start );
 }
 
-
+extern double time_vsync;
 /*
 =============
 RB_SwapBuffers
@@ -559,7 +559,10 @@ const void	RB_SwapBuffers( const void *data ) {
 		GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	backEnd.frameBufferId = FRAME_DEFAULT_BACKBUFFER;
 
+	uint64	start = Sys_GetPerformanceCounter();
 	GLimp_SwapBuffers();
+	uint64 end = Sys_GetPerformanceCounter();
+	time_vsync = Sys_GetPerformanceTimeMS( end - start );
 }
 
 /*
