@@ -666,7 +666,12 @@ static void	RB_SetFrameBuffer(const void *data)
 					qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-					qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, customMaskTexture, 0);
+					// NOTE: because this is an integer texture, it must be the highest numbered
+					//       color attachment we use, to work around a Mesa bug that broke
+					//       blending when it thought an integer color attachment was bound
+					//       due to a buggy check (this works around the buggy check)
+					//       https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34990
+					qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, customMaskTexture, 0);
 					
 					qglGenTextures(1, &lightTexture);
 					globalImages->currentLightImage->texnum = lightTexture;
@@ -677,7 +682,7 @@ static void	RB_SetFrameBuffer(const void *data)
 					qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-					qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, lightTexture, 0);
+					qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, lightTexture, 0);
 				}
 			}
 
