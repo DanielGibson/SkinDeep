@@ -1753,6 +1753,7 @@ idAsyncClient::RunFrame
 ==================
 */
 void idAsyncClient::RunFrame( void ) {
+	D3P_ScopedCPUSample(AsyncClient_RunFrame);
 	int			msec, size;
 	bool		newPacket;
 	idBitMsg	msg;

@@ -2057,6 +2057,7 @@ idSessionLocal::GuiFrameEvents
 =================
 */
 void idSessionLocal::GuiFrameEvents() {
+	D3P_CPUSampleFn();
 	const char	*cmd;
 	sysEvent_t  ev;
 	idUserInterface	*gui;

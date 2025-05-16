@@ -986,6 +986,7 @@ Sys_GenerateEvents
 ================
 */
 void Sys_GenerateEvents() {
+	D3P_CPUSampleFn();
 	char *s = Sys_ConsoleInput();
 
 	if (s)

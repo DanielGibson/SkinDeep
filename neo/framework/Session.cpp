@@ -2950,6 +2950,7 @@ void idSessionLocal::Draw() {
 		bool gameDraw = false;
 		// normal drawing for both single and multi player
 		if ( !com_skipGameDraw.GetBool() && GetLocalClientNum() >= 0 ) {
+			D3P_ScopedCPUSample(Game_Draw);
 			// draw the game view
 			// blendo eric: use higher precision timing
 			uint64	start = Sys_GetPerformanceCounter();
@@ -3025,6 +3026,8 @@ idSessionLocal::UpdateScreen
 */
 void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 
+	D3P_CPUSampleFnBacktrace();
+
 #ifdef _WIN32
 
 	if ( com_editors ) {
@@ -3047,16 +3050,22 @@ void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 		Sys_GrabMouseCursor( false );
 	}
 
+	D3P_BeginCPUSample(BeginFrame);
 	renderSystem->BeginFrame( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
+	D3P_EndCPUSample(BeginFrame);
 
+	D3P_BeginCPUSample(Draw);
 	// draw everything
 	Draw();
+	D3P_EndCPUSample(Draw);
 
+	D3P_BeginCPUSample(EndFrame);
 	if ( com_speeds.GetBool() || com_timing.GetBool() ) {
 		renderSystem->EndFrame( &time_frontend, &time_backend );
 	} else {
 		renderSystem->EndFrame( NULL, NULL );
 	}
+	D3P_EndCPUSample(EndFrame);
 
 	insideUpdateScreen = false;
 }
@@ -3067,6 +3076,7 @@ idSessionLocal::Frame
 ===============
 */
 void idSessionLocal::Frame() {
+	D3P_ScopedCPUSample(Session_Frame);
 	uint64 preWaitClockStart = Sys_GetPerformanceCounter();
 
 	if ( com_asyncSound.GetInteger() == 0 ) {
@@ -3303,6 +3313,7 @@ idSessionLocal::RunGameTic
 ================
 */
 void idSessionLocal::RunGameTic() {
+	D3P_CPUSampleFn();
 	logCmd_t	logCmd{};
 	usercmd_t	cmd;
 

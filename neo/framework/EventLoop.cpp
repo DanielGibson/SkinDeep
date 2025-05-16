@@ -175,6 +175,7 @@ idEventLoop::RunEventLoop
 ===============
 */
 int idEventLoop::RunEventLoop( bool commandExecution ) {
+	D3P_CPUSampleFn();
 	sysEvent_t	ev;
 
 	while ( 1 ) {

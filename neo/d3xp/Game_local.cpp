@@ -3050,6 +3050,7 @@ idGameLocal::RunFrame
 ================
 */
 gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds ) {
+	D3P_ScopedCPUSample(Game_RunFrame);
 	idEntity *	ent;
 	int			num;
 	float		ms;

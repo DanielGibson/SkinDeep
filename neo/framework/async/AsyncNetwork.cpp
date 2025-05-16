@@ -171,6 +171,7 @@ idAsyncNetwork::RunFrame
 ==================
 */
 void idAsyncNetwork::RunFrame( void ) {
+	D3P_ScopedCPUSample(AsyncNet_RunFrame);
 	if ( console->Active() ) {
 		Sys_GrabMouseCursor( false );
 		usercmdGen->InhibitUsercmd( INHIBIT_ASYNC, true );

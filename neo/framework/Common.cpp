@@ -2774,6 +2774,7 @@ idCommonLocal::Frame
 */
 void idCommonLocal::Frame( void ) {
 	try {
+		D3P_ScopedCPUSample(Common_Frame);
 
 		if (g_SteamUtilities)
 		{
@@ -2931,6 +2932,7 @@ idCommonLocal::GUIFrame
 =================
 */
 void idCommonLocal::GUIFrame( bool execCmd, bool network ) {
+	D3P_ScopedCPUSample(GUI_Frame);
 	Sys_GenerateEvents();
 	eventLoop->RunEventLoop( execCmd );	// and execute any commands
 	com_frameTime = com_ticNumber * USERCMD_MSEC;
