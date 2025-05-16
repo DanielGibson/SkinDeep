@@ -6857,6 +6857,7 @@ idEntity * idGameLocal::DoParticle(const char *particleName, idVec3 position, id
 	args.SetBool("start_off", true);
 	args.SetBool("airlessGravity", airlessGravity);
 	args.SetVector("_color", color);
+	args.SetBool("noclipmodel", true); // DG: the particles don't have a clipmodel and don't need one either
 	idleSmoke = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &args));	
 	if (idleSmoke)
 	{
@@ -6895,7 +6896,7 @@ void idGameLocal::HotReloadMap() {
 		idDict args = mapEnt->epairs;
 		if (idEntity* exEnt = gameEdit->FindEntity(name)) {
 			//note: this should not happen actually...
-			common->Warning("HotReload: multiple entities with name %s: rename the new one!");
+			common->Warning("HotReload: multiple entities with name %s: rename the new one!", name);
 			continue;
 		}
 		gameEdit->SpawnEntityDef(args, NULL);
