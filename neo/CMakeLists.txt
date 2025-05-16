@@ -198,6 +198,16 @@ endif()
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIRS})
 
+if(MSVC AND DHEWM3LIBS)
+	# on the Github Action servers, this always finds the static lib (libz.a) instead
+	# of the stub for the dynamic one (libz.dll.a or zlib1.lib) - which I can't reproduce locally...
+	# this is a problem for MSVC, because the static lib has been built with mingw and
+	# causes linking errors like "libz.a(inflate.o) : error LNK2026: module unsafe for SAFESEH image."
+	# so manually replace libz.a..
+	string(REPLACE "libz.a" "zlib1.lib" ZLIB_LIBRARY "${ZLIB_LIBRARY}")
+	message(STATUS "Modified zlib path = ${ZLIB_LIBRARY}")
+endif()
+
 find_package(OGG REQUIRED)
 include_directories(${OGG_INCLUDE_DIR})
 
