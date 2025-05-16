@@ -149,22 +149,21 @@ void idShaderGL::SetIntUniform(const char* name, int value)
 	qglUniform1i(loc, value);
 }
 
-static std::string readFile( const std::string& fileName )
+static std::string readFile( std::string_view fileName )
 {
 	//Sys_GetPath(PATH_BASE, basePath);
 	// DG: if fs_basepath is set  it should be used (helps with dev
 	//     when the executable is not next to the gamedata)
 	//     and if it's not explicitly set it defaults to Sys_GetPath(BASE_PATH,..)
 	//     anyway (see idFileSystemLocal::Init())
-	idStr basePath = cvarSystem->GetCVarString("fs_basepath");
+	std::string prefix = cvarSystem->GetCVarString("fs_basepath");
 #ifdef DEMO
-	std::string prefix = basePath.c_str();
 	prefix += "/basedemo/glsl/";
 #else
-	std::string prefix = basePath.c_str();
 	prefix += "/base/glsl/";
 #endif
-	std::string fullPath = prefix + fileName;
+	std::string fullPath(prefix);
+	fullPath += fileName;
 	std::ifstream shaderFile( fullPath );
 	std::string contents;
 
@@ -225,7 +224,7 @@ bool idShaderGL::CompileShader(const idStr& fileName,
 	} else if (fileName == "basicColorOnly.frag") {
 		contents = basisColorOnlyFrag;
 	} else {
-		contents = readFile( fileName.c_str() );
+		contents = readFile( fileName );
 	}
 	if (!contents.empty())
 	{
