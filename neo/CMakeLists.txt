@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.6...3.22 FATAL_ERROR)
-project(dhewm3)
+project(SkinDeep)
 
 # TODO
 
