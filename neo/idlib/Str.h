@@ -140,6 +140,7 @@ public:
 						idStr( const idStr &text, int start, int end );
 						idStr( const char *text );
 						idStr( const char *text, int start, int end );
+						idStr( std::string_view text );
 						explicit idStr( const bool b );
 						explicit idStr( const char c );
 						explicit idStr( const int i );
@@ -156,6 +157,7 @@ public:
 	char &				operator[]( int index );
 
 	void				operator=( const idStr &text );
+	void				operator=( std::string_view text );
 	void				operator=( const char *text );
 
 	friend idStr		operator+( const idStr &a, const idStr &b );
@@ -359,13 +361,13 @@ public:
 	static idStr		Format2(std::string_view fmt, Args&&... args)
 	{
 		std::string temp = std::vformat(fmt, std::make_format_args(args...));
-		return idStr(temp.c_str());
+		return idStr(temp);
 	}
 
 	// Conversion operator so we can pass an idStr directly to Format2
 	operator std::string_view() const
 	{
-		return std::string_view(c_str());
+		return std::string_view(c_str(), len);
 	}
 
 protected:
@@ -456,6 +458,16 @@ ID_INLINE idStr::idStr( const idStr &text ) {
 	strcpy( data, text.data );
 	len = l;
 }
+
+ID_INLINE idStr::idStr( std::string_view text ) {
+	Construct();
+	int l = text.length();
+	EnsureAlloced( l + 1 );
+	memcpy(data, text.data(), l);
+	data[l] = '\0';
+	len = l;
+}
+
 
 ID_INLINE idStr::idStr( const idStr &text, int start, int end ) {
 	Construct();
@@ -614,6 +626,15 @@ ID_INLINE void idStr::operator=( const idStr &text ) {
 	l = text.Length();
 	EnsureAlloced( l + 1, false );
 	memcpy( data, text.data, l );
+	data[l] = '\0';
+	len = l;
+}
+
+
+ID_INLINE void idStr::operator=( std::string_view text ) {
+	int l = text.length();
+	EnsureAlloced( l + 1, false );
+	memcpy( data, text.data(), l );
 	data[l] = '\0';
 	len = l;
 }
