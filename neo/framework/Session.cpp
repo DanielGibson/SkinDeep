@@ -3059,13 +3059,11 @@ void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 	Draw();
 	D3P_EndCPUSample(Draw);
 
-	D3P_BeginCPUSample(EndFrame);
 	if ( com_speeds.GetBool() || com_timing.GetBool() ) {
 		renderSystem->EndFrame( &time_frontend, &time_backend );
 	} else {
 		renderSystem->EndFrame( NULL, NULL );
 	}
-	D3P_EndCPUSample(EndFrame);
 
 	insideUpdateScreen = false;
 }

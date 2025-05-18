@@ -189,7 +189,7 @@ R_ToggleSmpFrame
 ====================
 */
 void R_ToggleSmpFrame( void ) {
-	
+	D3P_CPUSampleFn();
 	R_FreeDeferredTriSurfs( frameData );
 
 	// clear frame-temporary data

@@ -529,6 +529,7 @@ overbright past 1.0
 =================
 */
 void RB_DetermineLightScale( void ) {
+	D3P_CPUSampleFn();
 	viewLight_t			*vLight;
 	const idMaterial	*shader;
 	float				max;
@@ -584,6 +585,7 @@ to actually render the visible surfaces for this view
 =================
 */
 void RB_BeginDrawingView (void) {
+	D3P_CPUSampleFn();
 	// set the modelview matrix for the viewer
 	qglMatrixMode(GL_PROJECTION);
 	RB_LoadMatrix( backEnd.viewDef->projectionMatrix, GL_PROJECTION );
@@ -718,6 +720,7 @@ interaction into primitive interactions
 =============
 */
 void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInteraction)(const drawInteraction_t *) ) {
+	D3P_CPUSampleFn();
 	const idMaterial	*surfaceShader = surf->material;
 	const float			*surfaceRegs = surf->shaderRegisters;
 	const viewLight_t	*vLight = backEnd.vLight;
@@ -877,6 +880,7 @@ RB_DrawView
 =============
 */
 void RB_DrawView( const void *data ) {
+	D3P_CPUSampleFn();
 	const drawSurfsCommand_t	*cmd;
 
 	cmd = (const drawSurfsCommand_t *)data;

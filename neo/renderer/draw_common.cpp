@@ -488,6 +488,7 @@ void RB_T_FillCustomMask(const drawSurf_t* surf) {
 }
 
 void RB_STD_FillCustomMask(drawSurf_t** drawSurfs, int numDrawSurfs) {
+	D3P_CPUSampleFn();
 	// if we are just doing 2D rendering, no need to fill the depth buffer
 	if (!backEnd.viewDef->viewEntitys) {
 		return;
@@ -557,6 +558,7 @@ to force the alpha test to fail when behind that clip plane
 =====================
 */
 void RB_STD_FillDepthBuffer( drawSurf_t **drawSurfs, int numDrawSurfs ) {
+	D3P_CPUSampleFn();
 	// if we are just doing 2D rendering, no need to fill the depth buffer
 	if ( !backEnd.viewDef->viewEntitys ) {
 		return;
@@ -1071,6 +1073,7 @@ the shadow volumes face INSIDE
 =====================
 */
 static void RB_T_Shadow( const drawSurf_t *surf ) {
+	D3P_CPUSampleFn();
 	const srfTriangles_t	*tri;
 
 	// set the light position if we are using a vertex program to project the rear surfaces
@@ -1218,6 +1221,7 @@ been set to 128 on any surfaces that might receive shadows
 =====================
 */
 void RB_StencilShadowPass( const drawSurf_t *drawSurfs ) {
+	D3P_CPUSampleFn();
 	if ( !r_shadows.GetBool() ) {
 		return;
 	}
@@ -1564,6 +1568,7 @@ RB_STD_FogAllLights
 ==================
 */
 void RB_STD_FogAllLights( void ) {
+	D3P_CPUSampleFn();
 	viewLight_t	*vLight;
 
 	if ( r_skipFogLights.GetBool() || r_showOverDraw.GetInteger() != 0
@@ -1628,6 +1633,7 @@ a floating point value
 ==================
 */
 void RB_STD_LightScale( void ) {
+	D3P_CPUSampleFn();
 	float	v, f;
 
 	if ( backEnd.overBright == 1.0f ) {
@@ -1696,6 +1702,7 @@ RB_STD_DrawView
 =============
 */
 void	RB_STD_DrawView( void ) {
+	D3P_CPUSampleFn();
 	// SM: We get to RB_STD_DrawView on level load when it's the default buffer,
 	// but that's an error so don't render then
 	if (backEnd.frameBufferId == FRAME_DEFAULT_BACKBUFFER)
@@ -1755,7 +1762,9 @@ void	RB_STD_DrawView( void ) {
 	// which were excluded from the original RB_ARB2_DrawInteractions,
 	// then finally draw the rest of the effect passes
 	backEnd.materialStageCutoffInclusive = SS_BLENDLIT;
+	D3P_BeginCPUSample(DrawShaderPasses_BlendLit);
 	int	processed = RB_STD_DrawShaderPasses(drawSurfs, numDrawSurfs); // alpha darken
+	D3P_EndCPUSample(DrawShaderPasses_BlendLit);
 	backEnd.materialStageCutoffInclusive = SS_MAX;
 	
 	qglDrawBuffers(2, interactionBuffers);
@@ -1765,6 +1774,7 @@ void	RB_STD_DrawView( void ) {
 	qglDrawBuffers(1, mainBuffers);
 	// now draw any non-light dependent shading passes
 	if (processed < numDrawSurfs) {
+		D3P_ScopedCPUSample(DrawShaderPasses_NonLight);
 		processed += RB_STD_DrawShaderPasses(drawSurfs + processed, numDrawSurfs - processed);
 	}
 
@@ -1778,6 +1788,7 @@ void	RB_STD_DrawView( void ) {
 
 	// SM: Set environment parameters for invViewProj and prevViewProj
 	if ( backEnd.viewDef == tr.primaryView ) {
+		D3P_ScopedCPUSample(SetEnvParmsViewProj);
 		// Calculate invViewProj
 		// Occasionally, we may get a view-projection that's not invertible, in which case don't update
 		idMat4 invViewProj = viewProj;
@@ -1801,6 +1812,7 @@ void	RB_STD_DrawView( void ) {
 
 	// now draw any post-processing effects using _currentRender
 	if ( processed < numDrawSurfs ) {
+		D3P_ScopedCPUSample(DrawShaderPasses_PostPr);
 		RB_STD_DrawShaderPasses( drawSurfs+processed, numDrawSurfs-processed );
 	}
 

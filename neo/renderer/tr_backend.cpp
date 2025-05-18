@@ -43,6 +43,7 @@ may touch, including the editor.
 ======================
 */
 void RB_SetDefaultGLState( void ) {
+	D3P_CPUSampleFn();
 	int		i;
 
 	qglClearDepth( 1.0f );
@@ -430,6 +431,7 @@ RB_SetBuffer
 =============
 */
 static void	RB_SetBuffer( const void *data ) {
+	D3P_CPUSampleFn();
 	const setBufferCommand_t	*cmd;
 
 	// see which draw buffer we want to render the frame to
@@ -574,6 +576,7 @@ Copy part of the current framebuffer to an image
 =============
 */
 const void	RB_CopyRender( const void *data ) {
+	D3P_CPUSampleFn();
 	const copyRenderCommand_t	*cmd;
 
 	cmd = (const copyRenderCommand_t *)data;
@@ -723,6 +726,7 @@ smp extensions, or asyncronously by another thread.
 */
 uint64		backEndStartTime, backEndFinishTime;
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
+	D3P_CPUSampleFn();
 	// r_debugRenderToTexture
 	int	c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0, c_setFrameBuffers = 0;
 
@@ -757,9 +761,6 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			c_setBuffers++;
 			break;
 		case RC_SWAP_BUFFERS:
-
-
-
 			RB_SwapBuffers( cmds );
 			c_swapBuffers++;
 			break;
@@ -768,15 +769,21 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			c_copyRenders++;
 			break;
 		case RC_SET_FRAME_BUFFER:
+		{
+			D3P_BeginCPUSample(RC_Set_FrameBuffer);
 			RB_SetFrameBuffer(cmds);
 			c_setFrameBuffers++;
+			D3P_EndCPUSample(RC_Set_FrameBuffer);
 			break;
+		}
 		case RC_POST_EFFECT:
 		{	
+			D3P_BeginCPUSample(RC_Post_Effect);
 			// Swap to the correct framebuffer
 			setFrameBufferCommand_t swapCmd;
 			swapCmd.frameBufferId = backEnd.frameBufferId == FRAME_MAINVIEW ? FRAME_POSTPROCESSVIEW : FRAME_MAINVIEW;
 			RB_SetFrameBuffer(&swapCmd);
+			D3P_EndCPUSample(RC_Post_Effect);
 			break;
 		}
 		default:

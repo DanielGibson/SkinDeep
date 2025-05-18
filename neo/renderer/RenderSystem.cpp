@@ -148,6 +148,7 @@ Called by R_EndFrame each frame
 ====================
 */
 static void R_IssueRenderCommands( void ) {
+	D3P_CPUSampleFn();
 	if ( frameData->cmdHead->commandId == RC_NOP
 		&& !frameData->cmdHead->next ) {
 		// nothing to issue
@@ -727,15 +728,18 @@ Returns the number of msec spent in the back end
 =============
 */
 void idRenderSystemLocal::EndFrame( double *frontEndMsec, double *backEndMsec ) {
+	D3P_CPUSampleFn();
 	emptyCommand_t *cmd;
 
 	if ( !glConfig.isInitialized ) {
 		return;
 	}
 
+	D3P_BeginCPUSample(GuiModel_Close);
 	// close any gui drawing
 	guiModel->EmitFullScreen();
 	guiModel->Clear();
+	D3P_EndCPUSample(GuiModel_Close);
 
 	// save out timing information
 	if ( frontEndMsec ) {
@@ -744,8 +748,6 @@ void idRenderSystemLocal::EndFrame( double *frontEndMsec, double *backEndMsec ) 
 	if ( backEndMsec ) {
 		*backEndMsec = backEnd.pc.msec;
 	}
-
-	
 
 	// print any other statistics and clear all of them
 	R_PerformanceCounters();
@@ -768,7 +770,9 @@ void idRenderSystemLocal::EndFrame( double *frontEndMsec, double *backEndMsec ) 
 	R_ToggleSmpFrame();
 
 	// we can now release the vertexes used this frame
+	D3P_BeginCPUSample(VTX_EndFrame);
 	vertexCache.EndFrame();
+	D3P_EndCPUSample(VTX_EndFrame);
 
 	if ( session->writeDemo ) {
 		session->writeDemo->WriteInt( DS_RENDER );

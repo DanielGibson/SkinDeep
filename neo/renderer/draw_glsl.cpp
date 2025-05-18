@@ -49,6 +49,7 @@ static idShaderGL* currentShader = nullptr;
 
 void R_GLSL_SetProgramEnv(GLuint index, const idVec4& params)
 {
+	D3P_CPUSampleFn();
 	Uniforms.programEnv[index] = params;
 	if (currentShader)
 	{
@@ -58,6 +59,7 @@ void R_GLSL_SetProgramEnv(GLuint index, const idVec4& params)
 
 void R_GLSL_SetProgramLocal(GLuint index, const idVec4& params)
 {
+	D3P_CPUSampleFn();
 	Uniforms.programLocal[index] = params;
 	if (currentShader)
 	{
@@ -89,6 +91,7 @@ RB_GLSL_DrawInteraction
 ==================
 */
 void	RB_GLSL_DrawInteraction( const drawInteraction_t *din ) {
+	D3P_CPUSampleFn();
 	// load all the vertex program parameters
 	R_GLSL_SetProgramEnv(PP_LIGHT_ORIGIN, din->localLightOrigin);
 	R_GLSL_SetProgramEnv(PP_VIEW_ORIGIN, din->localViewOrigin);
@@ -152,6 +155,7 @@ RB_GLSL_CreateDrawInteractions
 =============
 */
 void RB_GLSL_CreateDrawInteractions( const drawSurf_t *surf ) {
+	D3P_CPUSampleFn();
 	if ( !surf ) {
 		return;
 	}
@@ -246,6 +250,7 @@ RB_GLSL_DrawInteractions
 ==================
 */
 void RB_GLSL_DrawInteractions( void ) {
+	D3P_CPUSampleFn();
 	viewLight_t		*vLight;
 
 	GLSL_SelectTextureNoClient( 0 );
@@ -333,6 +338,7 @@ RB_GLSL_DrawInteractionsBlend
 ==================
 */
 void RB_GLSL_DrawInteractionsBlend() {
+	D3P_CPUSampleFn();
 	viewLight_t		*vLight;
 
 	GLSL_SelectTextureNoClient(0);
@@ -538,6 +544,7 @@ static void R_GLSL_CopyUniformsToCurrent()
 
 void R_GLSL_SetActiveProgram(const idStr& program)
 {
+	D3P_CPUSampleFn();
 	idShaderGL** shader = nullptr;
 	if (shaderTable.Get(program, &shader))
 	{

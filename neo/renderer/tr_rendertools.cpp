@@ -305,6 +305,7 @@ RB_ShowOverdraw
 ==================
 */
 void RB_ShowOverdraw( void ) {
+	D3P_CPUSampleFn();
 	const idMaterial *	material;
 	int					i;
 	drawSurf_t * *		drawSurfs;
@@ -2344,6 +2345,7 @@ RB_RenderDebugTools
 =================
 */
 void RB_RenderDebugTools( drawSurf_t **drawSurfs, int numDrawSurfs ) {
+	D3P_CPUSampleFn();
 	// don't do anything if this was a 2D rendering
 	if ( !backEnd.viewDef->viewEntitys ) {
 		return;
