@@ -6896,7 +6896,7 @@ void idGameLocal::HotReloadMap() {
 		idDict args = mapEnt->epairs;
 		if (idEntity* exEnt = gameEdit->FindEntity(name)) {
 			//note: this should not happen actually...
-			common->Warning("HotReload: multiple entities with name %s: rename the new one!");
+			common->Warning("HotReload: multiple entities with name %s: rename the new one!", name);
 			continue;
 		}
 		gameEdit->SpawnEntityDef(args, NULL);
