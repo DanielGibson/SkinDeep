@@ -1069,6 +1069,7 @@ extern idCVar r_debugRenderToTexture;
 extern idCVar r_useBlendoAmbience;
 extern idCVar r_blendoAmbienceScale;
 extern idCVar r_stencilReverse;			// blendo eric: carmack's reverse
+extern idCVar r_useStencilOpSeparate;	// DG: to further speed up carmack's reverse
 extern idCVar r_blendoTriangleCount;    // blendo eric: only draw a x triangle per primitive, -1 off, for perf testing
 
 /*

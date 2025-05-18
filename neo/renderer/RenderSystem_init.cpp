@@ -237,6 +237,7 @@ idCVar r_blendoAmbienceScale("r_blendoAmbienceScale", "0.15", CVAR_RENDERER | CV
 
 idCVar r_blendoTriangleCount("r_blendoTriangleCount", "-1", CVAR_RENDERER | CVAR_INTEGER, "only draw a x triangle per primitive, -1 off"); // blendo eric: perf testing
 idCVar r_stencilReverse("r_stencilReverse", "1", CVAR_RENDERER | CVAR_BOOL, "use carmack's reverse"); // blendo eric: re-add carmack's reverse
+idCVar r_useStencilOpSeparate( "r_useStencilOpSeparate", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Use glStencilOpSeparate() (if available) when rendering shadows" );
 
 // DG: let users disable the "scale menus to 4:3" hack
 idCVar r_scaleMenusTo169( "r_scaleMenusTo169", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Scale menus, fullscreen videos and PDA to 16:9 aspect ratio even when widescreen" );
@@ -257,6 +258,9 @@ void (APIENTRY * qglColorTableEXT)( int, int, int, int, int, const void * );
 
 // EXT_stencil_two_side
 PFNGLACTIVESTENCILFACEEXTPROC			qglActiveStencilFaceEXT;
+
+// DG: couldn't find any extension for this, it's supported in GL2.0 and newer, incl OpenGL ES2.0
+PFNGLSTENCILOPSEPARATEPROC qglStencilOpSeparate;
 
 // ARB_texture_compression
 PFNGLCOMPRESSEDTEXIMAGE2DARBPROC		qglCompressedTexImage2DARB;
@@ -520,6 +524,15 @@ static void R_CheckPortableExtensions( void ) {
 	glConfig.twoSidedStencilAvailable = R_CheckExtension( "GL_EXT_stencil_two_side" );
 	if ( glConfig.twoSidedStencilAvailable )
 		qglActiveStencilFaceEXT = (PFNGLACTIVESTENCILFACEEXTPROC)GLimp_ExtensionPointer( "glActiveStencilFaceEXT" );
+
+	if( glConfig.glVersion >= 2.0) {
+		common->Printf( "... got GL2.0+ glStencilOpSeparate()\n" );
+		qglStencilOpSeparate = (PFNGLSTENCILOPSEPARATEPROC)GLimp_ExtensionPointer( "glStencilOpSeparate" );
+	} else {
+		// TODO: there was an extension by ATI providing glStencilOpSeparateATI - do we care?
+		common->Printf( "... don't have GL2.0+ glStencilOpSeparate()\n" );
+		qglStencilOpSeparate = nullptr;
+	}
 
 	// ARB_vertex_buffer_object
 	glConfig.ARBVertexBufferObjectAvailable = R_CheckExtension( "GL_ARB_vertex_buffer_object" );
