@@ -5,8 +5,9 @@ macOS support would require bigger changes, as macOS doesn't support the require
 (3.3 with a Compatibility profile - macOS only supports OpenGL Core profiles - and
  the GL_ARB_shading_language_420pack extension).
 
-Currently (2025-05-15) the code is based on Update01: https://store.steampowered.com/news/app/301280/view/820329049655083168
-but has additional changes to make it build and work on Linux (and I replaced libjpeg with stb_image.h).
+Currently (2025-05-25) the code is based on Hotfix03: https://store.steampowered.com/news/app/301280/view/529847413482979963
+but has additional changes to make it build and work on Linux and to work around some Mesa OpenGL
+driver bugs (and I replaced libjpeg with stb_image.h).
 
 You can find the original source code as released by Blendo Games in the "upstream" branch.
 
