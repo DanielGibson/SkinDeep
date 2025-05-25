@@ -470,6 +470,9 @@ idVec3 idAI_Spearbot::FindDeathTarget()
 		if (!entity)
 			continue;
 
+		if (!entity->GetPhysics())
+			continue;
+
 		idVec3 entityPos = entity->GetPhysics()->GetOrigin();
 		idVec3 myPos = GetPhysics()->GetOrigin();
 

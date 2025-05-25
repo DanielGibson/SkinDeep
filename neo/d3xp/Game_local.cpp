@@ -1741,7 +1741,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		savegame.DeleteObjects();
 		program.Restart();
 
-		gameLocal.Error("save game script program did not match");
+		gameLocal.Error("save game script program did not match\n\nAs a workaround fix, please:\n1. Type: disconnect\n2. Load a savegame that has the word 'AutoSave' in its name.");
 
 		return false;
 	}
