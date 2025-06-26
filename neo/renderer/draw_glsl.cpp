@@ -516,6 +516,13 @@ void R_GLSL_Init( void ) {
 	Uniforms.customPostValue = 0;
 }
 
+void R_GLSL_Shutdown( void ) {
+	for (int i = 0; i < shaderTable.Num(); i++) {
+		delete *shaderTable.GetIndex(i);
+	}
+	shaderTable.Clear();
+}
+
 static void R_GLSL_CopyUniformsToCurrent()
 {
 	currentShader->uniforms.projectionMatrix = Uniforms.projectionMatrix;

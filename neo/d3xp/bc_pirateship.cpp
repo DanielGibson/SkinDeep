@@ -1104,3 +1104,73 @@ void idPirateship::DestroyAccumulatorsInRoom(idLocationEntity *locationEnt)
 		ent->Damage(this, this, vec3_zero, "damage_1000", 1.0f, 0);		
 	}
 }
+
+void idPirateship::Event_PartBlocked(idEntity* blockingEntity)
+{
+	// SW 3rd June 2025: Handle situation where player decides to position themselves between the ship and the dock
+	// (I can't fault them really, I'd try the same thing)
+	if (blockingEntity->IsType(idPlayer::Type))
+	{
+		if (!static_cast<idPlayer*>(blockingEntity)->inDownedState)
+		{
+			blockingEntity->Damage(this, this, vec3_zero, "damage_1000", 1.0f, 0);
+		}
+		
+		// The primary case here is when the ship is moving towards the dock. Since ships dock horizontally, we can try moving the player up, down, or laterally to the direction of travel
+		idVec3 moveDir = this->move.dir;
+		if (moveDir != vec3_zero)
+		{
+			idVec3 forward, right, up;
+			moveDir.ToAngles().ToVectors(&forward, &right, &up);
+			idVec3 shipOrigin = this->GetPhysics()->GetOrigin();
+			idBounds playerBounds = blockingEntity->GetPhysics()->GetBounds();
+
+			// Remember that candidate positions are based on the direction of travel (hardcoded based on ship size, ewww)
+			idVec3 candidatePositions[8] = {
+				shipOrigin + (forward * 104) + (right * 128),
+				shipOrigin + (forward * 104) - (right * 128),
+				shipOrigin + (forward * 104) + (up * 96),
+				shipOrigin + (forward * 104) - (up * 112),
+				shipOrigin + (right * 128),
+				shipOrigin - (right * 128),
+				shipOrigin + (up * 96),
+				shipOrigin - (up * 112),
+			};
+
+			idVec3 targetPosition = vec3_zero;
+			// Test our candidate positions
+			for (int i = 0; i < 8; i++)
+			{
+				//gameRenderWorld->DebugBounds(idVec4(1, 0, 0, 1), playerBounds, candidatePositions[i], 10000);
+				
+				if (gameRenderWorld->PointInArea(candidatePositions[i]) == -1)
+					continue; // If we're outside the world, continue
+
+				if (gameLocal.clip.Contents(candidatePositions[i], NULL, mat3_identity, CONTENTS_SOLID, NULL) & MASK_SOLID)
+					continue; // If we're in a solid, continue
+
+				// Finally, do a bounds trace
+				trace_t tr;
+				gameLocal.clip.TraceBounds(tr, candidatePositions[i], candidatePositions[i], playerBounds, MASK_SOLID, blockingEntity);
+				if (tr.fraction >= 1.0f)
+				{
+					// Bounds check is clear, let's deposit the player here
+					targetPosition = candidatePositions[i];
+					break;
+				}
+			}
+
+			if (targetPosition != vec3_zero)
+			{
+				blockingEntity->Teleport(targetPosition, blockingEntity->GetPhysics()->GetAxis().ToAngles(), NULL);
+			}
+		}
+	}
+	else
+	{
+		idMover::Event_PartBlocked(blockingEntity);
+	}
+	
+
+
+}

@@ -1078,27 +1078,22 @@ int idDeviceContext::TextWidth( const char *text, float scale, int limit, float 
 		return 0;
 	}
 
-	int i;
+	idStr textStr = idStr(text);
+	int charIndex = 0;
+
 	float width = 0;
-	if (limit > 0) {
-		for (i = 0; text[i] != '\0' && i < limit; i++) {
-			if (idStr::IsColor( text + i )) {
-				i++;
-			}
-			else {
-				width += activeFont->GetGlyphWidth(scale, ((const unsigned char *)text)[i]) + scale*letterSpace;
-			}
+	int count = 0;
+	limit = limit > 0 ? limit : textStr.Length();
+	while (charIndex < textStr.Length() && count < limit) {
+		uint32 textChar = textStr.UTF8Char(charIndex);
+
+		if (textChar == C_COLOR_ESCAPE && charIndex < textStr.Length()) {
+			textChar = textStr.UTF8Char( charIndex );
+			continue;
 		}
-	}
-	else {
-		for (i = 0; text[i] != '\0'; i++) {
-			if (idStr::IsColor( text + i )) {
-				i++;
-			}
-			else {
-				width += activeFont->GetGlyphWidth( scale, ( ( const unsigned char * )text )[i] + scale*letterSpace );
-			}
-		}
+
+		width += activeFont->GetGlyphWidth(scale, textChar) + scale*letterSpace;
+		count++;
 	}
 	return idMath::Ftoi( width );
 }

@@ -52,6 +52,7 @@ private:
 	//BC 3-25-2025: locbox.
 	idEntity* locbox = nullptr;
 
+public:
 	//BC 4-10-2025: more robust handling of finding a candidate position for spawning objects.
 	idVec3					FindValidSpawnPosition(idBounds itemBounds);
 

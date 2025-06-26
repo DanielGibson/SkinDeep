@@ -48,6 +48,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "bc_meta.h"
 #include "bc_skullsaver.h"
 #include "bc_ftl.h"
+#include "bc_tablet.h"
+#include "bc_lostandfound.h"
 
 #include "Item.h"
 
@@ -829,7 +831,8 @@ void idItem::Event_RespawnFx( void ) {
 }
 
 void idItem::Event_PostPhysicsRest() {
-	if ( justDropped )
+	// SW 6th May 2025: Don't clear our owner if we're currently being held. This covers the scenario where the player drops an item and quickly picks it back up again.
+	if ( justDropped && (gameLocal.GetLocalPlayer()->GetCarryable() == NULL || gameLocal.GetLocalPlayer()->GetCarryable() != this)  )
 	{
 		GetPhysics()->GetClipModel()->SetOwner( nullptr );
 	}
@@ -842,8 +845,9 @@ void idItem::SetJustDropped(bool gentleDrop)
 	//so that items don't take damage immediately after being dropped.
 	
 
-	// If we're airless just immediately clear the owner
-	if ( gameLocal.GetAirlessAtPoint( GetPhysics()->GetOrigin() ) )
+	// If we're airless just immediately clear the owner (SM: and if it's not the player)
+	if ( gameLocal.GetAirlessAtPoint( GetPhysics()->GetOrigin() ) &&
+		GetPhysics()->GetClipModel()->GetOwner() != gameLocal.GetLocalPlayer() )
 	{
 		GetPhysics()->GetClipModel()->SetOwner( nullptr );
 	}
@@ -2653,6 +2657,7 @@ void idMoveableItem::SetLostInSpace()
 {
 	//player hasn't seen the object for a while.
 	//object has been consumed by FTL space......
+	bool shouldRemove = true;
 
 	if (IsType(idSkullsaver::Type))
 	{
@@ -2665,6 +2670,24 @@ void idMoveableItem::SetLostInSpace()
 
 		static_cast<idSkullsaver*>(this)->StoreSkull();
 	}
+	else if (IsType(idTablet::Type))
+	{
+		//5-28-2025: workaround fix for tablets, to fix bug where their text gets wipe out when they go to lostandfound. Instead,
+		//teleport their position to the lost and found.
+		idLostAndFound* lostAndFound = static_cast<idLostAndFound*>(static_cast<idMeta*>(gameLocal.metaEnt.GetEntity())->FindLostAndFoundMachine());
+		if (lostAndFound)
+		{
+			idVec3 newPosition = lostAndFound->FindValidSpawnPosition(GetPhysics()->GetBounds());
+			GetPhysics()->SetOrigin(newPosition);
+			UpdateGravity();
+			shouldRemove = false;
+
+			//BC 5-28-2025: print message that tablet is sent to lost and found.
+			gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_lostfound_sent"), displayName.c_str()), GetPhysics()->GetOrigin());
+
+			dropTimer = gameLocal.time; //This is to prevent dropped items from instantly creating interestpoints when they hit the ground.
+		}
+	}
 	else
 	{
 		gameLocal.GetLocalPlayer()->AddLostInSpace(entityDefNumber);
@@ -2672,10 +2695,13 @@ void idMoveableItem::SetLostInSpace()
 
 	bool showInfoFeed = (gameLocal.time > 2000) ? true : false; //dont show lost in space message if within first couple seconds of level
 
-	gameLocal.DoParticle(spawnArgs.GetString("model_lostinspace", "lost_despawn.prt"), GetPhysics()->GetOrigin());
 	gameLocal.AddEventLog(idStr::Format(common->GetLanguageDict()->GetString("#str_def_gameplay_lostinspace"), displayName.c_str()), GetPhysics()->GetOrigin(), showInfoFeed);
-	Hide();
-	PostEventMS(&EV_Remove, 0);
+	
+	if (shouldRemove) {
+		gameLocal.DoParticle(spawnArgs.GetString("model_lostinspace", "lost_despawn.prt"), GetPhysics()->GetOrigin());
+		Hide();
+		PostEventMS(&EV_Remove, 0);
+	}
 }
 
 void idMoveableItem::SetNextSoundTime(int value)

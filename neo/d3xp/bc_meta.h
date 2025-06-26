@@ -512,7 +512,9 @@ private:
 	void				DoSignalkitDepletionCheck();
 
 	idEntity*			FindSpaceLocation();
+public:
 	idEntity*			FindLostAndFoundMachine();
+private:
 
 	bool				signalkitDepletionCheckActive;
 

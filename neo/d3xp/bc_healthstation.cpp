@@ -603,10 +603,6 @@ bool idProximityAnnouncer::IsProximityNearSomeone()
 		if (!ent)
 			continue;
 
-		// No physics??
-		if (!ent->GetPhysics())
-			continue;
-
 		//if (ent->entityNumber == gameLocal.GetLocalPlayer()->entityNumber && coolDownTimer > gameLocal.time) //if player, then skip if we've recently done the announcement already		
 		//	continue;
 
@@ -627,6 +623,10 @@ bool idProximityAnnouncer::IsProximityNearSomeone()
 				continue;
 			}
 		}
+
+		// No physics??
+		if (!ent->GetPhysics())
+			continue;
 
 		//do distance check.
 		float distanceSqr = (loc - ent->GetPhysics()->GetOrigin()).LengthSqr();

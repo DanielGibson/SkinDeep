@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ui/UserInterfaceLocal.h"
 
 #include "ui/GameBearShootWindow.h"
+#include "Game_local.h"
 
 #define BEAR_GRAVITY 240
 #define BEAR_SIZE 24.f
@@ -219,6 +220,7 @@ void BSEntity::Draw(idDeviceContext *dc) {
 */
 idGameBearShootWindow::idGameBearShootWindow(idDeviceContext *d, idUserInterfaceLocal *g) : idWindow(d, g) {
 	highScore = DEFAULT_HIGHSCORE;
+	gameLocal.persistentLevelInfo.GetInt("bearShootHighScore", "0", highScore);
 	dc = d;
 	gui = g;
 	CommonInit();
@@ -226,6 +228,7 @@ idGameBearShootWindow::idGameBearShootWindow(idDeviceContext *d, idUserInterface
 
 idGameBearShootWindow::idGameBearShootWindow(idUserInterfaceLocal *g) : idWindow(g) {
 	highScore = DEFAULT_HIGHSCORE;
+	gameLocal.persistentLevelInfo.GetInt("bearShootHighScore", "0", highScore);
 	gui = g;
 	CommonInit();
 }
@@ -1137,6 +1140,7 @@ void idGameBearShootWindow::DoHighscoreLogic()
 		//Player has a new high score.
 		highscorestringToDisplay = common->GetLanguageDict()->GetString("#str_gui_arcade_newhighscore");
 		highScore = currentLevel;
+		gameLocal.persistentLevelInfo.SetInt("bearShootHighScore", highScore);
 	}
 	else
 	{

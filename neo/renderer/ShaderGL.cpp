@@ -143,32 +143,26 @@ void idShaderGL::SetIntUniform(const char* name, int value)
 
 static std::string readFile( const std::string& fileName )
 {
-	idStr basePath;
-	Sys_GetPath(PATH_BASE, basePath);
-#ifdef DEMO
-	std::string prefix = basePath.c_str();
-	prefix += "/basedemo/glsl/";
-#else
-	std::string prefix = basePath.c_str();
-	prefix += "/base/glsl/";
-#endif
+	std::string prefix = "glsl/";
 	std::string fullPath = prefix + fileName;
-	std::ifstream shaderFile( fullPath );
+	void* glslBuffer = NULL;
+	int glslBufferLength = fileSystem->ReadFile(fullPath.c_str(), &glslBuffer);
 	std::string contents;
 
-	if ( shaderFile.is_open() )
+	if (glslBufferLength > 0)
 	{
-		contents.reserve( 1024 );
+		std::istringstream shaderSteam((char*)glslBuffer);
+		contents.reserve(1024);
 		std::string line;
-		while ( !shaderFile.eof() )
+		while (!shaderSteam.eof())
 		{
-			std::getline( shaderFile, line );
-			if ( line.find( "#include" ) != std::string::npos )
+			std::getline(shaderSteam, line);
+			if (line.find("#include") != std::string::npos)
 			{
-				size_t startFile = line.find_first_of( '"' ) + 1;
-				size_t endFile = line.find_last_of( '"' );
-				std::string includeFile = line.substr( startFile, endFile - startFile );
-				contents += readFile( includeFile );
+				size_t startFile = line.find_first_of('"') + 1;
+				size_t endFile = line.find_last_of('"');
+				std::string includeFile = line.substr(startFile, endFile - startFile);
+				contents += readFile(includeFile);
 			}
 			else
 			{
@@ -177,6 +171,8 @@ static std::string readFile( const std::string& fileName )
 			}
 		}
 	}
+
+	fileSystem->FreeFile(glslBuffer);
 
 	return contents;
 }

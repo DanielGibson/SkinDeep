@@ -71,9 +71,9 @@ private:
 
 	int						heybarkTimer;
 
-	idFuncEmitter			*soundwaves = nullptr;
+	idEntityPtr<idFuncEmitter> soundwaves;
 
-	idFuncEmitter*			regnerationParticle = nullptr;
+	idEntityPtr<idFuncEmitter> regnerationParticle;
 
 
 	
@@ -99,7 +99,7 @@ private:
 	bool					isLowHealthState;
 	const idDeclParticle *	damageParticle = nullptr;
 	int						damageParticleFlyTime;
-	idFuncEmitter			*damageEmitter = nullptr;
+	idEntityPtr<idFuncEmitter> damageEmitter;
 
 	idEntityPtr<idEntity>	lostandfoundMachine;
 	idEntity*				FindLostandfoundMachine();

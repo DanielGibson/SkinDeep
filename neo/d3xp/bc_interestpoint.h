@@ -36,7 +36,7 @@ public:
 	int						sensoryTimer;
 	bool					isClaimed;
 	idEntityPtr<idAI>		claimant;				// SW: If the interestPoint is claimed, this should point to the AI currently investigating/interacting with it
-	idList<idAI*>			observers;				// Observers are AIs instructed to perform overwatch. There can only be one claimant, but many observers.
+	idList<idEntityPtr<idAI>> observers;				// Observers are AIs instructed to perform overwatch. There can only be one claimant, but many observers.
 	bool					cleanupWhenUnobserved;	// SW: This interestpoint has ceased to be remarkable. We can destroy it, but only if there are no active investigators/observers.
 	bool					forceCombat;			// Forces the AI to enter combat state.
 	bool					onlyLocalPVS;			// AI has to be in same PVS as the interestpoint. Only for audio interestpoints. This is so the AI ignores things in other PVSs, i.e. skullsaver yelling.

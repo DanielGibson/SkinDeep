@@ -55,6 +55,7 @@ enum SAVEGAME_VERSIONS
 	SAVEGAME_VERSION_INVALID = SAVEGAME_VERSION_0001, // the newest version that can no longer be loaded
 	SAVEGAME_VERSION_0002 = 2, // wire nades crash
 	SAVEGAME_VERSION_0003 = 3, // wire nades fixed
+	SAVEGAME_VERSION_0004 = 4, // convert couple of raw entities to idEntityPtr*
 	SAVEGAME_VERSION = BUILD_NUMBER,
 	SAVEGAME_VERSION_MAX = BUILD_NUMBER
 };

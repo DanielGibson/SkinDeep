@@ -72,7 +72,7 @@ public:
 	virtual idWinVar*	GetWinVarByName(const char *_name, bool winLookup = false, drawWin_t** owner = NULL);
 
 	void				UpdateList();
-	virtual bool		OverchildInteractive() { return listItems.Num() > 0; }
+	virtual bool		OverchildInteractive();
 
 private:
 	virtual bool		ParseInternalVar(const char *name, idParser *src);

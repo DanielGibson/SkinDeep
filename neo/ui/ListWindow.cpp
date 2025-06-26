@@ -815,6 +815,20 @@ void idListWindow::UpdateList() {
 	typed = "";
 }
 
+
+bool idListWindow::OverchildInteractive()
+{
+	if (Contains(gui->CursorX(), gui->CursorY()) && listItems.Num() > 0) {
+		float vert = GetMaxCharHeight();
+		int cur = (int)((gui->CursorY() - actualY - pixelOffset) / vert) + top;
+		if (cur >= 0 && cur < listItems.Num()) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void idListWindow::StateChanged( bool redraw ) {
 	UpdateList();
 }

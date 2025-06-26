@@ -1751,7 +1751,9 @@ idModList *idFileSystemLocal::ListMods( void ) {
 	search[0] = fs_savepath.GetString();
 	search[1] = fs_devpath.GetString();
 	search[2] = fs_basepath.GetString();
-	search[3] = fs_cdpath.GetString();
+	// SM: Don't list mods from fs_cdpath b/c we only use this for workshop mods
+	// (prevents double-listing of mods when a workshop one is loaded)
+	// search[3] = fs_cdpath.GetString();
 
 	for ( isearch = 0; isearch < 4; isearch++ ) {
 

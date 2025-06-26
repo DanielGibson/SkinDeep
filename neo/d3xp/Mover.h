@@ -139,7 +139,7 @@ protected:
 
 	void					Event_OpenPortal( void );	
 	void					Event_ClosePortal(void);
-	void					Event_PartBlocked( idEntity *blockingEntity );
+	virtual void			Event_PartBlocked( idEntity *blockingEntity );
 
 	void					MoveToPos( const idVec3 &pos);
 	void					UpdateMoveSound( moveStage_t stage );

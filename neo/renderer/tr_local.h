@@ -1069,6 +1069,7 @@ extern idCVar r_debugRenderToTexture;
 extern idCVar r_useBlendoAmbience;
 extern idCVar r_blendoAmbienceScale;
 extern idCVar r_stencilReverse;			// blendo eric: carmack's reverse
+extern idCVar r_useStencilOpSeparate;	// DG: to further speed up carmack's reverse
 extern idCVar r_blendoTriangleCount;    // blendo eric: only draw a x triangle per primitive, -1 off, for perf testing
 
 /*
@@ -1471,6 +1472,7 @@ typedef enum {
 
 // GLSL backend functions
 void	R_GLSL_Init( void );
+void	R_GLSL_Shutdown( void );
 void	RB_GLSL_DrawInteractions( void );
 void	RB_GLSL_DrawInteractionsBlend();
 void	R_ReloadGLSLPrograms_f( const idCmdArgs &args );

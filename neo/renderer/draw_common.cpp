@@ -1163,50 +1163,87 @@ static void RB_T_Shadow( const drawSurf_t *surf ) {
 		return;
 	}
 
-	// blendo eric: readd carmack's reverse (from ljbade fork)
-	if (r_stencilReverse.GetBool()) {
-		// LEITH: the patented "Carmack's Reverse" code
-		// patented depth-fail stencil shadows
-		if (!external) {
-			qglStencilOp(GL_KEEP, tr.stencilDecr, GL_KEEP);
-			GL_Cull(CT_FRONT_SIDED);
-			RB_DrawShadowElementsWithCounters(tri, numIndexes);
-			qglStencilOp(GL_KEEP, tr.stencilIncr, GL_KEEP);
-			GL_Cull(CT_BACK_SIDED);
-			RB_DrawShadowElementsWithCounters(tri, numIndexes);
-		}
-		// traditional depth-pass stencil shadows
-		else {
-			qglStencilOp(GL_KEEP, GL_KEEP, tr.stencilIncr);
-			GL_Cull(CT_FRONT_SIDED);
-			RB_DrawShadowElementsWithCounters(tri, numIndexes);
+	bool useStencilOpSeperate = r_useStencilOpSeparate.GetBool() && qglStencilOpSeparate != NULL;
+	if( !r_stencilReverse.GetBool() ) {
+		if( useStencilOpSeperate ) {
+			// not using z-fail, but using qglStencilOpSeparate()
+			GLenum firstFace = backEnd.viewDef->isMirror ? GL_FRONT : GL_BACK;
+			GLenum secondFace = backEnd.viewDef->isMirror ? GL_BACK : GL_FRONT;
+			GL_Cull( CT_TWO_SIDED );
+			if ( !external ) {
+				qglStencilOpSeparate( firstFace, GL_KEEP, tr.stencilDecr, tr.stencilDecr );
+				qglStencilOpSeparate( secondFace, GL_KEEP, tr.stencilIncr, tr.stencilIncr );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+			}
 
-			qglStencilOp(GL_KEEP, GL_KEEP, tr.stencilDecr);
-			GL_Cull(CT_BACK_SIDED);
-			RB_DrawShadowElementsWithCounters(tri, numIndexes);
-		}
-	} else {
-		// patent-free work around
-		if (!external) {
-			// "preload" the stencil buffer with the number of volumes
-			// that get clipped by the near or far clip plane
-			qglStencilOp(GL_KEEP, tr.stencilDecr, tr.stencilDecr);
-			GL_Cull(CT_FRONT_SIDED);
-			RB_DrawShadowElementsWithCounters(tri, numIndexes);
-			qglStencilOp(GL_KEEP, tr.stencilIncr, tr.stencilIncr);
-			GL_Cull(CT_BACK_SIDED);
-			RB_DrawShadowElementsWithCounters(tri, numIndexes);
-		}
+			qglStencilOpSeparate( firstFace, GL_KEEP, GL_KEEP, tr.stencilIncr );
+			qglStencilOpSeparate( secondFace, GL_KEEP, GL_KEEP, tr.stencilDecr );
 
-		// traditional depth-pass stencil shadows
-		qglStencilOp(GL_KEEP, GL_KEEP, tr.stencilIncr);
-		GL_Cull(CT_FRONT_SIDED);
-		RB_DrawShadowElementsWithCounters(tri, numIndexes);
+			RB_DrawShadowElementsWithCounters( tri, numIndexes );
 
-		qglStencilOp(GL_KEEP, GL_KEEP, tr.stencilDecr);
-		GL_Cull(CT_BACK_SIDED);
-		RB_DrawShadowElementsWithCounters(tri, numIndexes);
+		} else { // DG: this is the original code:
+			// patent-free work around
+			if ( !external ) {
+				// "preload" the stencil buffer with the number of volumes
+				// that get clipped by the near or far clip plane
+				qglStencilOp( GL_KEEP, tr.stencilDecr, tr.stencilDecr );
+				GL_Cull( CT_FRONT_SIDED );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+				qglStencilOp( GL_KEEP, tr.stencilIncr, tr.stencilIncr );
+				GL_Cull( CT_BACK_SIDED );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+			}
+
+			// traditional depth-pass stencil shadows
+			qglStencilOp( GL_KEEP, GL_KEEP, tr.stencilIncr );
+			GL_Cull( CT_FRONT_SIDED );
+			RB_DrawShadowElementsWithCounters( tri, numIndexes );
+
+			qglStencilOp( GL_KEEP, GL_KEEP, tr.stencilDecr );
+			GL_Cull( CT_BACK_SIDED );
+			RB_DrawShadowElementsWithCounters( tri, numIndexes );
+		}
+	} else { // use the formerly patented "Carmack's Reverse" Z-Fail code
+		if( useStencilOpSeperate ) {
+			// Z-Fail with glStencilOpSeparate() which will reduce draw calls
+			GLenum firstFace = backEnd.viewDef->isMirror ? GL_FRONT : GL_BACK;
+			GLenum secondFace = backEnd.viewDef->isMirror ? GL_BACK : GL_FRONT;
+			if ( !external ) { // z-fail
+				qglStencilOpSeparate( firstFace, GL_KEEP, tr.stencilDecr, GL_KEEP );
+				qglStencilOpSeparate( secondFace, GL_KEEP, tr.stencilIncr, GL_KEEP );
+			} else { // depth-pass
+				qglStencilOpSeparate( firstFace, GL_KEEP, GL_KEEP, tr.stencilIncr );
+				qglStencilOpSeparate( secondFace, GL_KEEP, GL_KEEP, tr.stencilDecr );
+			}
+			GL_Cull( CT_TWO_SIDED );
+			RB_DrawShadowElementsWithCounters( tri, numIndexes );
+
+		} else { // Z-Fail without glStencilOpSeparate()
+
+			// LEITH: the (formerly patented) "Carmack's Reverse" code
+
+			// depth-fail/Z-Fail stencil shadows
+			if ( !external ) {
+				qglStencilOp( GL_KEEP, tr.stencilDecr, GL_KEEP );
+				GL_Cull( CT_FRONT_SIDED );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+				qglStencilOp( GL_KEEP, tr.stencilIncr, GL_KEEP );
+				GL_Cull( CT_BACK_SIDED );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+			}
+			// traditional depth-pass stencil shadows
+			else {
+				qglStencilOp( GL_KEEP, GL_KEEP, tr.stencilIncr );
+				GL_Cull( CT_FRONT_SIDED );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+
+				qglStencilOp( GL_KEEP, GL_KEEP, tr.stencilDecr );
+				GL_Cull( CT_BACK_SIDED );
+				RB_DrawShadowElementsWithCounters( tri, numIndexes );
+			}
+		}
 	}
+
 }
 
 /*
@@ -1716,8 +1753,8 @@ void	RB_STD_DrawView( void ) {
 	RB_DetermineLightScale();
 
 	// Do the custom mask pass first
-	// Only draw to color attachment 1 (mask texture)
-	GLenum customBuffers[] = { GL_COLOR_ATTACHMENT1 };
+	// Only draw to color attachment 2 (mask texture)
+	GLenum customBuffers[] = { GL_COLOR_ATTACHMENT2 };
 	qglDrawBuffers(1, customBuffers);
 	RB_STD_FillCustomMask( drawSurfs, numDrawSurfs );
 
@@ -1729,8 +1766,8 @@ void	RB_STD_DrawView( void ) {
 	RB_STD_FillDepthBuffer( drawSurfs, numDrawSurfs );
 
 	// main light renderer
-	// For interactions, we want color attachment 0 (main color) and 2 (light)
-	GLenum interactionBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT2 };
+	// For interactions, we want color attachment 0 (main color) and 1 (light)
+	GLenum interactionBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	qglDrawBuffers(2, interactionBuffers);
 	switch( tr.backEndRenderer ) {
 	case BE_GLSL:

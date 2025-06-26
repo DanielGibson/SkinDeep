@@ -263,7 +263,9 @@ bool idVRVisor::DoFrob(int index, idEntity * frobber)
 
 		isFrobbable = false;
 
-		playerStartPosition = gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin();
+		//BC 6-11-2025: fix issue where player can go out of bounds by exiting a clambered/crouch space while interacting with vr visor (sd-654)
+		playerStartPosition = GetSafeStartPosition();		
+
 		playerStartAngle = gameLocal.GetLocalPlayer()->viewAngles.yaw;
 
 		//Get visor final position.
@@ -286,6 +288,63 @@ bool idVRVisor::DoFrob(int index, idEntity * frobber)
 
 
 	return true;
+}
+
+//BC 6-11-2025: fix issue where player can go out of bounds by exiting a clambered/crouch space while interacting with vr visor (sd-654)
+idVec3 idVRVisor::GetSafeStartPosition()
+{
+	//See if player is already standing on solid ground.
+	idVec3 candidateStartPosition = gameLocal.GetLocalPlayer()->GetPhysics()->GetOrigin();
+
+	trace_t tr;
+	gameLocal.clip.TracePoint(tr, candidateStartPosition + idVec3(0, 0, 1), candidateStartPosition + idVec3(0, 0, -16), MASK_SOLID, NULL);
+
+	if (tr.fraction < 1)
+	{
+		return candidateStartPosition; //player is on ground.
+	}
+
+	//Player is NOT on ground. Find the ground.
+	gameLocal.clip.TracePoint(tr, candidateStartPosition + idVec3(0, 0, 1), candidateStartPosition + idVec3(0, 0, -128), MASK_SOLID, NULL);
+	candidateStartPosition = tr.endpos + idVec3(0, 0, .1f);
+
+	//Get player standing bounding box
+	idBounds playerbounds = gameLocal.GetLocalPlayer()->GetPhysics()->GetBounds();
+	playerbounds[1].z = pm_normalheight.GetFloat(); //Get standing height.
+	
+	#define CANDIDATEOFFSETCOUNT 9
+	idVec3 candidateOffsets[] =
+	{
+		idVec3(0, 0, 0),
+
+		idVec3(0, -16, 0),
+		idVec3(0, -32, 0),
+
+		idVec3(-16, 0, 0),
+		idVec3(-32, 0, 0),
+
+		idVec3(0, 16, 0),
+		idVec3(0, 32, 0),
+
+		idVec3(16, 0, 0),
+		idVec3(32, 0, 0),
+	};
+
+	//do bounds check.	
+	for (int i = 0; i < CANDIDATEOFFSETCOUNT; i++)
+	{
+		trace_t standingTr;
+		idVec3 adjustedPos = candidateStartPosition + candidateOffsets[i];
+		gameLocal.clip.TraceBounds(standingTr, adjustedPos, adjustedPos, playerbounds, MASK_SOLID, NULL);
+
+		if (standingTr.fraction >= 1)
+		{
+			return adjustedPos;
+		}
+	}
+
+	//Couldn't find a clear spot, so just return the original position on the ground.
+	return candidateStartPosition;
 }
 
 //If this visor is active, then deactivate it and return player to the hub.

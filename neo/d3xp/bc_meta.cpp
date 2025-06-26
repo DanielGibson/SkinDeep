@@ -3562,7 +3562,9 @@ void idMeta::InterestPointInvestigated(idEntity* entity)
 
 	for (int i = 0; i < interestPoint->observers.Num(); i++)
 	{
-		interestPoint->observers[i]->ClearInterestPoint();
+		if (interestPoint->observers[i].IsValid()) {
+			interestPoint->observers[i].GetEntity()->ClearInterestPoint();
+		}
 	}
 	interestPoint->ClearObservers();
 	interestPoint->SetClaimed(false);
@@ -3600,7 +3602,10 @@ void idMeta::InterestPointDistracted(idEntity* interestPointEnt, idAI* distracte
 		bool overwatchToInvestigate = false;
 		for (int i = 0; i < interestPoint->observers.Num(); i++)
 		{
-			idAI* aiEnt = interestPoint->observers[i];
+			if (!interestPoint->observers[i].IsValid())
+				continue;
+
+			idAI* aiEnt = interestPoint->observers[i].GetEntity();
 			if (!aiEnt || !aiEnt->IsType(idAI::Type))
 				continue;
 

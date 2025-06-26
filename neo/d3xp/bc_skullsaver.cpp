@@ -134,8 +134,8 @@ void idSkullsaver::Spawn(void)
 	args.Set("model", "sound_burst.prt");
 	args.Set("start_off", "1");
 	soundwaves = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &args));
-	soundwaves->SetOrigin(GetPhysics()->GetOrigin());
-	soundwaves->Bind(this, true);
+	soundwaves.GetEntity()->SetOrigin(GetPhysics()->GetOrigin());
+	soundwaves.GetEntity()->Bind(this, true);
 	heybarkTimer = gameLocal.time + YELL_INITIAL_DELAY + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
 
 
@@ -144,8 +144,8 @@ void idSkullsaver::Spawn(void)
 	args.Set("model", spawnArgs.GetString("model_regeneration"));
 	args.Set("start_off", "1");
 	regnerationParticle = static_cast<idFuncEmitter*>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &args));
-	regnerationParticle->SetOrigin(GetPhysics()->GetOrigin());
-	regnerationParticle->Bind(this, true);
+	regnerationParticle.GetEntity()->SetOrigin(GetPhysics()->GetOrigin());
+	regnerationParticle.GetEntity()->Bind(this, true);
 	
 
 	conveyorDelayTime = gameLocal.time + spawnArgs.GetInt("convey_delay_time", "2000");
@@ -188,8 +188,8 @@ void idSkullsaver::Spawn(void)
 	args.Set("model", spawnArgs.GetString("model_damageparticle2"));
 	args.Set("start_off", "1");
 	damageEmitter = static_cast<idFuncEmitter *>(gameLocal.SpawnEntityType(idFuncEmitter::Type, &args));
-	damageEmitter->SetOrigin(GetPhysics()->GetOrigin());
-	damageEmitter->Bind(this, false);
+	damageEmitter.GetEntity()->SetOrigin(GetPhysics()->GetOrigin());
+	damageEmitter.GetEntity()->Bind(this, false);
 
 	this->GetRenderEntity()->gui[0] = uiManager->FindGui(spawnArgs.GetString("gui"), true, true); //Create a UNIQUE gui so that it doesn't auto sync with other guis.
 	PostEventMS(&EV_PostSpawn, 0);
@@ -224,9 +224,9 @@ void idSkullsaver::Save(idSaveGame *savefile) const
 
 	savefile->WriteInt( heybarkTimer ); // int heybarkTimer
 
-	savefile->WriteObject( soundwaves ); // idFuncEmitter * soundwaves
+	soundwaves.Save(savefile); // idEntityPtr<idFuncEmitter> soundwaves
 
-	savefile->WriteObject( regnerationParticle ); // idFuncEmitter* regnerationParticle
+	regnerationParticle.Save(savefile); // idEntityPtr<idFuncEmitter> regnerationParticle
 
 
 	savefile->WriteInt( conveyorDelayTime ); // int conveyorDelayTime
@@ -257,7 +257,7 @@ void idSkullsaver::Save(idSaveGame *savefile) const
 	savefile->WriteBool( isLowHealthState ); // bool isLowHealthState
 	savefile->WriteParticle( damageParticle ); // const idDeclParticle * damageParticle
 	savefile->WriteInt( damageParticleFlyTime ); // int damageParticleFlyTime
-	savefile->WriteObject( damageEmitter ); // idFuncEmitter * damageEmitter
+	damageEmitter.Save(savefile); // idEntityPtr<idFuncEmitter> damageEmitter
 
 	savefile->WriteObject( lostandfoundMachine ); // idEntityPtr<idEntity> lostandfoundMachine
 
@@ -290,10 +290,20 @@ void idSkullsaver::Restore(idRestoreGame *savefile)
 
 	savefile->ReadInt( heybarkTimer ); // int heybarkTimer
 
-	savefile->ReadObject( CastClassPtrRef(soundwaves) ); // idFuncEmitter * soundwaves
+	if (savefile->GetSaveVersion() < SAVEGAME_VERSION_0004) {
+		idFuncEmitter* soundwavesTemp = nullptr;
+		savefile->ReadObject(CastClassPtrRef(soundwavesTemp)); // idFuncEmitter * soundwaves
+		soundwaves = soundwavesTemp;
 
-	savefile->ReadObject( CastClassPtrRef(regnerationParticle) ); // idFuncEmitter* regnerationParticle
+		idFuncEmitter* regnerationParticleTemp = nullptr;
+		savefile->ReadObject(CastClassPtrRef(regnerationParticle)); // idFuncEmitter* regnerationParticle
+		regnerationParticle = regnerationParticleTemp;
+	} else {
+		soundwaves.Restore(savefile);
+		regnerationParticle.Restore(savefile);
+	}
 
+	
 	savefile->ReadInt( conveyorDelayTime ); // int conveyorDelayTime
 	savefile->ReadObject( conveyorRespawnpoint ); // idEntityPtr<idEntity> conveyorRespawnpoint
 	savefile->ReadFloat( conveyorTotalMoveTime ); // float conveyorTotalMoveTime
@@ -321,7 +331,13 @@ void idSkullsaver::Restore(idRestoreGame *savefile)
 	savefile->ReadBool( isLowHealthState ); // bool isLowHealthState
 	savefile->ReadParticle( damageParticle ); // const idDeclParticle * damageParticle
 	savefile->ReadInt( damageParticleFlyTime ); // int damageParticleFlyTime
-	savefile->ReadObject( CastClassPtrRef(damageEmitter) ); // idFuncEmitter * damageEmitter
+	if (savefile->GetSaveVersion() < SAVEGAME_VERSION_0004) {
+		idFuncEmitter* damageEmitterTemp = nullptr;
+		savefile->ReadObject(CastClassPtrRef(damageEmitterTemp)); // idFuncEmitter * damageEmitter
+		damageEmitter = damageEmitterTemp;
+	} else {
+		damageEmitter.Restore(savefile);
+	}
 
 	savefile->ReadObject( lostandfoundMachine ); // idEntityPtr<idEntity> lostandfoundMachine
 
@@ -435,17 +451,19 @@ void idSkullsaver::Think(void)
 			//Do the yell.
 			if (gameLocal.time > heybarkTimer && !gameLocal.GetLocalPlayer()->IsJockeying()) //BC 4-15-2025: don't do skull conversation if player is jockeying
 			{
+				int barkLength = 0;
+
 				if ((gameLocal.GetLocalPlayer()->HasEntityInCarryableInventory(this) && gameLocal.GetLocalPlayer()->GetCarryable() != this))
 				{
 					//Is in pocket. Muffled.
-					StartSound("snd_hey_muffled", SND_CHANNEL_VOICE);
+					StartSound("snd_hey_muffled", SND_CHANNEL_VOICE, 0, false, &barkLength);
 					gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), spawnArgs.GetString("interest_yell_muffled"));
 					gameLocal.GetLocalPlayer()->DoLocalSoundwave(gameLocal.GetLocalPlayer()->spawnArgs.GetString("model_soundwave_faint"));
 				}
 				else if (!gameLocal.InPlayerPVS(this))
 				{
 					//Is in a different PVS than player, and is not in player inventory.
-					StartSound("snd_hey_muffled", SND_CHANNEL_VOICE);
+					StartSound("snd_hey_muffled", SND_CHANNEL_VOICE, 0, false, &barkLength);
 					gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), spawnArgs.GetString("interest_yell"));
 				}
 				else
@@ -483,27 +501,29 @@ void idSkullsaver::Think(void)
 							}
 						}
 
-						int length;
-						if (StartSound(doRant  ? "snd_vo_heldrant" : "snd_held", SND_CHANNEL_VOICE, 0, false, &length)) //skull says something to nina.
+						if (StartSound(doRant  ? "snd_vo_heldrant" : "snd_held", SND_CHANNEL_VOICE, 0, false, &barkLength)) //skull says something to nina.
 						{
 							//BC 2-14-2025: logic for nina replying to skull
 							waitingForNinaReply = true;
-							ninaReplyTimer = gameLocal.time + length + NINAREPLY_TIMEGAP;
+							ninaReplyTimer = gameLocal.time + barkLength + NINAREPLY_TIMEGAP;
+
+							//BC 5-9-2025: fixed bug where skullsaver (when being held) wasn't generating interestpoint.
+							gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), spawnArgs.GetString("interest_skullnoise"));							
 						}
 					}
 					else
 					{
-						StartSound("snd_hey", SND_CHANNEL_VOICE); //skullsaver rolling around on ground.
+						StartSound("snd_hey", SND_CHANNEL_VOICE, 0, barkLength); //skullsaver rolling around on ground.
 						gameLocal.SpawnInterestPoint(this, this->GetPhysics()->GetOrigin(), spawnArgs.GetString("interest_yell"));
 					}
 
-					if (doSoundwave)
+					if (doSoundwave && soundwaves.IsValid())
 					{
-						soundwaves->SetActive(true);
+						soundwaves.GetEntity()->SetActive(true);
 					}
 				}
 
-				heybarkTimer = gameLocal.time + YELL_MINTIME + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
+				heybarkTimer = gameLocal.time + barkLength + YELL_MINTIME + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
 			}
 		}
 
@@ -649,9 +669,13 @@ void idSkullsaver::Think(void)
 
 					StartSound("snd_vo_respawn", SND_CHANNEL_VOICE);
 					StartSound( "snd_startrespawn", SND_CHANNEL_BODY3 );
-					soundwaves->SetActive(true);
+					if (soundwaves.IsValid()) {
+						soundwaves.GetEntity()->SetActive(true);
+					}
 
-					regnerationParticle->SetActive(true);
+					if (regnerationParticle.IsValid()) {
+						regnerationParticle.GetEntity()->SetActive(true);
+					}
 				}
 				else
 				{
@@ -666,7 +690,9 @@ void idSkullsaver::Think(void)
 		{
 			StartSound("snd_vo_respawn", SND_CHANNEL_VOICE);
 			heybarkTimer = gameLocal.time + YELL_MINTIME + gameLocal.random.RandomInt(YELL_RANDOMVARIATIONTIME);
-			soundwaves->SetActive(true);
+			if (soundwaves.IsValid()) {
+				soundwaves.GetEntity()->SetActive(true);
+			}
 		}		
 
 
@@ -796,9 +822,9 @@ void idSkullsaver::Think(void)
 	}
 
 	// SW 24th Feb 2025
-	if (soundwaves != NULL)
+	if (soundwaves.IsValid())
 	{
-		soundwaves->Show();
+		soundwaves.GetEntity()->Show();
 	}
 
 	UpdateSpacePush();
@@ -1112,9 +1138,9 @@ void idSkullsaver::Hide(void)
 	}
 	
 	// SW 24th Feb 2025
-	if (soundwaves != NULL)
+	if (soundwaves.IsValid())
 	{
-		soundwaves->Hide();
+		soundwaves.GetEntity()->Hide();
 	}
 }
 
@@ -1236,7 +1262,9 @@ void idSkullsaver::ResetConveyTime()
 		pathBeamOrigin[i]->Hide();
 	}
 
-	regnerationParticle->SetActive(false);
+	if (regnerationParticle.IsValid()) {
+		regnerationParticle.GetEntity()->SetActive(false);
+	}
 }
 
 void idSkullsaver::Damage(idEntity* inflictor, idEntity* attacker, const idVec3& dir, const char* damageDefName, const float damageScale, const int location, const int materialType)
@@ -1253,7 +1281,10 @@ void idSkullsaver::Damage(idEntity* inflictor, idEntity* attacker, const idVec3&
 		isLowHealthState = true;
 		damageParticle = static_cast<const idDeclParticle*>(declManager->FindType(DECL_PARTICLE, spawnArgs.GetString("model_damageparticle")));
 		damageParticleFlyTime = gameLocal.time;
-		damageEmitter->SetActive(true);		
+		
+		if (damageEmitter.IsValid()) {
+			damageEmitter.GetEntity()->SetActive(true);
+		}
 	}
 }
 
@@ -1285,6 +1316,8 @@ void idSkullsaver::JustThrown()
 	{
 		//gameLocal.voManager.SayVO(this, "snd_vo_ejectspace", VO_CATEGORY_BARK);
 		StartSound("snd_vo_ejectspace", SND_CHANNEL_VOICE);
-		soundwaves->SetActive(true);
+		if (soundwaves.IsValid()) {
+			soundwaves.GetEntity()->SetActive(true);
+		}
 	}
 }

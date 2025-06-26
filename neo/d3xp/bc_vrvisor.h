@@ -41,5 +41,7 @@ private:
 
 	idEntity*				arrowProp = nullptr;
 
+	//BC 6-11-2025 fix for going out of bounds when exiting vr visor
+	idVec3					GetSafeStartPosition();
 
 };
