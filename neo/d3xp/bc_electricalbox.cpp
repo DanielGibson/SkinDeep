@@ -287,7 +287,7 @@ void idElectricalBox::Damage(idEntity *inflictor, idEntity *attacker, const idVe
 			{
 				int entNum = lightIndexes[i];
 
-				if (!gameLocal.entities[entNum]->IsType(idLight::Type))
+				if (!gameLocal.entities[entNum] || !gameLocal.entities[entNum]->IsType(idLight::Type))
 					continue;
 
 				//fade the light to red
@@ -299,7 +299,7 @@ void idElectricalBox::Damage(idEntity *inflictor, idEntity *attacker, const idVe
 			for (int i = 0; i < turretIndexes.Num(); i++)
 			{
 				int entNum = turretIndexes[i];
-				if (!gameLocal.entities[entNum]->IsType(idTurret::Type))
+				if (!gameLocal.entities[entNum] || !gameLocal.entities[entNum]->IsType(idTurret::Type))
 					continue;
 
 				static_cast<idTurret *>(gameLocal.entities[entNum])->SetElectricalActive(false);
@@ -310,7 +310,7 @@ void idElectricalBox::Damage(idEntity *inflictor, idEntity *attacker, const idVe
 			for (int i = 0; i < securitycameraIndexes.Num(); i++)
 			{
 				int entNum = securitycameraIndexes[i];
-				if (!gameLocal.entities[entNum]->IsType(idSecurityCamera::Type))
+				if (!gameLocal.entities[entNum] || !gameLocal.entities[entNum]->IsType(idSecurityCamera::Type))
 					continue;
 
 				static_cast<idSecurityCamera *>(gameLocal.entities[entNum])->SetElectricalActive(false);

@@ -666,7 +666,8 @@ static void	RB_SetFrameBuffer(const void *data)
 					qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 					qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-					// NOTE: because this is an integer texture, it must be the highest numbered
+
+					// 5-25-2025 NOTE: because this is an integer texture, it must be the highest numbered
 					//       color attachment we use, to work around a Mesa bug that broke
 					//       blending when it thought an integer color attachment was bound
 					//       due to a buggy check (this works around the buggy check)

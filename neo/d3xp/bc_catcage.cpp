@@ -845,7 +845,8 @@ void idCatcage::ReleaseCat()
 		gameRenderWorld->FreeLightDef(headlightHandle);
 	}
 
-	
+	// SW 27th May 2025: Cat cage can't be hacked once it's opened!
+	spawnArgs.SetBool("hackable", false);
 
 
 	// Run script calls if necessary

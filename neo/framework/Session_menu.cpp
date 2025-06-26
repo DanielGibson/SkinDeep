@@ -471,7 +471,6 @@ void idSessionLocal::SetModsMenuGuiVars( void ) {
 		{
 			idStr descPath = modpaths[i].c_str();
 
-#if 1
 #ifdef _WIN32
 #define PATH_SLASH "\\"
 #else
@@ -479,25 +478,27 @@ void idSessionLocal::SetModsMenuGuiVars( void ) {
 #endif
 			descPath.Append(PATH_SLASH"description.txt");
 
-			//generate a relative folder path.
-			int foldernameIndex = idStr::FindText(modpaths[i], PATH_SLASH "steamapps" PATH_SLASH "workshop" PATH_SLASH, false);
-			int steamappsFolderLength = 10;
-			modpaths[i] = modpaths[i].Right(modpaths[i].Length() - foldernameIndex - steamappsFolderLength);
-#ifdef __APPLE__
-			modpaths[i] = ".." PATH_SLASH ".." PATH_SLASH ".." PATH_SLASH ".." PATH_SLASH ".." + modpaths[i]; //append the ..
-#else
-			modpaths[i] = ".." PATH_SLASH ".." + modpaths[i]; //append the ..
-#endif
+			const char searchPath[] = PATH_SLASH "steamapps" PATH_SLASH "workshop" PATH_SLASH "content" PATH_SLASH;
+			
+			// Get whatever comes after workshop/content
+			int foldernameIndex = idStr::FindText(modpaths[i], searchPath, false);
+			int rightSize = modpaths[i].Length() - foldernameIndex - sizeof(searchPath) + 1;
+			idStr workshopStr = modpaths[i].Right(rightSize);
+			
+			// Find the point where there's a slash between the appid and the workshopid
+			int workshopSlashIdx = idStr::FindText(workshopStr, PATH_SLASH, false);
+			
+			// Root directory is everything but the workshopid
+			idStr rootDirStr = modpaths[i].Left(modpaths[i].Length() - workshopStr.Length() + workshopSlashIdx);
+			
+			// need just the final workshopid
+			workshopStr = workshopStr.Right(workshopStr.Length() - workshopSlashIdx - 1);
 
-#undef PATH_SLASH
-#else
-			descPath.Append("/description.txt");
-#endif
 			idStr modTitle = fileSystem->GetModDescription(descPath);
 
 			// SW 6th March 2025
 			// Figure out the active mod for displaying at the top of the list
-			if (!foundActiveMod && modpaths[i].Icmp(cvarSystem->GetCVarString("fs_game")) == 0)
+			if (!foundActiveMod && workshopStr.Icmp(cvarSystem->GetCVarString("fs_game")) == 0)
 			{
 				foundActiveMod = true;
 				guiActive->SetStateString("activemodname", modTitle);
@@ -509,9 +510,12 @@ void idSessionLocal::SetModsMenuGuiVars( void ) {
 			modName += common->GetLanguageDict()->GetString("#str_gui_mainmenu_mod_workshop");
 			guiActive->SetStateString(idStr::Format("modsList_item_%d", i + list->GetNumMods()).c_str(), modName.c_str());
 
-			common->Printf("MODS: #%d workshop path: %s\n", list->GetNumMods() + i, modpaths[i].c_str());
+			common->Printf("MODS: #%d workshop root: %s id: %s\n", list->GetNumMods() + i, rootDirStr.c_str(), workshopStr.c_str());
 
-			modsList[list->GetNumMods() + i] = modpaths[i].c_str();
+			// Store this as a combinatoin of the fs_cdpath and fs_game, separated by '|'
+			modsList[list->GetNumMods() + i] = rootDirStr + '|' + workshopStr;
+
+#undef PATH_SLASH
 		}
 
 		for (i = 0; i < totalNumberOfMods; i++)
@@ -1187,7 +1191,19 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		if ( !idStr::Icmp( cmd, "loadMod" ) ) {
 			int choice = guiActive->State().GetInt( "modsList_sel_0" );
 			if ( choice >= 0 && choice < modsList.Num() ) {
-				cvarSystem->SetCVarString( "fs_game", modsList[ choice ] );
+				// SM: This is a workshop mod if the text has a '|' in it
+				// (Note: | is not a valid char in a windows path so should be ok)
+				if (modsList[choice].Find('|') != -1) {
+					idStrList workshopSplits = modsList[choice].Split('|');
+					cvarSystem->SetCVarString("fs_cdpath", workshopSplits[0]);
+					cvarSystem->SetCVarString("fs_game", workshopSplits[1]);
+				} else {
+					// SM: This is a local mod, so just set fs_game directly from the list
+					// (and clear fs_cdpath just in case)
+					cvarSystem->SetCVarString("fs_cdpath", "");
+					cvarSystem->SetCVarString( "fs_game", modsList[ choice ] );
+				}
+
 				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
 			}
 		}

@@ -379,6 +379,7 @@ public:
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
 	idEntityPtr<type> &		operator=( type *ent );
+	bool					operator==(idEntityPtr<type>& other) const;
 
 	// synchronize entity pointers over the network
 	int						GetSpawnId( void ) const { return spawnId; }
@@ -1053,6 +1054,11 @@ ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( type *ent ) {
 		spawnId = ( gameLocal.spawnIds[ent->entityNumber] << GENTITYNUM_BITS ) | ent->entityNumber;
 	}
 	return *this;
+}
+
+template< class type >
+ID_INLINE bool idEntityPtr<type>::operator==(idEntityPtr<type>& other) const {
+	return spawnId == other.spawnId;
 }
 
 template< class type >

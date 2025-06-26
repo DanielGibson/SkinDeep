@@ -151,35 +151,26 @@ void idShaderGL::SetIntUniform(const char* name, int value)
 
 static std::string readFile( std::string_view fileName )
 {
-	//Sys_GetPath(PATH_BASE, basePath);
-	// DG: if fs_basepath is set  it should be used (helps with dev
-	//     when the executable is not next to the gamedata)
-	//     and if it's not explicitly set it defaults to Sys_GetPath(BASE_PATH,..)
-	//     anyway (see idFileSystemLocal::Init())
-	std::string prefix = cvarSystem->GetCVarString("fs_basepath");
-#ifdef DEMO
-	prefix += "/basedemo/glsl/";
-#else
-	prefix += "/base/glsl/";
-#endif
-	std::string fullPath(prefix);
+	std::string fullPath = "glsl/";
 	fullPath += fileName;
-	std::ifstream shaderFile( fullPath );
+	void* glslBuffer = NULL;
+	int glslBufferLength = fileSystem->ReadFile(fullPath.c_str(), &glslBuffer);
 	std::string contents;
 
-	if ( shaderFile.is_open() )
+	if (glslBufferLength > 0)
 	{
-		contents.reserve( 1024 );
+		std::istringstream shaderSteam((char*)glslBuffer);
+		contents.reserve(1024);
 		std::string line;
-		while ( !shaderFile.eof() )
+		while (!shaderSteam.eof())
 		{
-			std::getline( shaderFile, line );
-			if ( line.find( "#include" ) != std::string::npos )
+			std::getline(shaderSteam, line);
+			if (line.find("#include") != std::string::npos)
 			{
-				size_t startFile = line.find_first_of( '"' ) + 1;
-				size_t endFile = line.find_last_of( '"' );
-				std::string includeFile = line.substr( startFile, endFile - startFile );
-				contents += readFile( includeFile );
+				size_t startFile = line.find_first_of('"') + 1;
+				size_t endFile = line.find_last_of('"');
+				std::string includeFile = line.substr(startFile, endFile - startFile);
+				contents += readFile(includeFile);
 			}
 			else
 			{
@@ -188,6 +179,8 @@ static std::string readFile( std::string_view fileName )
 			}
 		}
 	}
+
+	fileSystem->FreeFile(glslBuffer);
 
 	return contents;
 }

@@ -6033,6 +6033,10 @@ void idPlayer::ServerSpectate( bool spectate )
 			Show(); 
 		}
 
+		// SW 28th May 2025: Handle case where player finishes game in a vent
+		inConfinedState = false;
+		confinedAngleLock = false;
+
 		Spectate( spectate );
 		if ( spectate ) {
 
@@ -6835,7 +6839,12 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 
 	//item durability.
 	int itemHealth = -1;
-	if (carryableItem.IsValid())
+	// SW 28th May 2025: Don't show item durability in mech (-1 will cause it to hide)
+	if (mechTransitionState != MECHTRANSITION_NONE)
+	{
+		itemHealth = -1;
+	}
+	else if (carryableItem.IsValid())
 	{
 		itemHealth = carryableItem.GetEntity()->health;
 	}
@@ -7138,7 +7147,7 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 bool idPlayer::ShouldHideLegend()
 {
 	if (weapon.GetEntity()->IsReloading() ||  weapon.GetEntity()->IsRacking() || leanState != LEANSTATE_OFF
-		|| contextMenuActive || armstatsActive || iteminspectActive || physicsObj.GetAcroType() != ACROTYPE_NONE)
+		|| contextMenuActive || armstatsActive || iteminspectActive || physicsObj.GetAcroType() != ACROTYPE_NONE || mechTransitionState != MECHTRANSITION_NONE)
 		return true;
 
 	if (weapon.GetEntity()->IsInspectingMagazine() || weapon.GetEntity()->IsInspectingChamber())
@@ -12878,7 +12887,11 @@ void idPlayer::ThrowCarryable(void)
 	item = carryableItem.GetEntity();
 	SetCarryable(NULL, false);
 
-	item->GetPhysics()->SetOrigin( firstPersonViewOrigin + forward * carryOffset.x + right * carryOffset.y );
+	// SW 6th May 2025: Certain held carryables can clip through walls/floors if the player presses themselves right up against them.
+	// This isn't particularly noticeable to the player most of the time because of the weapon depth hack, 
+	// but it does mean that it's possible for the throwing arc to start *outside* the world, meaning that thrown/dropped items will disappear into the void.
+	// To get around this, we start the throwing arc slightly further back than the carryable's actual position
+	item->GetPhysics()->SetOrigin( firstPersonViewOrigin + forward * carryOffset.x + right * carryOffset.y + (throwAngle * -16) );
 	item->GetPhysics()->SetLinearVelocity(throwAngle * GetThrowPower(item));
 	item->GetPhysics()->SetAngularVelocity(GetThrowAngularVelocity());
 	item->throwTime = gameLocal.time;
@@ -14431,6 +14444,14 @@ void idPlayer::DrawThrowArc()
 		currentState.i.linearMomentum = throwForward * GetThrowPower(GetCarryable()) * physicsObj->GetMass();
 		currentState.i.angularMomentum = (GetThrowAngularVelocity() * physicsObj->GetMass());
 
+		// SW 6th May 2025: Certain held carryables can clip through walls/floors if the player presses themselves right up against them.
+		// This isn't particularly noticeable to the player most of the time because of the weapon depth hack, 
+		// but it does mean that it's possible for the throwing arc to start *outside* the world, meaning that thrown/dropped items will disappear into the void.
+		// To get around this, we start the throwing arc slightly further back than the carryable's actual position
+		idVec3 newStart = currentState.i.position + (throwForward * -16);
+		currentState.i.position = newStart;
+		nextState.i.position = newStart;
+
 		lastDrawPoint = currentState.i.position;
 		lastOrientation = currentState.i.orientation;
 
@@ -15964,6 +15985,14 @@ void idPlayer::UpdateFocus( void ) {
 		return;
 	}
 
+	// SW 27th May 2025
+	// Don't focus on UIs while in memory palace (this puts the player into a state where they can't frob notes)
+	if (memorypalaceState != MEMP_NONE)
+	{
+		ClearFocus();
+		return;
+	}
+
 	// only update the focus character when attack button isn't pressed so players
 	// can still chainsaw NPC's
 	if ( gameLocal.isMultiplayer || ( !focusCharacter && ( usercmd.buttons & BUTTON_ATTACK ) ) ) {
@@ -16999,7 +17028,8 @@ void idPlayer::UpdateViewAngles( void ) {
 		}
 
 	}	
-	else if ((physicsObj.GetAcroType() == ACROTYPE_SPLITS || physicsObj.GetAcroType() == ACROTYPE_CEILINGHIDE || physicsObj.GetAcroType() == ACROTYPE_CARGOHIDE) && physicsObj.GetClamberState() == CLAMBERSTATE_ACRO)
+	// SW 28th May 2025: Don't apply view lock when spectating
+	else if ((physicsObj.GetAcroType() == ACROTYPE_SPLITS || physicsObj.GetAcroType() == ACROTYPE_CEILINGHIDE || physicsObj.GetAcroType() == ACROTYPE_CARGOHIDE) && physicsObj.GetClamberState() == CLAMBERSTATE_ACRO && !spectating)
 	{
 		//lock the viewangles when doing the splits.
 
@@ -21419,9 +21449,9 @@ void idPlayer::Think( void ) {
 	//centerView.Init( gameLocal.time, 200, viewAngles.pitch, 0 );
 	
 	
-
+	// SW 28th May 2025: don't let player inspect item while in mech
 	if ((usercmd.buttons & BUTTON_ZOOM) && !iteminspectActive && zoombuttonTimer + ZOOM_HOLDTIME_THRESHOLD < gameLocal.time && zoomWaitingForInitialRelease
-		&& !peekObject.IsValid()) //BC 2-27-2025: don't allow held item inspect while in peek.
+		&& !peekObject.IsValid() && mechTransitionState == MECHTRANSITION_NONE) //BC 2-27-2025: don't allow held item inspect while in peek.
 	{
 		//player held zoom button for a while. enter item inspect mode.
 		zoomWaitingForInitialRelease = false;
@@ -21816,7 +21846,8 @@ void idPlayer::Think( void ) {
 	}
 
 	//BC LEANING
-	if (usercmd.buttons & BUTTON_LEAN && !peekObject.IsValid() && !IsInMech() &&  !zoominspect_LabelmodeActive && !iteminspectActive ) // SW: Don't let the player lean inside a ventpeek!
+	//6-11-2025: disable lean during frozen camera.
+	if (usercmd.buttons & BUTTON_LEAN && !peekObject.IsValid() && !IsInMech() &&  !zoominspect_LabelmodeActive && !iteminspectActive && isFrozen == FROZ_NONE) // SW: Don't let the player lean inside a ventpeek!
 	{
 		if (leanState == LEANSTATE_OFF)
 		{
@@ -23471,6 +23502,10 @@ void idPlayer::DoPickpocketSuccess(idEntity* ent)
 
 	idEntityFx::StartFx(spawnArgs.GetString("fx_pickpocket_success"), &ent->GetPhysics()->GetOrigin(), &mat3_identity, NULL, false); //Twinkle particle fx.
 	ent->StopSound(SND_CHANNEL_PDA);
+	if (ent->spawnArgs.GetBool("takedamage", "1"))
+	{
+		ent->fl.takedamage = true; // SW 3rd June 2025: Fix issue where pickpocketed items would stay invincible
+	} 
 	ent->DoFrob(0, this);
 }
 
@@ -27475,7 +27510,8 @@ idPlayer::SetSpectateOrigin
 ===============
 */
 void idPlayer::SetSpectateOrigin( void ) {
-	idVec3 neworig = GetEyePosition();
+	// SW 3rd June 2025: Changing how this is calculated so that players entering spectate in vents don't end up in the damn void
+	idVec3 neworig = firstPersonViewOrigin;
 	SetOrigin( neworig );
 }
 
@@ -27961,7 +27997,7 @@ float idPlayer::GetAutoaimScore(const idVec3& targetPos, const idVec3& cameraPos
 
 void idPlayer::StartBashAttack()
 {
-	if (iteminspectActive || armstatsActive || GuiActive() || weapon.GetEntity()->IsInspectingChamber() || zoommodeActive) //don't allow bash attack if item is being inspected.
+	if (iteminspectActive || armstatsActive || GuiActive() || weapon.GetEntity()->IsInspectingChamber() || zoommodeActive || mechTransitionState != MECHTRANSITION_NONE) //don't allow bash attack if item is being inspected.
 		return;
 
 	if (gameLocal.time < nextAttackTime)
@@ -30175,6 +30211,13 @@ void idPlayer::SetHideState(idEntity * hideEnt, int hideType)
 	//{
 	//	DropCurrentCarryable(true);
 	//}
+
+	// SW 27th May 2025: Kick player out of fallen state if necessary
+	if (GetFallenState())
+	{
+		SetFallState(false, false);
+		physicsObj.SetImmediateExitFallState();
+	}
 	physicsObj.SetHideState(hideEnt, hideType);
 }
 

@@ -577,6 +577,80 @@ void idCatpodInterior::EquipSlots()
 
 }
 
+//Verify the player is being returned to a space that has clearance. This is helpful for things such as: if player was near doors that were about to close
+idVec3 idCatpodInterior::GetSafeLastPosition()
+{
+	idBounds playerbounds = gameLocal.GetLocalPlayer()->GetPhysics()->GetBounds();
+	playerbounds[1].z = pm_normalheight.GetFloat(); //When we teleport, it's in a standing stance. So we technically need clearance for standing size.
+	playerbounds.Expand(1);
+	
+	#define CANDIDATEOFFSETCOUNT 17
+	idVec3 candidateOffsets[] =
+	{
+		idVec3(0, 0, 0),
+	
+		idVec3(0, -32, 0),
+		idVec3(0, -64, 0),
+	
+		idVec3(-32, 0, 0),
+		idVec3(-64, 0, 0),
+	
+		idVec3(0, 32, 0),
+		idVec3(0, 64, 0),
+	
+		idVec3(32, 0, 0),
+		idVec3(64, 0, 0),
+
+
+		idVec3(0, -32, -76),
+		idVec3(0, -64, -76),
+
+		idVec3(-32, 0, -76),
+		idVec3(-64, 0, -76),
+
+		idVec3(0, 32, -76),
+		idVec3(0, 64, -76),
+
+		idVec3(32, 0, -76),
+		idVec3(64, 0, -76),
+	};
+
+	//Find best position that's closest to the original position.
+	float shortestDistance = 9999999;
+	idVec3 bestPosition = vec3_zero;
+	idVec3 candidateStartPosition = lastPlayerPosition;
+	for (int i = 0; i < CANDIDATEOFFSETCOUNT; i++)
+	{
+		idVec3 adjustedPos = candidateStartPosition + candidateOffsets[i];
+
+		int penetrationContents = gameLocal.clip.Contents(adjustedPos, NULL, mat3_identity, CONTENTS_SOLID, NULL);
+		if (penetrationContents & MASK_SOLID)
+		{
+			continue; //If it starts in solid, then skip it.
+		}
+
+		trace_t tr;		
+		gameLocal.clip.TraceBounds(tr, adjustedPos, adjustedPos, playerbounds, MASK_SOLID, NULL);
+		if (tr.fraction >= 1)
+		{
+			float dist = (adjustedPos - lastPlayerPosition).LengthSqr();
+			if (dist < shortestDistance)
+			{
+				shortestDistance = dist;
+				bestPosition = adjustedPos;
+			}
+		}
+	}
+
+	if (bestPosition == vec3_zero)
+	{
+		//couldn't find a good spot. Just use original position.
+		return lastPlayerPosition;
+	}
+
+	return bestPosition;
+}
+
 void idCatpodInterior::DoExitPod()
 {
 	//When player frobs the exit button
@@ -586,7 +660,7 @@ void idCatpodInterior::DoExitPod()
 	gameLocal.GetLocalPlayer()->SetViewFade(0, 0, 0, 0.0f, 500);
 
 	//Teleport player back to where they frobbed the pod.
-	gameLocal.GetLocalPlayer()->Teleport(lastPlayerPosition, lastPlayerViewangle, NULL);
+	gameLocal.GetLocalPlayer()->Teleport(GetSafeLastPosition(), lastPlayerViewangle, NULL);
 
 	
 	//Tell the cat pod to launch.

@@ -922,9 +922,12 @@ int idRenderWorldLocal::NumPortalsInArea( int areaNum ) {
 	int				count;
 	portal_t		*portal;
 
-	if ( areaNum >= numPortalAreas || areaNum < 0 ) {
-		common->Error( "idRenderWorld::NumPortalsInArea: bad areanum %i", areaNum );
-	}
+	// SW 27th May 2025: Changing common->Error to an assert so that we can get a call stack for the sh_library crash
+	assert(!(areaNum >= numPortalAreas || areaNum < 0));
+	//if ( areaNum >= numPortalAreas || areaNum < 0 ) {
+	//	common->Error( "idRenderWorld::NumPortalsInArea: bad areanum %i", areaNum );
+	//}
+
 	area = &portalAreas[areaNum];
 
 	count = 0;

@@ -26,6 +26,9 @@ public:
 
 	void					DebugFastForward();
 
+protected:
+	virtual void			Event_PartBlocked(idEntity* blockingEntity);
+
 private:
 
 

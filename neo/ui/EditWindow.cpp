@@ -417,10 +417,10 @@ const char *idEditWindow::HandleEvent(const sysEvent_t *event, bool *updateVisua
 			*updateVisuals = true;
 		}
 
-		if (key == K_MWHEELUP) {
+		if (key == K_MWHEELUP || key == K_JOY_STICK2_DOWN) {
 			key = K_UPARROW;
 		}
-		else if (key == K_MWHEELDOWN) {
+		else if (key == K_MWHEELDOWN || key == K_JOY_STICK2_UP) {
 			key = K_DOWNARROW;
 		}
 

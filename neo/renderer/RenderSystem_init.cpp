@@ -2661,6 +2661,8 @@ idRenderSystemLocal::ShutdownOpenGL
 */
 void idRenderSystemLocal::ShutdownOpenGL( void ) {
 	// free the context and close the window
+	GLimp_ClearFrameBuffers();
+	R_GLSL_Shutdown();
 	R_ShutdownFrameData();
 	GLimp_Shutdown();
 	glConfig.isInitialized = false;

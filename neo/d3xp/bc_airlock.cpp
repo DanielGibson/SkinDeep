@@ -552,7 +552,7 @@ void idAirlock::Spawn(void)
 	}
 
 
-	if (1)
+	if (spawnArgs.GetBool("warninglabel", "1"))
 	{
 		//Spawn the pressure regulator sign inspectable
 		//idVec3 forward, right, up;

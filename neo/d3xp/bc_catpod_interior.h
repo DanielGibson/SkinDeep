@@ -73,6 +73,8 @@ private:
 	// SW 10th March 2025
 	idList<idMoveableItem*>		GetItemsInside(void);
 	
+	//BC 6-11-2025 verify player is returned to space that has clearance
+	idVec3					GetSafeLastPosition();
 
 
 };

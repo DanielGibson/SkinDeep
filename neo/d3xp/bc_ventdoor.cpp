@@ -201,8 +201,8 @@ idVec3 idVentdoor::GetPlayerDestinationPos()
 			int offsetAmount;
 			idAngles doorAngle = GetPhysics()->GetAxis().ToAngles();
 
-			int adjustedYaw = ( int )( doorAngle.yaw );
-			if ( adjustedYaw == 0 || adjustedYaw == 179 || adjustedYaw == 89 || adjustedYaw == -89 )
+  			float orthoTest = fmod( idMath::Fabs(doorAngle.yaw), 90.0f );
+			if ( orthoTest < 1.0f || orthoTest > 89.0f )
 				offsetAmount = 24;
 			else
 				offsetAmount = 32;
@@ -239,7 +239,17 @@ idVec3 idVentdoor::GetPlayerDestinationPos()
 			}
 			else
 			{
-				playerDestinationPosition = downTr.endpos;
+				if (offsetAmount >= 32)
+				{	// if diag offset, first check that end pos is actually lower than the closer ortho offset
+					idVec3 candidatePosClose = GetPhysics()->GetOrigin() + ( downDir * 24 );
+					trace_t downTrClose;
+					gameLocal.clip.TracePoint(downTrClose, candidatePosClose, candidatePosClose + idVec3(0, 0, -80), MASK_SOLID, this);
+					playerDestinationPosition = downTr.endpos.z < downTrClose.endpos.z ? downTrClose.endpos : downTr.endpos;
+				}
+				else
+				{
+					playerDestinationPosition = downTr.endpos;
+				}
 			}
 		}
 		else

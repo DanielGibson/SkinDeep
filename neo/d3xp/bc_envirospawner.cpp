@@ -256,7 +256,11 @@ void idEnviroSpawner::SpawnElement()
 			}
 		}
 		if (insideOccluders)
+		{
+			randomSpawnPos = vec3_zero; // SW 4th June 2025: Prevent spawnpos inside occluder from being used if it's our final attempt
 			continue;
+		}
+			
 		
 		// Iterate backwards through our list of asteroid entries and see which type we're spawning here
 		for (int i = asteroidEntries.Num() - 1; i >= 0; i--)

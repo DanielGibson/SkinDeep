@@ -88,7 +88,13 @@ void idInterestPoint::Save(idSaveGame *savefile) const
 	savefile->WriteBool( isClaimed ); // bool isClaimed
 	claimant.Save( savefile ); // idEntityPtr<idAI> claimant
 
-	SaveFileWriteArray(observers, observers.Num(), WriteObject); // idList<idAI*> observers
+	// idList<idEntityPtr<idAI>> observers
+	int numObservers = observers.Num();
+	savefile->WriteInt(numObservers);
+	for (int i = 0; i < numObservers; i++) {
+		observers[i].Save(savefile);
+	}
+
 	savefile->WriteBool( cleanupWhenUnobserved ); // bool cleanupWhenUnobserved
 	savefile->WriteBool( forceCombat ); // bool forceCombat
 	savefile->WriteBool( onlyLocalPVS ); // bool onlyLocalPVS
@@ -120,7 +126,23 @@ void idInterestPoint::Restore(idRestoreGame *savefile)
 	savefile->ReadBool( isClaimed ); // bool isClaimed
 	claimant.Restore( savefile ); // idEntityPtr<idAI> claimant
 
-	SaveFileReadListCast(observers, ReadObject, idClass*&); // idList<idAI*> observers
+	if (savefile->GetSaveVersion() < SAVEGAME_VERSION_0004) {
+		idList<idAI*> observersTemp;
+		SaveFileReadListCast(observersTemp, ReadObject, idClass*&); // idList<idAI*> observers
+		for (int i = 0; i < observersTemp.Num(); i++) {
+			idEntityPtr<idAI> observer;
+			observer = observersTemp[i];
+			observers.Append(observer);
+		}
+	} else {
+		int numObservers = 0;
+		savefile->ReadInt(numObservers);
+		observers.SetNum(numObservers);
+		for (int i = 0; i < numObservers; i++) {
+			observers[i].Restore(savefile);
+		}
+	}
+
 	savefile->ReadBool( cleanupWhenUnobserved ); // bool cleanupWhenUnobserved
 	savefile->ReadBool( forceCombat ); // bool forceCombat
 	savefile->ReadBool( onlyLocalPVS ); // bool onlyLocalPVS
@@ -176,9 +198,9 @@ void idInterestPoint::Think()
 			gameRenderWorld->DebugLine(colorWhite, this->GetPhysics()->GetOrigin(), this->claimant.GetEntity()->GetPhysics()->GetOrigin(), 4);
 		for (int i = 0; i < observers.Num(); i++)
 		{
-			if (observers[i] != NULL)
+			if (observers[i].IsValid())
 			{
-				gameRenderWorld->DebugLine(debugcolor * 0.25, this->GetPhysics()->GetOrigin(), observers[i]->GetPhysics()->GetOrigin(), 4);
+				gameRenderWorld->DebugLine(debugcolor * 0.25, this->GetPhysics()->GetOrigin(), observers[i].GetEntity()->GetPhysics()->GetOrigin(), 4);
 			}
 		}
 	}
@@ -204,17 +226,23 @@ int idInterestPoint::GetExpirationTime(void)
 
 void idInterestPoint::AddObserver(idAI* observer)
 {
-	observers.Append(observer);
+	idEntityPtr<idAI> ptr;
+	ptr = observer;
+	observers.Append(ptr);
 }
 
 void idInterestPoint::RemoveObserver(idAI* observer)
 {
-	observers.Remove(observer);
+	idEntityPtr<idAI> ptr;
+	ptr = observer;
+	observers.Remove(ptr);
 }
 
 bool idInterestPoint::HasObserver(idAI* observer)
 {
-	return observers.Find(observer) != NULL;
+	idEntityPtr<idAI> ptr;
+	ptr = observer;
+	return observers.Find(ptr) != NULL;
 }
 
 void idInterestPoint::ClearObservers(void)

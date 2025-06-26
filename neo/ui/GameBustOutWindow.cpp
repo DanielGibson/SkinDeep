@@ -53,6 +53,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "idlib/LangDict.h"
 
 #include "ui/GameBustOutWindow.h"
+#include "Game_local.h"
 
 #define BALL_RADIUS		12.f
 #define BALL_SPEED		300.f //BC was 250
@@ -445,6 +446,7 @@ collideDir_t BOBrick::checkCollision( idVec2 pos, idVec2 vel ) {
 */
 idGameBustOutWindow::idGameBustOutWindow(idDeviceContext *d, idUserInterfaceLocal *g) : idWindow(d, g) {
 	highScore = DEFAULT_HIGHSCORE;
+	gameLocal.persistentLevelInfo.GetInt("bustOutHighScore", "0", highScore);
 	dc = d;
 	gui = g;
 	CommonInit();
@@ -452,6 +454,7 @@ idGameBustOutWindow::idGameBustOutWindow(idDeviceContext *d, idUserInterfaceLoca
 
 idGameBustOutWindow::idGameBustOutWindow(idUserInterfaceLocal *g) : idWindow(g) {
 	highScore = DEFAULT_HIGHSCORE;
+	gameLocal.persistentLevelInfo.GetInt("bustOutHighScore", "0", highScore);
 	gui = g;
 	CommonInit();
 }
@@ -892,6 +895,7 @@ void idGameBustOutWindow::UpdateScore() {
 			//Player has a new high score.
 			highscorestringToDisplay = common->GetLanguageDict()->GetString("#str_gui_arcade_newhighscore");
 			highScore = gemCounter;
+			gameLocal.persistentLevelInfo.SetInt("bustOutHighScore", highScore);
 		}
 		else
 		{
