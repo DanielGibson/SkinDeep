@@ -921,10 +921,19 @@ int idRenderWorldLocal::NumPortalsInArea( int areaNum ) {
 	portal_t		*portal;
 
 	// SW 27th May 2025: Changing common->Error to an assert so that we can get a call stack for the sh_library crash
-	assert(!(areaNum >= numPortalAreas || areaNum < 0));
-	//if ( areaNum >= numPortalAreas || areaNum < 0 ) {
-	//	common->Error( "idRenderWorld::NumPortalsInArea: bad areanum %i", areaNum );
-	//}
+	//assert(!(areaNum >= numPortalAreas || areaNum < 0));
+
+	if ( areaNum >= numPortalAreas || areaNum < 0 )
+	{
+		//common->Error( "idRenderWorld::NumPortalsInArea: bad areanum %i", areaNum );
+		common->Warning("idRenderWorld::NumPortalsInArea: bad areanum %i", areaNum);
+
+		//BC 8-18-1025: There's a crash where areanum is sometimes -1, which results in a crash/assert.
+		//Can't figure out exactly what is causing it, and seems to happen in various maps. Best guess is
+		//it's some sort of specific visportal layout that the engine doesn't cooperate with.
+		//For now, hack fix to make game not crash. Just return zero portals found if it errors out.
+		return 0;
+	}
 
 	area = &portalAreas[areaNum];
 
