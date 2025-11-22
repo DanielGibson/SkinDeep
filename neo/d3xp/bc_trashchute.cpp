@@ -8,6 +8,8 @@
 
 //#include "trigger.h"
 
+#include "bc_spearprojectile.h"
+
 #include "bc_trashexit.h"
 #include "bc_trashchute.h"
 
@@ -264,6 +266,11 @@ void idTrashchute::Think(void)
 							continue;
 						}
 					}
+
+					//BC 10-01-2025: SD 694 fix issue where trashchute is slurping up spearbot currently impaled in player.
+					if (ent->IsType(idSpearprojectile::Type))
+						continue;
+
 
 					//if (((ent->IsType(idMoveableItem::Type) || ent->IsType(idMoveable::Type)) && ent->IsAtRest()) || ent->IsType(idActor::Type))
 					if (((ent->IsType(idMoveableItem::Type) || ent->IsType(idMoveable::Type))) || ent->IsType(idActor::Type))
