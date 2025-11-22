@@ -26,6 +26,8 @@ private:
 
 	int						maxhealth;
 
+	void					PushObjects();
+
 
 };
 //#pragma once
