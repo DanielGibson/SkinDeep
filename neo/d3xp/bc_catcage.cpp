@@ -656,6 +656,7 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 		return true;
 	}
 
+	idEntity* lostKeyEnt = nullptr;
 	idLocationEntity* cageLoc = gameLocal.LocationForEntity(this);
 	idEntityPtr<idLocationEntity> closestCatKeyLoc;
 	closestCatKeyLoc = NULL;
@@ -716,6 +717,7 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 			{
 				//If the key somehow ended up in a place that does not have a location...
 				fallbackPosition = ent->GetPhysics()->GetOrigin();
+				lostKeyEnt = ent;
 			}
 		}
 	}
@@ -727,17 +729,16 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 		return true;
 	}
 
-
-	//Check lost and found.
-	if (gameLocal.GetLocalPlayer()->IsEntityLostInSpace("item_cat_key"))
-	{
-		SetWordbubble("#str_def_gameplay_catcage_lostfound");
-		return true;
-	}
-
 	//Do fallback of the cat XYZ position.
 	if (fallbackPosition != vec3_zero)
 	{
+		//BC 8-14-2025: if in a place that has no location entity, then just cast it into outer space so lost and found system can take care of it.
+		if (lostKeyEnt != nullptr)
+		{
+			static_cast<idMoveableItem*>(lostKeyEnt)->SetLostInSpace();
+		}
+
+		/*
 		SetWordbubble("#str_def_gameplay_catcage_arrow");
 		//gameRenderWorld->DebugArrow(colorWhite, this->GetPhysics()->GetOrigin(), fallbackPosition, 8, 90000);
 
@@ -746,7 +747,13 @@ bool idCatcage::DoFrobHold(int index, idEntity* frobber)
 		arrowActive = true;
 		arrowProp->GetPhysics()->SetOrigin(fallbackPosition + idVec3(0,0,4));
 		arrowProp->Show();
+		*/
+	}
 
+	//Check lost and found.
+	if (gameLocal.GetLocalPlayer()->IsEntityLostInSpace("item_cat_key"))
+	{
+		SetWordbubble("#str_def_gameplay_catcage_lostfound");
 		return true;
 	}
 
