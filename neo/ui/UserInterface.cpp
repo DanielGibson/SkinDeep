@@ -829,6 +829,23 @@ void idUserInterfaceLocal::RecurseSetKeyBindingNames( idWindow *window ) {
 	int i;
 	idWinVar *v = window->GetWinVarByName( "bind" );
 	if ( v ) {
+
+		//BC 10-02-2025: SD 698 Controls reset bug. This is a pretty bad hack fix.
+		// 
+		//This addresses the issue where a gamepad player can click on a keyboard bind
+		//and then click the Reset Controls button, and enter a weird soft lock state
+		//for the bind system.
+		//
+		//This fix forces the bindwindow to exit its "waitingOnKey" state. Refer to
+		//idBindWindow::HandleEvent to see what this connects to.
+		bool updateVisuals = false;
+		sysEvent_t  ev;
+		memset(&ev, 0, sizeof(ev));
+		ev.evType = SE_MOUSEWIN;
+		ev.evValue = 7777;
+		window->HandleEvent(&ev, &updateVisuals);
+
+
 		SetStateString( v->GetName(), idKeyInput::KeysFromBinding( v->GetName(), window->controllerBinding ) );
 	}
 	i = 0;

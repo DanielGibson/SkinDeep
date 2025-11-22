@@ -82,6 +82,13 @@ void idBindWindow::ReadFromSaveGame( idRestoreGame *savefile )
 const char *idBindWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) {
 	static char ret[ 256 ];
 
+	//BC 10-02-2025: SD 698. A hack fix, yikes, oof.
+	if (event->evType == SE_MOUSEWIN && event->evValue == 7777)
+	{
+		waitingOnKey = false;
+	}
+
+
 	if (!(event->evType == SE_KEY && event->evValue2)) {
 		return "";
 	}
