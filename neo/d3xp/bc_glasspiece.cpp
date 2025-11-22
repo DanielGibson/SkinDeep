@@ -177,7 +177,8 @@ void idGlassPiece::Event_Touch(idEntity *other, trace_t *trace)
 	{
 		//Player was NOT looking down.
 		//if (other->IsType(idPlayer::Type) && !gameLocal.GetLocalPlayer()->IsCrouching() && (gameLocal.GetLocalPlayer()->usercmd.forwardmove != 0 || gameLocal.GetLocalPlayer()->usercmd.rightmove != 0))
-		if (other->IsType(idPlayer::Type) && !gameLocal.GetLocalPlayer()->IsCrouching() && gameLocal.GetLocalPlayer()->GetPhysics()->GetLinearVelocity().Length() > 0)
+		if (other->IsType(idPlayer::Type) && !gameLocal.GetLocalPlayer()->IsCrouching() && gameLocal.GetLocalPlayer()->GetPhysics()->GetLinearVelocity().Length() > 0
+			&& !gameLocal.GetLocalPlayer()->IsInMech() /*BC 10-1-2025: SD-695 don't do glasswound if player is in mech*/ )
 		{
 			//Puncture the foot.		
 			trace_t floorPos;
