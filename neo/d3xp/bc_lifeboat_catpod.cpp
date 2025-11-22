@@ -455,3 +455,13 @@ int idCatpod::GetCatsAwaitingRescue()
 	return amount;
 }
 
+void idCatpod::Damage(idEntity* inflictor, idEntity* attacker, const idVec3& dir, const char* damageDefName, const float damageScale, const int location, const int materialType)
+{
+	//BC 10-1-2025: SD 693: ignore damage if 1. All cats are inside the pod, and 2. The player hasn't yet entered the pod.
+	//This resolves an issue where the player can enter a weird state where all cats are deposited but the pod
+	//emergency leaves before the player can be teleported into the pod.
+	if (IsAllCatsRescued() && doFinalCatSequence)
+		return;
+	
+	idLifeboat::Damage(inflictor, attacker, dir, damageDefName, damageScale, location, materialType);
+}
