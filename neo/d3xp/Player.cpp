@@ -15558,6 +15558,21 @@ void idPlayer::LevelselectMenuOpen(int value)
 		return;
 	}
 
+	//BC 8-14-2025: hack kludge to fix issue where the gui's 3D rotating medal icon was messing up rendering in the game world.
+	//Force it to hide coins and select the first level (tutorial) that has no medals.
+	if (levelselectMenu && levelselectGuiList)
+	{
+		//Make the gui's 3D models all hidden.
+		levelselectMenu->SetStateBool("showmilestones", 0); //BC 9-29-2025: completely hiding the milestone list seems to be a cleaner "fix" (hack)
+		levelselectMenu->SetStateBool("milestonecoin1_visible", 0);
+		levelselectMenu->SetStateBool("milestonecoin2_visible", 0);
+		levelselectMenu->SetStateBool("milestonecoin3_visible", 0);
+
+		//Revert to the first item in the list.
+		levelselectGuiList->SetSelection(0);
+		OnSelectLevelselectIndex(0);		
+	}
+
 	session->SetGUI(NULL, NULL);
 	levelselectMenuActive = false;
 	//static_cast<idUserInterfaceLocal*>(levelselectMenu)->GetDesktop()->SetFlag(WIN_NOCURSOR);
