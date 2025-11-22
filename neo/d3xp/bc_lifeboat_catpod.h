@@ -16,6 +16,7 @@ public:
 
 
 	virtual bool			DoFrob(int index = 0, idEntity * frobber = NULL);
+	virtual void			Damage(idEntity* inflictor, idEntity* attacker, const idVec3& dir, const char* damageDefName, const float damageScale, const int location, const int materialType = SURFTYPE_NONE);
 
 protected:
 
