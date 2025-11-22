@@ -646,6 +646,25 @@ void idGunnerMonster::HasArriveAtPathNode()
 	if (currentPathTarget.GetEntity()->spawnArgs.GetBool("use_yaw"))
 	{
 		//we want to lerp position/yaw to the pathnode.
+
+
+		//BC 8-18-2025: check whether we're physically near the path node.
+		//If we exit search state, we sometimes inadvertently teleport to the path anim node.
+		//Avoid this issue by doing a distance check.
+		if (currentPathTarget.GetEntity()->spawnArgs.GetBool("use_position", "1"))
+		{
+			//Get distance to node.
+			float distanceToAnimNode = (currentPathTarget.GetEntity()->GetPhysics()->GetOrigin() - GetPhysics()->GetOrigin()).Length();
+			if (distanceToAnimNode > ARRIVAL_DISTANCE)
+			{
+				//If too far from node, then skip to next node.
+				customIdleAnim.Empty();
+				GotoNextPathNode();
+				return;
+			}
+		}		
+
+
 		idlenodePositionSnapped = false;
 		idlenodeStartTime = gameLocal.time;
 		
